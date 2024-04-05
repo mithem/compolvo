@@ -30,7 +30,8 @@ create or replace table service
     id               int auto_increment
         primary key,
     retrieval_data   text                                        not null,
-    retrieval_method enum ('command', 'apt', 'compolvo_package') not null
+    retrieval_method enum ('command', 'apt', 'compolvo_package') not null,
+    current_version  tinytext                                    null
 );
 
 create or replace table agent_software
