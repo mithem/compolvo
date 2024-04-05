@@ -1,0 +1,9 @@
+services:
+  mariadb:
+    container_name: mariadb
+    image: mariadb:11.3
+    ports:
+      - target: 3306
+        published: 3306
+    environment:
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: true
