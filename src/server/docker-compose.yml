@@ -7,3 +7,12 @@ services:
         published: 3306
     environment:
       MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: true
+  compolvo-server:
+    container_name: compolvo-server
+    ports:
+      - target: 8000
+        published: 8000
+    build:
+      context: .
+      labels:
+        - compolvo-server:latest

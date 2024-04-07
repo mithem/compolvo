@@ -1,0 +1,29 @@
+POST http://localhost:8000/api/user
+Content-Type: application/json
+
+{
+  "name": "Thomas Meier",
+  "email": "hello@example.com",
+  "password": "1234"
+}
+
+###
+
+PATCH http://localhost:8000/api/user
+
+{
+  "email": "hello@example.com",
+  "new_name": "Thomas Meyer"
+}
+
+###
+
+GET http://localhost:8000/api/user
+
+###
+
+DELETE http://localhost:8000/api/user
+
+{
+  "email": "hello@example.com"
+}
