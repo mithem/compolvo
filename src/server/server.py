@@ -1,9 +1,9 @@
+import os
 import secrets
 import string
 
-import sanic_beskar
-from sanic import Sanic, redirect, HTTPResponse, Request, text, json
-from sanic.errorpages import BadRequest
+from sanic import Sanic, redirect, HTTPResponse, Request, text
+from sanic.exceptions import BadRequest, NotFound
 from sanic_beskar import Beskar
 from sanic_beskar.exceptions import AuthenticationError, TOTPRequired
 from tortoise.contrib.sanic import register_tortoise
@@ -14,11 +14,12 @@ from compolvo.models import User, Service, Serializable
 app = Sanic("compolvo")
 beskar = Beskar()
 
-#app.config.SECRET_KEY = "".join(secrets.choice(string.ascii_letters) for i in range(32))
-app.config.SECRET_KEY = "helloworld"
+app.config.SECRET_KEY = "".join(secrets.choice(string.ascii_letters) for i in range(32))
 
 beskar.init_app(app, User)
-register_tortoise(app, db_url='mysql://root:@localhost:3306/compolvo',
+db_hostname = os.environ[
+    "DB_HOSTNAME"]  # TODO: Make other parameters configurable via environment variables
+register_tortoise(app, db_url=f'mysql://root:@{db_hostname}:3306/compolvo',
                   modules={'models': ['compolvo.models']}, generate_schemas=True)
 
 
@@ -56,14 +57,15 @@ async def login(request: Request):
     except (AuthenticationError, TOTPRequired) as e:
         raise BadRequest("Invalid email or password.") from e
 
+
 @app.get("/protected")
-@sanic_beskar.auth_required
+# @sanic_beskar.auth_required
 async def protected(request):
     return text("You're accessing a protected page!")
 
 
 @app.get("/api/user")
-@sanic_beskar.roles_required(["admin"])
+# @sanic_beskar.roles_required(["admin"])
 async def get_users(request):
     return await Serializable.all_json(User)
 
@@ -71,12 +73,11 @@ async def get_users(request):
 @app.post("/api/user")
 async def create_user(request):
     try:
-        user = User(
+        user = await User.create(
             name=request.json["name"],
             email=request.json["email"],
             password=beskar.hash_password(request.json["password"])
         )
-        await user.save()
         return user.json()
     except KeyError:
         raise BadRequest("Missing name, email, or password.")
@@ -121,5 +122,48 @@ async def get_services(request):
     return await Serializable.all_json(Service)
 
 
+@app.post("/api/service")
+async def create_service(request):
+    service = await Service.create(
+        name=request.json["name"],
+        retrieval_method=request.json["retrieval_method"],
+        retrieval_data=request.json["retrieval_data"]
+    )
+    return service.json()
+
+
+@app.get("/api/version")
+async def version(request):
+    return text("1.0.0a1")
+
+
+@app.patch("/api/service")
+async def update_service(request):
+    service = await Service.get_or_none(id=request.args["id"][0])
+    print("Service: " + str(service))
+    if service is None:
+        raise NotFound("Service not found.")
+
+    new_name = request.json.get("name", None)
+    if new_name is not None:
+        service.name = new_name
+    new_retrieval_method = request.json.get("retrieval_method", None)
+    if new_retrieval_method is not None:
+        service.retrieval_method = new_retrieval_method
+    new_retrieval_data = request.json.get("retrieval_data", None)
+    if new_retrieval_data is not None:
+        service.retrieval_data = str(new_retrieval_data)
+    await service.save()
+    return service.json()
+
+
+@app.delete("/api/service")
+async def delete_service(request):
+    service = await Service.get_or_none(id=request.args["id"][0])
+    if service is None:
+        raise NotFound("Service not found.")
+    await service.delete()
+    return HTTPResponse(status=204)
+
 if __name__ == "__main__":
-    app.run()
+    app.run("0.0.0.0")

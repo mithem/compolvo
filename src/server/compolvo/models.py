@@ -1,11 +1,12 @@
-import asyncio
 from enum import IntEnum
 from typing import List, Type
 
 from sanic import json
-from tortoise.models import Model
-from tortoise.fields import UUIDField, TextField, CharField, IntEnumField, FloatField, IntField, DatetimeField, BooleanField, ForeignKeyField
 from tortoise import run_async
+from tortoise.fields import UUIDField, TextField, CharField, IntEnumField, FloatField, IntField, \
+    DatetimeField, BooleanField, ForeignKeyField
+from tortoise.models import Model
+
 
 class Serializable:
     fields: List[str]
@@ -14,6 +15,8 @@ class Serializable:
         data = {}
         for field in self.fields:
             value = getattr(self, field)
+            if field == "id":
+                value = str(value)
             data[field] = value
         return data
 
@@ -37,7 +40,7 @@ class User(Model, Serializable):
     email = CharField(255, unique=True)
     password = TextField(null=True)
 
-    fields = ["name", "email", "password"]
+    fields = ["name", "email"]
 
     @property
     def rolenames(self):
@@ -81,11 +84,12 @@ class Service(Model, Serializable):
         COMPOLVO_PACKAGE = 3
 
     id = UUIDField(pk=True)
+    name = TextField()
     retrieval_method = IntEnumField(RetrievalMethod)
     retrieval_data = TextField()
     latest_version = TextField(null=True)
 
-    fields = ["retrieval_method", "retrieval_data", "latest_version"]
+    fields = ["id", "name", "retrieval_method", "retrieval_data", "latest_version"]
 
 class ServiceOffering(Model, Serializable):
     id = UUIDField(pk=True)
