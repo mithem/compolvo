@@ -1,17 +1,19 @@
+import datetime
 import os
 import secrets
 import string
 
-from sanic import Sanic, redirect, Request, text, Blueprint
+from sanic import Sanic, redirect, Request, text, Blueprint, json, HTTPResponse
 from sanic.exceptions import BadRequest, NotFound
 from sanic_beskar import Beskar
 from sanic_beskar.exceptions import AuthenticationError, TOTPRequired
+from sanic_openapi import openapi
 from tortoise.contrib.sanic import register_tortoise
 
 from compolvo import cors
 from compolvo import options
 from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint
-from compolvo.models import User, Service, Serializable, ServiceOffering, ServicePlan
+from compolvo.models import User, Service, Serializable, ServiceOffering, ServicePlan, Tag
 
 app = Sanic("compolvo")
 beskar = Beskar()
@@ -24,17 +26,15 @@ db_hostname = os.environ[
 register_tortoise(app, db_url=f'mysql://root:@{db_hostname}:3306/compolvo',
                   modules={'models': ['compolvo.models']}, generate_schemas=True)
 
-api = Blueprint("api", url_prefix="/api")
 user = Blueprint("user", url_prefix="/api/user")
 service = Blueprint("service", url_prefix="/api/service")
 service_offering = Blueprint("service_offering", url_prefix="/api/service/offering")
 service_plan = Blueprint("service_plan", url_prefix="/api/service/plan")
+tag = Blueprint("tag", url_prefix="/api/tag")
+service_group = Blueprint.group(service, service_offering, service_plan)
+api = Blueprint.group(user, service_group, tag)
 
 app.blueprint(api)
-app.blueprint(user)
-app.blueprint(service)
-app.blueprint(service_offering)
-app.blueprint(service_plan)
 
 app.register_middleware(cors.add_cors_headers, "response")
 
@@ -113,8 +113,17 @@ async def delete_user(request, user):
 
 
 @service.get("/")
-async def get_services(request):
-    return await Serializable.all_json(Service)
+@get_endpoint(Service)
+@openapi.summary("Get all services")
+@openapi.description(
+    "By default, returns a JSON list of all services including tags. If a `id` is specified in the query args, only that specific service will be returned (provided it is found).")
+# @openapi.response(200, {"application/json": Union[List[Service], Service]})
+async def get_services(request, services):
+    if services is list:
+        return json(
+            [{**await svc.to_dict(), "tags": [await tag.to_dict() for tag in await svc.tags]} for
+             svc in
+             services])
 
 
 @service.post("/")
@@ -128,11 +137,6 @@ async def create_service(request):
         retrieval_data=request.json["retrieval_data"]
     )
     return await service.json()
-
-
-@api.get("/version")
-async def version(request):
-    return text("1.0.0a1")
 
 
 @service.patch("/")
@@ -149,7 +153,7 @@ async def delete_service(request, svc):
 
 @service_offering.get("/")
 @get_endpoint(ServiceOffering)
-async def get_service_offerings(request):
+async def get_service_offerings(request, offerings):
     pass
 
 
@@ -166,7 +170,7 @@ async def create_service_offering(request):
             duration_days=request.json["duration_days"],
             service=svc
         )
-        return offering.json()
+        return await offering.json()
     except KeyError:
         raise BadRequest(
             "Missing parameters. Please provide service, name, price, and duration_days.")
@@ -182,6 +186,95 @@ async def update_service_offering(request, offering):
 @delete_endpoint(ServiceOffering)
 async def delete_service_offering(request, offering):
     pass
+
+
+@service_plan.get("/")
+@get_endpoint(ServicePlan)
+async def get_service_plans(request, plans):
+    pass
+
+
+@service_plan.post("/")
+async def create_service_plan(request):
+    try:
+        user_id = request.json["user"]
+        user = await User.get(id=user_id)
+        service_offering_id = request.json["service_offering"]
+        offering = await ServiceOffering.get(id=service_offering_id)
+        start_date = request.json.get("start_date")
+        start = datetime.date.fromisoformat(
+            start_date) if start_date is not None else datetime.datetime.now()
+        data = {"user": user, "service_offering": offering, "start_date": start}
+        end = request.json.get("end_date")
+        if end is not None:
+            data = {**data, "end_date": datetime.datetime.fromisoformat(end)}
+        plan = await ServicePlan.create(**data)
+        return await plan.json()
+    except KeyError:
+        raise BadRequest("Missing parameters. Required: service_offering, and user.")
+
+
+@service_plan.patch("/")
+@patch_endpoint(ServicePlan)
+async def update_service_plan(request, plan):
+    pass
+
+
+@service_plan.delete("/")
+@delete_endpoint(ServicePlan)
+async def delete_service_plan(request):
+    pass
+
+
+@tag.get("/")
+@get_endpoint(Tag)
+async def get_tags(request, tags):
+    pass
+
+
+@tag.post("/")
+async def create_tag(request):
+    try:
+        label = request.json["label"]
+        tag = await Tag.create(label=label)
+        return await tag.json()
+    except KeyError:
+        raise BadRequest("Missing parameters. Requires: label.")
+
+
+@tag.patch("/")
+@patch_endpoint(Tag)
+async def update_tag(request, tag):
+    pass
+
+
+@tag.delete("/")
+@delete_endpoint(Tag)
+async def delete_tag(request, tag):
+    pass
+
+
+async def _get_svc_and_tag(request):
+    try:
+        service = await Service.get(id=request.json["service"])
+        tag = await Tag.get(id=request.json["tag"])
+        return service, tag
+    except KeyError:
+        raise BadRequest("Missing parameter(s). Required: service, tag (both as ids).")
+
+
+@service.post("/tag")
+async def associate_tag_with_service(request):
+    svc, tag = await _get_svc_and_tag(request)
+    await svc.tags.add(tag)
+    return HTTPResponse(status=204)
+
+
+@service.delete("/tag")
+async def deassociate_tag_with_service(request):
+    svc, tag = await _get_svc_and_tag(request)
+    await svc.tags.remove(tag)
+    return HTTPResponse(status=204)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,9 @@
+POST http://localhost:8000/api/tag
+
+{
+  "label": "Developers"
+}
+
+###
+
+DELETE http://localhost:8000/api/tag?id=594b7780-c9c6-4a01-b343-4c0d23fb2f92
