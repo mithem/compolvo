@@ -95,11 +95,15 @@ class Service(Model, Serializable):
 
     id = UUIDField(pk=True)
     name = TextField()
+    description = TextField(null=True)
+    license = TextField(null=True)
+    download_count = IntField(null=True)
     retrieval_method = IntEnumField(RetrievalMethod)
     retrieval_data = TextField()
     latest_version = TextField(null=True)
 
-    fields = ["id", "name", "retrieval_method", "retrieval_data", "latest_version"]
+    fields = ["id", "name", "description", "license", "download_count", "retrieval_method",
+              "retrieval_data", "latest_version"]
 
 
 class ServiceOffering(Model, Serializable):
