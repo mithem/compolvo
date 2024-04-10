@@ -7,9 +7,8 @@ from sanic.exceptions import BadRequest, NotFound
 from sanic_beskar import Beskar
 from sanic_beskar.exceptions import AuthenticationError, TOTPRequired
 from tortoise.contrib.sanic import register_tortoise
-from tortoise.exceptions import IntegrityError
 
-from compolvo.decorators import patch_endpoint, delete_endpoint
+from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint
 from compolvo.models import User, Service, Serializable, ServiceOffering
 
 app = Sanic("compolvo")
@@ -92,8 +91,6 @@ async def create_user(request):
         return user.json()
     except KeyError:
         raise BadRequest("Missing name, email, or password.")
-    except IntegrityError:
-        raise BadRequest("User with specified email already exists.")
 
 
 @user.patch("/")
@@ -120,7 +117,7 @@ async def create_service(request):
         retrieval_method=request.json["retrieval_method"],
         retrieval_data=request.json["retrieval_data"]
     )
-    return service.json()
+    return await service.json()
 
 
 @api.get("/version")
@@ -141,11 +138,9 @@ async def delete_service(request, svc):
 
 
 @service_offering.get("/")
+@get_endpoint(ServiceOffering)
 async def get_service_offerings(request):
-    service_id = request.args.get("id")
-    if service_id is None:
-        return await Serializable.all_json(ServiceOffering)
-    return await Serializable.list_json(await ServiceOffering.filter(service=service_id[0]))
+    pass
 
 
 @service_offering.post("/")
