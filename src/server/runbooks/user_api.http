@@ -1,0 +1,29 @@
+POST http://localhost:8000/api/user
+Content-Type: application/json
+
+{
+  "name": "Thomas Meier",
+  "email": "hello@example.com",
+  "password": "1234"
+}
+
+###
+
+PATCH http://localhost:8000/api/user?id=bc7c2d7e-d460-4ad4-8725-d5380136c697
+
+{
+  "email": "hello@world.com",
+  "name": "Thomas Meyer"
+}
+
+###
+
+GET http://localhost:8000/api/user
+
+###
+
+DELETE http://localhost:8000/api/user?id=bc7c2d7e-d460-4ad4-8725-d5380136c697
+
+{
+  "email": "hello@example.com"
+}
