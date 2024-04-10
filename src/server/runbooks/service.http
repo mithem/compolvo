@@ -1,0 +1,23 @@
+POST http://localhost:8000/api/service
+
+{
+  "name": "compolvo-server",
+  "retrieval_method": 1,
+  "retrieval_data": {
+    "link": "http://localhost:8000/api/version",
+    "regex": "(?<version>.+)"
+  }
+}
+
+###
+
+PATCH http://localhost:8000/api/service?id=52df2bad-8e34-4472-8920-19b79312d423
+
+{
+  "name": "Compolvo (Server)",
+  "retrieval_method": 2
+}
+
+###
+
+DELETE http://localhost:8000/api/service?id=52df2bad-8e34-4472-8920-19b79312d423
