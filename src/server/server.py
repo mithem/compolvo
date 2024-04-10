@@ -121,6 +121,9 @@ async def get_services(request):
 async def create_service(request):
     service = await Service.create(
         name=request.json["name"],
+        description=request.json.get("description"),
+        license=request.json.get("license"),
+        download_count=request.json.get("download_count"),
         retrieval_method=request.json["retrieval_method"],
         retrieval_data=request.json["retrieval_data"]
     )

@@ -2,6 +2,9 @@ POST http://localhost:8000/api/service
 
 {
   "name": "compolvo-server",
+  "description": "Demo description",
+  "license": "MIT",
+  "download_count": 69,
   "retrieval_method": 1,
   "retrieval_data": {
     "link": "http://localhost:8000/api/version",
