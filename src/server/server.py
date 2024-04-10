@@ -8,8 +8,10 @@ from sanic_beskar import Beskar
 from sanic_beskar.exceptions import AuthenticationError, TOTPRequired
 from tortoise.contrib.sanic import register_tortoise
 
+from compolvo import cors
+from compolvo import options
 from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint
-from compolvo.models import User, Service, Serializable, ServiceOffering
+from compolvo.models import User, Service, Serializable, ServiceOffering, ServicePlan
 
 app = Sanic("compolvo")
 beskar = Beskar()
@@ -26,11 +28,15 @@ api = Blueprint("api", url_prefix="/api")
 user = Blueprint("user", url_prefix="/api/user")
 service = Blueprint("service", url_prefix="/api/service")
 service_offering = Blueprint("service_offering", url_prefix="/api/service/offering")
+service_plan = Blueprint("service_plan", url_prefix="/api/service/plan")
 
 app.blueprint(api)
 app.blueprint(user)
 app.blueprint(service)
 app.blueprint(service_offering)
+app.blueprint(service_plan)
+
+app.register_middleware(cors.add_cors_headers, "response")
 
 
 @app.get("/")
@@ -40,6 +46,7 @@ async def index(request):
 
 @app.listener("before_server_start")
 async def test_user(request):
+    options.setup_options(app, request)
     email = "test@example.com"
     user = await User.get_or_none(email=email)
     if user:
