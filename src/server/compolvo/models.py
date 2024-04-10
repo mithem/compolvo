@@ -1,6 +1,8 @@
 from enum import IntEnum
 from typing import List, Type
+from uuid import UUID
 
+import tortoise.queryset
 from sanic import json
 from tortoise import run_async
 from tortoise.fields import UUIDField, TextField, CharField, IntEnumField, FloatField, IntField, \
@@ -11,27 +13,35 @@ from tortoise.models import Model
 class Serializable:
     fields: List[str]
 
-    def to_dict(self):
+    async def to_dict(self):
         data = {}
         for field in self.fields:
             value = getattr(self, field)
-            if field == "id":
+            if isinstance(value, UUID):
                 value = str(value)
+            elif isinstance(value, tortoise.queryset.QuerySet):
+                value = await value.get_or_none()
+                try:
+                    value = await value.to_dict()
+                    if "id" in value.keys():
+                        value = value["id"]
+                except AttributeError:
+                    value = str(value)
             data[field] = value
         return data
 
-    def json(self):
-        return json(self.to_dict())
+    async def json(self):
+        return json(await self.to_dict())
 
     @staticmethod
-    def list_json(objects: List["Serializable"]):
-        return json(list(map(lambda obj: obj.to_dict(), objects)))
+    async def list_json(objects: List["Serializable"]):
+        return json([await object.to_dict() for object in objects])
 
     @staticmethod
     async def all_json(cls: Type[Model]):
         assert Serializable in cls.__mro__, "`cls` must be a subclass of `Serializable`."
         assert Model in cls.__mro__, "`cls` must be a subclass of `Model`."
-        return cls.list_json(await cls.all()) # typing: ignore
+        return await cls.list_json(await cls.all())  # typing: ignore
 
 
 class User(Model, Serializable):
@@ -40,11 +50,11 @@ class User(Model, Serializable):
     email = CharField(255, unique=True)
     password = TextField(null=True)
 
-    fields = ["name", "email"]
+    fields = ["id", "name", "email"]
 
     @property
     def rolenames(self):
-        return ["user"] # TODO: Find a way to actually get user's roles
+        return ["user"]  # TODO: Find a way to actually get user's roles
         return list(map(lambda role: role.role, run_async(UserRole.filter(user=self.id).all())))
 
     @classmethod
@@ -65,7 +75,6 @@ class User(Model, Serializable):
         return self.id
 
 
-
 class UserRole(Model, Serializable):
     class Role(IntEnum):
         USER = 1
@@ -76,6 +85,7 @@ class UserRole(Model, Serializable):
     role = IntEnumField(Role)
 
     fields = ["user", "role"]
+
 
 class Service(Model, Serializable):
     class RetrievalMethod(IntEnum):
@@ -91,6 +101,7 @@ class Service(Model, Serializable):
 
     fields = ["id", "name", "retrieval_method", "retrieval_data", "latest_version"]
 
+
 class ServiceOffering(Model, Serializable):
     id = UUIDField(pk=True)
     name = TextField()
@@ -99,7 +110,8 @@ class ServiceOffering(Model, Serializable):
     price = FloatField()
     duration_days = IntField()
 
-    fields = ["name", "service", "description", "price", "duration_days"]
+    fields = ["id", "name", "service", "description", "price", "duration_days"]
+
 
 class ServicePlan(Model, Serializable):
     id = UUIDField(pk=True)
@@ -109,7 +121,8 @@ class ServicePlan(Model, Serializable):
     end_date = DatetimeField(null=True)
     canceled_by_user = BooleanField(default=False)
 
-    fields = ["service_offering", "user", "start_date", "end_date", "canceled_by_user"]
+    fields = ["id", "service_offering", "user", "start_date", "end_date", "canceled_by_user"]
+
 
 class Payment(Model, Serializable):
     id = UUIDField(pk=True)
@@ -119,12 +132,14 @@ class Payment(Model, Serializable):
 
     fields = ["service_plan", "amount", "date"]
 
+
 class Agent(Model, Serializable):
     id = UUIDField(pk=True)
     user = ForeignKeyField("models.User", "agents")
     last_connection_start = DatetimeField(null=True)
 
     fields = ["user", "last_connection_start"]
+
 
 class AgentSoftware(Model):
     id = UUIDField(pk=True)

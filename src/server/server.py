@@ -2,13 +2,14 @@ import os
 import secrets
 import string
 
-from sanic import Sanic, redirect, HTTPResponse, Request, text, Blueprint
+from sanic import Sanic, redirect, Request, text, Blueprint
 from sanic.exceptions import BadRequest, NotFound
 from sanic_beskar import Beskar
 from sanic_beskar.exceptions import AuthenticationError, TOTPRequired
 from tortoise.contrib.sanic import register_tortoise
 from tortoise.exceptions import IntegrityError
 
+from compolvo.decorators import patch_endpoint, delete_endpoint
 from compolvo.models import User, Service, Serializable, ServiceOffering
 
 app = Sanic("compolvo")
@@ -31,6 +32,7 @@ app.blueprint(api)
 app.blueprint(user)
 app.blueprint(service)
 app.blueprint(service_offering)
+
 
 @app.get("/")
 async def index(request):
@@ -95,35 +97,15 @@ async def create_user(request):
 
 
 @user.patch("/")
-async def update_user(request):
-    # TODO: Authentication: require that user changes itself or has admin/user role
-    try:
-        old_email = request.json["email"]
-        new_name = request.json.get("new_name", None)
-        new_email = request.json.get("new_email", None)
-        new_password = request.json.get("new_password", None)
-        user = await User.get(email=old_email)
-        if new_name is not None:
-            user.name = new_name
-        if new_email is not None:
-            user.email = new_email
-        if new_password is not None:
-            user.password = beskar.hash_password(new_password)
-        await user.save()
-        return user.json()
-    except KeyError:
-        raise BadRequest("Please specify the old email of the user to change its attributes of.")
+@patch_endpoint(User)
+async def update_user(request, user):
+    pass  # TODO: Authentication: require that user changes itself or has admin/user role
 
 
 @user.delete("/")
-async def delete_user(request):
-    try:
-        email = request.json["email"]
-        user = await User.get(email=email)
-        await user.delete()
-        return HTTPResponse(status=204)
-    except KeyError:
-        raise BadRequest("Please specify the new email of the user to delete.")
+@delete_endpoint(User)
+async def delete_user(request, user):
+    pass
 
 
 @service.get("/")
@@ -147,32 +129,15 @@ async def version(request):
 
 
 @service.patch("/")
-async def update_service(request):
-    service = await Service.get_or_none(id=request.args["id"][0])
-    print("Service: " + str(service))
-    if service is None:
-        raise NotFound("Service not found.")
-
-    new_name = request.json.get("name", None)
-    if new_name is not None:
-        service.name = new_name
-    new_retrieval_method = request.json.get("retrieval_method")
-    if new_retrieval_method is not None:
-        service.retrieval_method = new_retrieval_method
-    new_retrieval_data = request.json.get("retrieval_data")
-    if new_retrieval_data is not None:
-        service.retrieval_data = str(new_retrieval_data)
-    await service.save()
-    return service.json()
+@patch_endpoint(Service)
+async def update_service(request, svc):
+    pass
 
 
 @service.delete("/")
-async def delete_service(request):
-    service = await Service.get_or_none(id=request.args["id"][0])
-    if service is None:
-        raise NotFound("Service not found.")
-    await service.delete()
-    return HTTPResponse(status=204)
+@delete_endpoint(Service)
+async def delete_service(request, svc):
+    pass
 
 
 @service_offering.get("/")
@@ -180,7 +145,39 @@ async def get_service_offerings(request):
     service_id = request.args.get("id")
     if service_id is None:
         return await Serializable.all_json(ServiceOffering)
-    return await ServiceOffering.filter(service=service_id[0])
+    return await Serializable.list_json(await ServiceOffering.filter(service=service_id[0]))
+
+
+@service_offering.post("/")
+async def create_service_offering(request):
+    try:
+        svc = await Service.get_or_none(id=request.json["service"])
+        if svc is None:
+            raise NotFound("Specified service not found.")
+        offering = await ServiceOffering.create(
+            name=request.json["name"],
+            description=request.json.get("description"),
+            price=request.json["price"],
+            duration_days=request.json["duration_days"],
+            service=svc
+        )
+        return offering.json()
+    except KeyError:
+        raise BadRequest(
+            "Missing parameters. Please provide service, name, price, and duration_days.")
+
+
+@service_offering.patch("/")
+@patch_endpoint(ServiceOffering)
+async def update_service_offering(request, offering):
+    pass
+
+
+@service_offering.delete("/")
+@delete_endpoint(ServiceOffering)
+async def delete_service_offering(request, offering):
+    pass
+
 
 if __name__ == "__main__":
     app.run("0.0.0.0")

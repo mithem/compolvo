@@ -1,0 +1,21 @@
+POST http://localhost:8000/api/service/offering
+
+{
+  "name": "monthly",
+  "price": 29.99,
+  "duration_days": 30,
+  "service": "d8a39ca4-f194-476b-993f-5df36c2e12c3"
+}
+
+###
+
+PATCH http://localhost:8000/api/service/offering?id=b1046e1a-63ab-44b0-bcbc-0a8b63fde201
+
+{
+  "name": "Docker Desktop (monthly)",
+  "price": 24.99
+}
+
+###
+
+DELETE http://localhost:8000/api/service/offering?id=b1046e1a-63ab-44b0-bcbc-0a8b63fde201
