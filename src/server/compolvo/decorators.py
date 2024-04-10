@@ -31,6 +31,7 @@ def patch_endpoint(cls: Type[Serializable]):
 
 def delete_endpoint(cls: Type[Serializable]):
     def decorator(func):
+        @wraps(func)
         async def wrapper(request, *args, **kwargs):
             instance = await cls.get_or_none(id=request.args["id"][0])
             if instance is None:
@@ -38,6 +39,23 @@ def delete_endpoint(cls: Type[Serializable]):
             await instance.delete()
             return_value = await func(request, instance, *args, **kwargs)
             return return_value if return_value is not None else HTTPResponse(status=204)
+
+        return wrapper
+
+    return decorator
+
+
+def get_endpoint(cls: Type[Serializable]):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(request, *args, **kwargs):
+            instance_id = request.args.get("id", None)
+            if instance_id is None:
+                return await Serializable.all_json(cls)
+            instance = await cls.get_or_none(id=instance_id)
+            if instance is None:
+                raise NotFound(f"Specified {cls.__name__} not found.")
+            return await instance.json()
 
         return wrapper
 
