@@ -7,10 +7,11 @@ from sanic.exceptions import BadRequest, NotFound
 from sanic_beskar import Beskar
 from sanic_beskar.exceptions import AuthenticationError, TOTPRequired
 from tortoise.contrib.sanic import register_tortoise
-from tortoise.exceptions import IntegrityError
 
-from compolvo.decorators import patch_endpoint, delete_endpoint
-from compolvo.models import User, Service, Serializable, ServiceOffering
+from compolvo import cors
+from compolvo import options
+from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint
+from compolvo.models import User, Service, Serializable, ServiceOffering, ServicePlan
 
 app = Sanic("compolvo")
 beskar = Beskar()
@@ -27,11 +28,15 @@ api = Blueprint("api", url_prefix="/api")
 user = Blueprint("user", url_prefix="/api/user")
 service = Blueprint("service", url_prefix="/api/service")
 service_offering = Blueprint("service_offering", url_prefix="/api/service/offering")
+service_plan = Blueprint("service_plan", url_prefix="/api/service/plan")
 
 app.blueprint(api)
 app.blueprint(user)
 app.blueprint(service)
 app.blueprint(service_offering)
+app.blueprint(service_plan)
+
+app.register_middleware(cors.add_cors_headers, "response")
 
 
 @app.get("/")
@@ -41,6 +46,7 @@ async def index(request):
 
 @app.listener("before_server_start")
 async def test_user(request):
+    options.setup_options(app, request)
     email = "test@example.com"
     user = await User.get_or_none(email=email)
     if user:
@@ -92,8 +98,6 @@ async def create_user(request):
         return user.json()
     except KeyError:
         raise BadRequest("Missing name, email, or password.")
-    except IntegrityError:
-        raise BadRequest("User with specified email already exists.")
 
 
 @user.patch("/")
@@ -120,7 +124,7 @@ async def create_service(request):
         retrieval_method=request.json["retrieval_method"],
         retrieval_data=request.json["retrieval_data"]
     )
-    return service.json()
+    return await service.json()
 
 
 @api.get("/version")
@@ -141,11 +145,9 @@ async def delete_service(request, svc):
 
 
 @service_offering.get("/")
+@get_endpoint(ServiceOffering)
 async def get_service_offerings(request):
-    service_id = request.args.get("id")
-    if service_id is None:
-        return await Serializable.all_json(ServiceOffering)
-    return await Serializable.list_json(await ServiceOffering.filter(service=service_id[0]))
+    pass
 
 
 @service_offering.post("/")
