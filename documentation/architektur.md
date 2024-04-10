@@ -19,3 +19,5 @@ Dafür soll das JavaScript- (bzw. TypeScript-) Framework Vue.js verwendet werden
 Der _Agent_ läuft auf den jeweiligen Kundenrechnern, um lokale Änderungen an der Konfiguration machen zu können (z.B. Installation von Software (-Updates)).
 Agents bauen bei Bedarf Verbindungen zum Server auf, damit dieser Befehle erteilen kann.
 Dies ist nötig, da die Agents i.A. nicht vom Internet erreichbar sind (da sie hinter einer Firewall sind).
+
+# TODO: weitere Libraries ergänzen
