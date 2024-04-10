@@ -44,7 +44,7 @@ Hier bietet "Compolvo" eine bedeutende Chance, indem es sich als zentrales Tool 
 Software, die Big Data verarbeiten und KI-Anwendungen unterstützen kann, wird zunehmend nachgefragt. 
 "Compolvo" könnte in diesem Zusammenhang als Plattform dienen, die hilft, die am besten geeignete Software für spezifische Big Data- und KI-Projekte zu identifizieren und zu vergleichen.
 
-## Wettbewerbsanalyse
+## 3. Wettbewerbsanalyse
 
 ### Marktakteure
 
