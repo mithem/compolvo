@@ -1,12 +1,13 @@
 import datetime
+import datetime
 import os
 import secrets
 import string
 
 from sanic import Sanic, redirect, Request, text, Blueprint, json, HTTPResponse
 from sanic.exceptions import BadRequest, NotFound
-from sanic_beskar import Beskar
-from sanic_beskar.exceptions import AuthenticationError, TOTPRequired
+from sanic_jwt import exceptions, initialize
+from sanic_jwt.decorators import protected
 from sanic_openapi import openapi
 from tortoise.contrib.sanic import register_tortoise
 
@@ -17,11 +18,9 @@ from compolvo.models import User, Service, Serializable, ServiceOffering, Servic
     Agent, AgentSoftware
 
 app = Sanic("compolvo")
-beskar = Beskar()
 
 app.config.SECRET_KEY = "".join(secrets.choice(string.ascii_letters) for i in range(32))
 
-beskar.init_app(app, User)
 db_hostname = os.environ[
     "DB_HOSTNAME"]  # TODO: Make other parameters configurable via environment variables
 register_tortoise(app, db_url=f'mysql://root:@{db_hostname}:3306/compolvo',
@@ -40,8 +39,28 @@ api = Blueprint.group(user, service_group, tag, payment, agent, agent_software)
 
 app.blueprint(api)
 
-app.register_middleware(cors.add_cors_headers, "response")
 
+async def authenticate(request, *args, **kwargs):
+    auth_failed = exceptions.AuthenticationFailed("Invalid username or password")
+    if request.json is None:
+        raise auth_failed
+    try:
+        email = request.json["email"]
+        password = request.json["password"]
+    except KeyError:
+        raise auth_failed
+
+    user = await User.get_or_none(email=email)
+    if user is None:
+        raise auth_failed
+
+    if password != user.password:
+        raise auth_failed
+    return user
+
+
+initialize(app, authenticate=authenticate)
+app.register_middleware(cors.add_cors_headers, "response")
 
 @app.get("/")
 async def index(request):
@@ -59,28 +78,23 @@ async def test_user(request):
         await User(
             email=email,
             name="Test user",
-            password=beskar.hash_password("test")
+            password="test"
         ).save()
         return text("Created", status=201)
 
 
 @app.get("/login")
 async def login(request: Request):
+    headers = {"WWW-Authenticate": "Bearer"}
     try:
-        user = await beskar.authenticate(request.args["email"][0], request.args["password"][0],
-                                         lookup="email")
-        return redirect(
-            request.url_for("index"),
-            headers={"Authorization": "Bearer " + await beskar.encode_jwt_token(user)},
-        )
-    except (KeyError, IndexError):
-        raise BadRequest("Expected email as well as password.")
-    except (AuthenticationError, TOTPRequired) as e:
-        raise BadRequest("Invalid email or password.") from e
+        user = await authenticate(request)
+        return HTTPResponse(status=401, headers=headers)
+    except exceptions.AuthenticationFailed:
+        return HTTPResponse("Unauthorized.", status=401, headers=headers)
 
 
 @app.get("/protected")
-# @sanic_beskar.auth_required
+@protected()
 async def protected(request):
     return text("You're accessing a protected page!")
 
@@ -97,7 +111,7 @@ async def create_user(request):
         user = await User.create(
             name=request.json["name"],
             email=request.json["email"],
-            password=beskar.hash_password(request.json["password"])
+            password=request.json["password"]
         )
         return user.json()
     except KeyError:
