@@ -104,10 +104,11 @@ class Service(Model, Serializable):
     retrieval_method = IntEnumField(RetrievalMethod)
     retrieval_data = TextField()
     latest_version = TextField(null=True)
+    image = TextField(null=True)
     tags = ManyToManyField("models.Tag", related_name="services")
 
     fields = ["id", "name", "description", "license", "download_count", "retrieval_method",
-              "retrieval_data", "latest_version"]
+              "retrieval_data", "latest_version", "image"]
 
 
 class Tag(Model, Serializable):

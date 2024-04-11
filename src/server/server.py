@@ -13,7 +13,8 @@ from tortoise.contrib.sanic import register_tortoise
 from compolvo import cors
 from compolvo import options
 from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint
-from compolvo.models import User, Service, Serializable, ServiceOffering, ServicePlan, Tag
+from compolvo.models import User, Service, Serializable, ServiceOffering, ServicePlan, Tag, Payment, \
+    Agent, AgentSoftware
 
 app = Sanic("compolvo")
 beskar = Beskar()
@@ -32,7 +33,10 @@ service_offering = Blueprint("service_offering", url_prefix="/api/service/offeri
 service_plan = Blueprint("service_plan", url_prefix="/api/service/plan")
 tag = Blueprint("tag", url_prefix="/api/tag")
 service_group = Blueprint.group(service, service_offering, service_plan)
-api = Blueprint.group(user, service_group, tag)
+payment = Blueprint("payment", url_prefix="/api/payment")
+agent = Blueprint("agent", url_prefix="/api/agent")
+agent_software = Blueprint("agent_software", url_prefix="/api/agent/software")
+api = Blueprint.group(user, service_group, tag, payment, agent, agent_software)
 
 app.blueprint(api)
 
@@ -138,7 +142,8 @@ async def create_service(request):
         license=request.json.get("license"),
         download_count=request.json.get("download_count"),
         retrieval_method=request.json["retrieval_method"],
-        retrieval_data=request.json["retrieval_data"]
+        retrieval_data=request.json["retrieval_data"],
+        image=request.json.get("image")
     )
     return await service.json()
 
@@ -279,6 +284,105 @@ async def deassociate_tag_with_service(request):
     svc, tag = await _get_svc_and_tag(request)
     await svc.tags.remove(tag)
     return HTTPResponse(status=204)
+
+
+@payment.get("/")
+async def get_payments(request, payments):
+    pass
+
+
+@payment.post("/")
+async def create_payment(request):
+    try:
+        plan = await ServicePlan.get(id=request.json["service_plan"])
+        date_str = request.json.get("date")
+        if date_str is not None:
+            date = datetime.datetime.fromisoformat(date_str)
+        else:
+            date = datetime.datetime.now()
+        payment = await Payment.create(
+            service_plan=plan,
+            date=date,
+            amount=request.json["amount"]
+        )
+        return await payment.json()
+    except KeyError:
+        raise BadRequest("Missing parameters. Required: servcice_plan")
+
+
+@payment.patch("/")
+@patch_endpoint(Payment)
+async def update_payment(request, payment):
+    pass
+
+
+@payment.delete("/")
+@delete_endpoint(Payment)
+async def delete_payment(request, payment):
+    pass
+
+
+@agent.get("/")
+@get_endpoint(Agent)
+async def get_agents(request, agents):
+    pass
+
+
+@agent.post("/")
+async def create_agent(request):
+    try:
+        user_id = request.json["user"]
+        user = await User.get(id=user_id)
+        agent = await Agent.create(
+            user=user
+        )
+        return await agent.json()
+    except KeyError:
+        raise BadRequest("Missing parameters. Required: user")
+
+
+@agent.patch("/")
+@patch_endpoint(Agent)
+async def update_agent(request, agent):
+    pass
+
+
+@agent.delete("/")
+@delete_endpoint(Agent)
+async def delete_agent(request, agent):
+    pass
+
+
+@agent_software.get("/")
+@get_endpoint(AgentSoftware)
+async def get_agent_software(request, software):
+    pass
+
+
+@agent_software.post("/")
+async def create_agent_software(request):
+    try:
+        agent = await Agent.get(id=request.json["agent"])
+        service_plan = await ServicePlan.get(id=request.json["service_plan"])
+        software = await AgentSoftware.create(
+            agent=agent,
+            service_plan=service_plan,
+        )
+        return await software.json()
+    except KeyError:
+        raise BadRequest("Missing parameters. Required: agent, service_plan")
+
+
+@agent.patch("/")
+@patch_endpoint(AgentSoftware)
+async def update_agent_software(request, software):
+    pass
+
+
+@agent_software.delete("/")
+@delete_endpoint(AgentSoftware)
+async def delete_agent_software(request, software):
+    pass
 
 
 if __name__ == "__main__":
