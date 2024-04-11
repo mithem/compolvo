@@ -1,6 +1,9 @@
 <template>
   <filter_panel/>
-  <v-container>{{ data }}</v-container>
+  <v-btn @click="fetchData">Load Data</v-btn>
+  <v-container>
+    <div v-if="data">{{ data }}</div>
+  </v-container>
   <v-container>
     <v-row>
       <v-col cols="12" md="6" lg="4" v-for="service in services" :key="service.id">
@@ -20,76 +23,72 @@
 
 </template>
 <script lang="ts">
-import { defineComponent } from 'vue';
-import CompactCard from '/src/components/compact_card.vue';
-import {onMounted, ref} from "vue";
-
-const data = ref(null);
-const api_host = "https://localhost:8000/api/"
-
-const fetchSpell = async () => {
-  try {
-    const response = await fetch(api_host + 'service');
-    data.value = await response.json();
-  } catch (error) {
-    console.error(error);
-  }
-}
-onMounted(fetchSpell);
+import { defineComponent, ref, onMounted } from 'vue';
+import CompactCard from '@/components/compact_card.vue'; // Adjust the path as necessary
 
 export default defineComponent({
   components: {
     CompactCard
   },
-  data() {
-    return {
-      services: [
-        {
-          id: 1,
-          name: "Example Service",
-          version: "1.0.0",
-          description: "This is an example of a compact card component in Vue using Vuetify.",
-          license: "MIT",
-          image: "https://cdn.vuetifyjs.com/images/cards/sunshine.jpg",
-          tags: ["Web", "API", "Tech"],
-          downloads: 1500,
-          price: "$19.99"
-        },
-        {
-          id: 2,
-          name: "Example Service",
-          version: "1.0.0",
-          description: "This is an example of a compact card component in Vue using Vuetify.",
-          license: "MIT",
-          image: "https://cdn.vuetifyjs.com/images/cards/sunshine.jpg",
-          tags: ["Web", "API", "Tech"],
-          downloads: 1500,
-          price: "$19.99"
-        },
-        {
-          id: 3,
-          name: "Example Service",
-          version: "1.0.0",
-          description: "This is an example of a compact card component in Vue using Vuetify.",
-          license: "MIT",
-          image: "https://cdn.vuetifyjs.com/images/cards/sunshine.jpg",
-          tags: ["Web", "API", "Tech"],
-          downloads: 1500,
-          price: "$19.99"
-        },
-        {
-          id: 4,
-          name: "Example Service",
-          version: "1.0.0",
-          description: "This is an example of a compact card component in Vue using Vuetify.",
-          license: "MIT",
-          image: "https://cdn.vuetifyjs.com/images/cards/sunshine.jpg",
-          tags: ["Web", "API", "Tech"],
-          downloads: 1500,
-          price: "$19.99"
-        },
-      ]
-    }
+  setup() {
+    const services = ref([
+      {
+        id: 1,
+        name: "Example Service",
+        version: "1.0.0",
+        description: "This is an example of a compact card component in Vue using Vuetify.",
+        license: "MIT",
+        image: "https://cdn.vuetifyjs.com/images/cards/sunshine.jpg",
+        tags: ["Web", "API", "Tech"],
+        downloads: 1500,
+        price: "$19.99"
+      },{
+        id: 2,
+        name: "Example Service",
+        version: "1.0.0",
+        description: "This is an example of a compact card component in Vue using Vuetify.",
+        license: "MIT",
+        image: "https://cdn.vuetifyjs.com/images/cards/sunshine.jpg",
+        tags: ["Web", "API", "Tech"],
+        downloads: 1500,
+        price: "$19.99"
+      },{
+        id: 3,
+        name: "Example Service",
+        version: "1.0.0",
+        description: "This is an example of a compact card component in Vue using Vuetify.",
+        license: "MIT",
+        image: "https://cdn.vuetifyjs.com/images/cards/sunshine.jpg",
+        tags: ["Web", "API", "Tech"],
+        downloads: 1500,
+        price: "$19.99"
+      },{
+        id: 4,
+        name: "Example Service",
+        version: "1.0.0",
+        description: "This is an example of a compact card component in Vue using Vuetify.",
+        license: "MIT",
+        image: "https://cdn.vuetifyjs.com/images/cards/sunshine.jpg",
+        tags: ["Web", "API", "Tech"],
+        downloads: 1500,
+        price: "$19.99"
+      },
+    ]);
+    const data = ref(null);
+    const apiHost = "http://localhost:8000/api/";
+
+    const fetchData = async () => {
+      try {
+        const response = await fetch(`${apiHost}service`);
+        data.value = await response.json();
+      } catch (error) {
+        console.error('Fetch error:', error);
+      }
+    };
+
+    onMounted(fetchData);
+
+    return { services, data, fetchData };
   }
 });
 </script>
