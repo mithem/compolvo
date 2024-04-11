@@ -373,7 +373,7 @@ async def create_agent_software(request):
         raise BadRequest("Missing parameters. Required: agent, service_plan")
 
 
-@agent.patch("/")
+@agent_software.patch("/")
 @patch_endpoint(AgentSoftware)
 async def update_agent_software(request, software):
     pass
