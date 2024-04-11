@@ -24,3 +24,21 @@ PATCH http://localhost:8000/api/service?id=52df2bad-8e34-4472-8920-19b79312d423
 ###
 
 DELETE http://localhost:8000/api/service?id=52df2bad-8e34-4472-8920-19b79312d423
+
+###
+
+POST http://localhost:8000/api/service/tag
+
+{
+  "service": "a576d76d-3f62-41f0-b8fa-22713372ec2b",
+  "tag": "53149fa9-fc24-4fd4-ba49-93dd13e48554"
+}
+
+###
+
+DELETE http://localhost:8000/api/service/tag
+
+{
+  "service": "a576d76d-3f62-41f0-b8fa-22713372ec2b",
+  "tag": "53149fa9-fc24-4fd4-ba49-93dd13e48554"
+}

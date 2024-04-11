@@ -1,3 +1,4 @@
+import datetime
 from enum import IntEnum
 from typing import List, Type
 from uuid import UUID
@@ -6,7 +7,7 @@ import tortoise.queryset
 from sanic import json
 from tortoise import run_async
 from tortoise.fields import UUIDField, TextField, CharField, IntEnumField, FloatField, IntField, \
-    DatetimeField, BooleanField, ForeignKeyField
+    DatetimeField, BooleanField, ForeignKeyField, ManyToManyField
 from tortoise.models import Model
 
 
@@ -19,6 +20,8 @@ class Serializable:
             value = getattr(self, field)
             if isinstance(value, UUID):
                 value = str(value)
+            elif isinstance(value, datetime.datetime):
+                value = value.isoformat()
             elif isinstance(value, tortoise.queryset.QuerySet):
                 value = await value.get_or_none()
                 try:
@@ -101,10 +104,19 @@ class Service(Model, Serializable):
     retrieval_method = IntEnumField(RetrievalMethod)
     retrieval_data = TextField()
     latest_version = TextField(null=True)
+    image = TextField(null=True)
+    tags = ManyToManyField("models.Tag", related_name="services")
 
     fields = ["id", "name", "description", "license", "download_count", "retrieval_method",
-              "retrieval_data", "latest_version"]
+              "retrieval_data", "latest_version", "image"]
 
+
+class Tag(Model, Serializable):
+    id = UUIDField(pk=True)
+    label = TextField()
+    # services = ManyToManyField("models.Service", related_name="tags")
+
+    fields = ["id", "label"]
 
 class ServiceOffering(Model, Serializable):
     id = UUIDField(pk=True)
