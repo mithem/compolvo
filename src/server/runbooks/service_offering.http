@@ -4,7 +4,7 @@ POST http://localhost:8000/api/service/offering
   "name": "monthly",
   "price": 29.99,
   "duration_days": 30,
-  "service": "32826de4-b278-476a-a964-ec9343be5161"
+  "service": "adcc945b-ac7f-4c8f-8fa8-4001d68d6d3b"
 }
 
 ###

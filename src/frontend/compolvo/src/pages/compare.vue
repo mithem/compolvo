@@ -86,7 +86,7 @@ export default defineComponent({
       }
     };
 
-    onMounted(fetchData);
+    //onMounted(fetchData);
 
     return { services, data, fetchData };
   }
