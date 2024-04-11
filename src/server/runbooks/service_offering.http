@@ -1,19 +1,18 @@
 POST http://localhost:8000/api/service/offering
 
 {
-  "name": "monthly",
-  "price": 29.99,
+  "name": "month",
+  "price": 1290.99,
   "duration_days": 30,
-  "service": "adcc945b-ac7f-4c8f-8fa8-4001d68d6d3b"
+  "service": "0bf5f457-df08-4025-ac14-c79707648807"
 }
 
 ###
 
-PATCH http://localhost:8000/api/service/offering?id=b1046e1a-63ab-44b0-bcbc-0a8b63fde201
+PATCH http://localhost:8000/api/service/offering?id=e803c9fb-926f-4ca8-b256-e49b39048cba
 
 {
-  "name": "Docker Desktop (monthly)",
-  "price": 24.99
+  "name": "year"
 }
 
 ###
