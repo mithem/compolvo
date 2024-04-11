@@ -30,6 +30,8 @@ class Serializable:
                         value = value["id"]
                 except AttributeError:
                     value = str(value)
+            elif isinstance(value, Serializable):
+                value = await value.to_dict()
             data[field] = value
         return data
 

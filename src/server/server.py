@@ -124,7 +124,9 @@ async def delete_user(request, user):
 # @openapi.response(200, {"application/json": Union[List[Service], Service]})
 async def get_services(request, services):
     async def expand(svc: Service) -> dict:
-        return {**await svc.to_dict(), "tags": [await tag.to_dict() for tag in await svc.tags]}
+        return {**await svc.to_dict(), "tags": [await tag.to_dict() for tag in await svc.tags],
+                "offerings": [await offering.to_dict() for offering in
+                              await ServiceOffering.filter(service=svc).all()]}
 
     if isinstance(services, list):
         return json(
