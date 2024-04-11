@@ -7,7 +7,7 @@ def _add_cors_headers(response, methods: Iterable[str]) -> None:
         allow_methods.append("OPTIONS")
     headers = {
         "Access-Control-Allow-Methods": "*",
-        "Access-Control-Allow-Origin": "localhost:3000",
+        "Access-Control-Allow-Origin": "http://localhost:3000",
         "Access-Control-Allow-Credentials": "true",
         "Access-Control-Allow-Headers": (
             "origin, content-type, accept, "
