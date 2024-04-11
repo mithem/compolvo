@@ -6,8 +6,6 @@ import string
 
 from sanic import Sanic, redirect, Request, text, Blueprint, json, HTTPResponse
 from sanic.exceptions import BadRequest, NotFound
-from sanic_jwt import exceptions, initialize
-from sanic_jwt.decorators import protected
 from sanic_openapi import openapi
 from tortoise.contrib.sanic import register_tortoise
 
@@ -40,26 +38,6 @@ api = Blueprint.group(user, service_group, tag, payment, agent, agent_software)
 app.blueprint(api)
 
 
-async def authenticate(request, *args, **kwargs):
-    auth_failed = exceptions.AuthenticationFailed("Invalid username or password")
-    if request.json is None:
-        raise auth_failed
-    try:
-        email = request.json["email"]
-        password = request.json["password"]
-    except KeyError:
-        raise auth_failed
-
-    user = await User.get_or_none(email=email)
-    if user is None:
-        raise auth_failed
-
-    if password != user.password:
-        raise auth_failed
-    return user
-
-
-initialize(app, authenticate=authenticate)
 app.register_middleware(cors.add_cors_headers, "response")
 
 @app.get("/")
@@ -85,16 +63,10 @@ async def test_user(request):
 
 @app.get("/login")
 async def login(request: Request):
-    headers = {"WWW-Authenticate": "Bearer"}
-    try:
-        user = await authenticate(request)
-        return HTTPResponse(status=401, headers=headers)
-    except exceptions.AuthenticationFailed:
-        return HTTPResponse("Unauthorized.", status=401, headers=headers)
+    return text("Not Implemented")
 
 
 @app.get("/protected")
-@protected()
 async def protected(request):
     return text("You're accessing a protected page!")
 
