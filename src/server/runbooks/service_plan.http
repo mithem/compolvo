@@ -1,0 +1,6 @@
+POST http://localhost:8000/api/service/plan
+
+{
+  "user": "b7bdf5ca-fb3f-4a2a-86fd-b9b1b664344d",
+  "service_offering": "8ea6a35f-df77-4791-8825-8e1ad9cabc63"
+}

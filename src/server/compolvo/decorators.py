@@ -51,10 +51,17 @@ def get_endpoint(cls: Type[Serializable]):
         async def wrapper(request, *args, **kwargs):
             instance_id = request.args.get("id", None)
             if instance_id is None:
-                return await Serializable.all_json(cls)
+                instances = await cls.all()
+                return_value = await func(request, instances, *args, **kwargs)
+                if return_value is not None:
+                    return return_value
+                return await Serializable.list_json(instances)
             instance = await cls.get_or_none(id=instance_id)
             if instance is None:
                 raise NotFound(f"Specified {cls.__name__} not found.")
+            return_value = await func(request, instance, *args, **kwargs)
+            if return_value is not None:
+                return return_value
             return await instance.json()
 
         return wrapper
