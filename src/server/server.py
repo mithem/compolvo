@@ -119,11 +119,15 @@ async def delete_user(request, user):
     "By default, returns a JSON list of all services including tags. If a `id` is specified in the query args, only that specific service will be returned (provided it is found).")
 # @openapi.response(200, {"application/json": Union[List[Service], Service]})
 async def get_services(request, services):
-    if services is list:
+    async def expand(svc: Service) -> dict:
+        return {**await svc.to_dict(), "tags": [await tag.to_dict() for tag in await svc.tags]}
+
+    if isinstance(services, list):
         return json(
-            [{**await svc.to_dict(), "tags": [await tag.to_dict() for tag in await svc.tags]} for
+            [await expand(svc) for
              svc in
              services])
+    return json(await expand(services))
 
 
 @service.post("/")
