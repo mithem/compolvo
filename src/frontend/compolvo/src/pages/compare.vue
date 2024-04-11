@@ -1,5 +1,6 @@
 <template>
   <filter_panel/>
+  <v-container>{{ data }}</v-container>
   <v-container>
     <v-row>
       <v-col cols="12" md="6" lg="4" v-for="service in services" :key="service.id">
@@ -21,6 +22,20 @@
 <script lang="ts">
 import { defineComponent } from 'vue';
 import CompactCard from '/src/components/compact_card.vue';
+import {onMounted, ref} from "vue";
+
+const data = ref(null);
+const api_host = "https://localhost:8000/api/"
+
+const fetchSpell = async () => {
+  try {
+    const response = await fetch(api_host + 'service');
+    data.value = await response.json();
+  } catch (error) {
+    console.error(error);
+  }
+}
+onMounted(fetchSpell);
 
 export default defineComponent({
   components: {
