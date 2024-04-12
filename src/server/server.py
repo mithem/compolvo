@@ -1,23 +1,27 @@
 import datetime
-import datetime
 import os
 import secrets
 import string
 
+import jwt
+import jwt.exceptions
 from sanic import Sanic, redirect, Request, text, Blueprint, json, HTTPResponse
-from sanic.exceptions import BadRequest, NotFound
+from sanic.exceptions import BadRequest, NotFound, Unauthorized
 from sanic_openapi import openapi
 from tortoise.contrib.sanic import register_tortoise
 
 from compolvo import cors
 from compolvo import options
-from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint
-from compolvo.models import User, Service, Serializable, ServiceOffering, ServicePlan, Tag, Payment, \
-    Agent, AgentSoftware
+from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, protected
+from compolvo.models import User, Service, ServiceOffering, ServicePlan, Tag, Payment, \
+    Agent, AgentSoftware, UserRole
+
+HTTP_HEADER_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
 
 app = Sanic("compolvo")
 
 app.config.SECRET_KEY = "".join(secrets.choice(string.ascii_letters) for i in range(32))
+app.config.SESSION_TIMEOUT = 60 * 60
 
 db_hostname = os.environ[
     "DB_HOSTNAME"]  # TODO: Make other parameters configurable via environment variables
@@ -37,8 +41,8 @@ api = Blueprint.group(user, service_group, tag, payment, agent, agent_software)
 
 app.blueprint(api)
 
-
 app.register_middleware(cors.add_cors_headers, "response")
+
 
 @app.get("/")
 async def index(request):
@@ -47,35 +51,70 @@ async def index(request):
 
 @app.listener("before_server_start")
 async def test_user(request):
+    async def create_user(email: str, name: str, password: str, role: UserRole.Role = None):
+        user = await User.get_or_none(email=email)
+        if user is None:
+            user = await User.create(
+                email=email,
+                name=name,
+                password=password
+            )
+        if role is None:
+            role = UserRole.Role.USER
+        existing_role = await UserRole.get_or_none(user=user, role=role)
+        if existing_role is None:
+            await UserRole.create(
+                user=user,
+                role=role
+            )
+
     options.setup_options(app, request)
-    email = "test@example.com"
-    user = await User.get_or_none(email=email)
-    if user:
-        return text("Already exists.")
-    else:
-        await User(
-            email=email,
-            name="Test user",
-            password="test"
-        ).save()
-        return text("Created", status=201)
+    await create_user("test@example.com", "Test user", "test")
+    await create_user("admin@example.com", "Admin", "admin", UserRole.Role.ADMIN)
 
 
-@app.get("/login")
+@app.get("/api/login")
 async def login(request: Request):
-    return text("Not Implemented")
+    email = request.args.get("email", [None])
+    password = request.args.get("password", None)
+    if email is None or password is None:
+        raise BadRequest("Missing email or password.")
+    user = await User.get_or_none(email=email)
+    if not user:
+        raise NotFound("User not found.")
+    if password != user.password:
+        raise Unauthorized()
+    expires = datetime.datetime.now() + datetime.timedelta(seconds=app.config.SESSION_TIMEOUT)
+    token = jwt.encode({"id": str(user.id), "expires": expires.isoformat()}, app.config.SECRET_KEY,
+                       algorithm="HS256")
+    headers = {"Set-Cookie": f"token={token}; Expires={expires.strftime(HTTP_HEADER_DATE_FORMAT)}"}
+    redirect_url = request.args.get("redirect_url", request.url_for("index"))
+    return redirect(redirect_url, headers=headers)
 
 
-@app.get("/protected")
-async def protected(request):
-    return text("You're accessing a protected page!")
+@app.get("/api/logout")
+async def logout(request: Request):
+    redirect_url = request.args.get("redirect_url", request.url_for("index"))
+    return redirect(redirect_url, headers={"Set-Cookie": f"token=deleted"})
 
+
+@app.get("/admin")
+@protected({UserRole.Role.ADMIN})
+async def admin(request, user):
+    return text("Admin page")
 
 @user.get("/")
-# @sanic_beskar.roles_required(["admin"])
-async def get_users(request):
-    return await Serializable.all_json(User)
+@protected()
+@get_endpoint(User, {UserRole.Role.ADMIN})
+async def get_users(request, users, user):
+    pass
 
+
+@user.get("/me")
+@protected()
+async def get_user(request, user):
+    return json(
+        {**await user.to_dict(), "roles": [await role.to_dict() for role in await user.roles]})
 
 @user.post("/")
 async def create_user(request):
@@ -85,30 +124,37 @@ async def create_user(request):
             email=request.json["email"],
             password=request.json["password"]
         )
+        await UserRole.create(
+            user=user,
+            role=UserRole.Role.USER
+        )
         return user.json()
     except KeyError:
         raise BadRequest("Missing name, email, or password.")
 
 
 @user.patch("/")
+@protected({UserRole.Role.ADMIN})
 @patch_endpoint(User)
 async def update_user(request, user):
-    pass  # TODO: Authentication: require that user changes itself or has admin/user role
+    pass  # TODO: Make, so that authenticated user can update themselves, but not others
 
 
 @user.delete("/")
+@protected({UserRole.Role.ADMIN})
 @delete_endpoint(User)
 async def delete_user(request, user):
-    pass
+    pass  # TODO: Make, so that admins can delete anyone, but everyone themselves
 
 
 @service.get("/")
+@protected()
 @get_endpoint(Service)
 @openapi.summary("Get all services")
 @openapi.description(
     "By default, returns a JSON list of all services including tags. If a `id` is specified in the query args, only that specific service will be returned (provided it is found).")
 # @openapi.response(200, {"application/json": Union[List[Service], Service]})
-async def get_services(request, services):
+async def get_services(request, services, user):
     async def expand(svc: Service) -> dict:
         return {**await svc.to_dict(), "tags": [await tag.to_dict() for tag in await svc.tags],
                 "offerings": [await offering.to_dict() for offering in
@@ -123,7 +169,8 @@ async def get_services(request, services):
 
 
 @service.post("/")
-async def create_service(request):
+@protected({UserRole.Role.ADMIN})
+async def create_service(request, user):
     service = await Service.create(
         name=request.json["name"],
         description=request.json.get("description"),
@@ -137,24 +184,28 @@ async def create_service(request):
 
 
 @service.patch("/")
+@protected({UserRole.Role.ADMIN})
 @patch_endpoint(Service)
 async def update_service(request, svc):
     pass
 
 
 @service.delete("/")
+@protected({UserRole.Role.ADMIN})
 @delete_endpoint(Service)
 async def delete_service(request, svc):
     pass
 
 
 @service_offering.get("/")
+@protected()
 @get_endpoint(ServiceOffering)
-async def get_service_offerings(request, offerings):
+async def get_service_offerings(request, user, offerings):
     pass
 
 
 @service_offering.post("/")
+@protected({UserRole.Role.ADMIN})
 async def create_service_offering(request):
     try:
         svc = await Service.get_or_none(id=request.json["service"])
@@ -174,28 +225,30 @@ async def create_service_offering(request):
 
 
 @service_offering.patch("/")
+@protected({UserRole.Role.ADMIN})
 @patch_endpoint(ServiceOffering)
 async def update_service_offering(request, offering):
     pass
 
 
 @service_offering.delete("/")
+@protected({UserRole.Role.ADMIN})
 @delete_endpoint(ServiceOffering)
 async def delete_service_offering(request, offering):
     pass
 
 
 @service_plan.get("/")
-@get_endpoint(ServicePlan)
-async def get_service_plans(request, plans):
+@protected()
+@get_endpoint(ServicePlan, {UserRole.Role.ADMIN})
+async def get_service_plans(request, plans, user):
     pass
 
 
 @service_plan.post("/")
-async def create_service_plan(request):
+@protected()
+async def create_service_plan(request, user):
     try:
-        user_id = request.json["user"]
-        user = await User.get(id=user_id)
         service_offering_id = request.json["service_offering"]
         offering = await ServiceOffering.get(id=service_offering_id)
         start_date = request.json.get("start_date")
@@ -212,24 +265,28 @@ async def create_service_plan(request):
 
 
 @service_plan.patch("/")
+@protected({UserRole.Role.ADMIN})
 @patch_endpoint(ServicePlan)
 async def update_service_plan(request, plan):
-    pass
+    pass  # TODO: Make so users can cancel their own service plans
 
 
 @service_plan.delete("/")
+@protected({UserRole.Role.ADMIN})
 @delete_endpoint(ServicePlan)
 async def delete_service_plan(request):
     pass
 
 
 @tag.get("/")
+@protected()
 @get_endpoint(Tag)
-async def get_tags(request, tags):
+async def get_tags(request, tags, user):
     pass
 
 
 @tag.post("/")
+@protected({UserRole.Role.ADMIN})
 async def create_tag(request):
     try:
         label = request.json["label"]
@@ -240,12 +297,14 @@ async def create_tag(request):
 
 
 @tag.patch("/")
+@protected({UserRole.Role.ADMIN})
 @patch_endpoint(Tag)
 async def update_tag(request, tag):
     pass
 
 
 @tag.delete("/")
+@protected({UserRole.Role.ADMIN})
 @delete_endpoint(Tag)
 async def delete_tag(request, tag):
     pass
@@ -261,6 +320,7 @@ async def _get_svc_and_tag(request):
 
 
 @service.post("/tag")
+@protected({UserRole.Role.ADMIN})
 async def associate_tag_with_service(request):
     svc, tag = await _get_svc_and_tag(request)
     await svc.tags.add(tag)
@@ -268,6 +328,7 @@ async def associate_tag_with_service(request):
 
 
 @service.delete("/tag")
+@protected({UserRole.Role.ADMIN})
 async def deassociate_tag_with_service(request):
     svc, tag = await _get_svc_and_tag(request)
     await svc.tags.remove(tag)
@@ -275,11 +336,14 @@ async def deassociate_tag_with_service(request):
 
 
 @payment.get("/")
-async def get_payments(request, payments):
+@protected()
+@get_endpoint(Payment, {UserRole.Role.ADMIN})
+async def get_payments(request, payments, user):
     pass
 
 
 @payment.post("/")
+@protected({UserRole.Role.ADMIN})
 async def create_payment(request):
     try:
         plan = await ServicePlan.get(id=request.json["service_plan"])
@@ -299,28 +363,30 @@ async def create_payment(request):
 
 
 @payment.patch("/")
+@protected({UserRole.Role.ADMIN})
 @patch_endpoint(Payment)
 async def update_payment(request, payment):
     pass
 
 
 @payment.delete("/")
+@protected({UserRole.Role.ADMIN})
 @delete_endpoint(Payment)
 async def delete_payment(request, payment):
     pass
 
 
 @agent.get("/")
-@get_endpoint(Agent)
-async def get_agents(request, agents):
+@protected()
+@get_endpoint(Agent, {UserRole.Role.ADMIN})
+async def get_agents(request, agents, user):
     pass
 
 
 @agent.post("/")
-async def create_agent(request):
+@protected()
+async def create_agent(request, user):
     try:
-        user_id = request.json["user"]
-        user = await User.get(id=user_id)
         agent = await Agent.create(
             user=user
         )
@@ -330,25 +396,29 @@ async def create_agent(request):
 
 
 @agent.patch("/")
+@protected({UserRole.Role.ADMIN})
 @patch_endpoint(Agent)
-async def update_agent(request, agent):
+async def update_agent(request, agent, user):
     pass
 
 
 @agent.delete("/")
+@protected({UserRole.Role.ADMIN})
 @delete_endpoint(Agent)
-async def delete_agent(request, agent):
+async def delete_agent(request, agent, user):
     pass
 
 
 @agent_software.get("/")
+@protected({UserRole.Role.ADMIN})
 @get_endpoint(AgentSoftware)
-async def get_agent_software(request, software):
+async def get_agent_software(request, software, user):
     pass
 
 
 @agent_software.post("/")
-async def create_agent_software(request):
+@protected({UserRole.Role.ADMIN})
+async def create_agent_software(request, user):
     try:
         agent = await Agent.get(id=request.json["agent"])
         service_plan = await ServicePlan.get(id=request.json["service_plan"])
@@ -362,14 +432,16 @@ async def create_agent_software(request):
 
 
 @agent_software.patch("/")
+@protected({UserRole.Role.ADMIN})
 @patch_endpoint(AgentSoftware)
-async def update_agent_software(request, software):
+async def update_agent_software(request, software, user):
     pass
 
 
 @agent_software.delete("/")
+@protected({UserRole.Role.ADMIN})
 @delete_endpoint(AgentSoftware)
-async def delete_agent_software(request, software):
+async def delete_agent_software(request, software, user):
     pass
 
 

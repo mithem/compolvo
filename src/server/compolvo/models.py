@@ -48,7 +48,6 @@ class Serializable:
         assert Model in cls.__mro__, "`cls` must be a subclass of `Model`."
         return await cls.list_json(await cls.all())  # typing: ignore
 
-
 class User(Model, Serializable):
     id = UUIDField(pk=True)
     name = TextField(null=True)

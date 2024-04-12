@@ -31,19 +31,6 @@ defineComponent({
 });
 
 function login() {
-  fetch("http://localhost:8000/auth", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email: "test@example.com",
-      password: "test"
-    })
-  }).then(res => {
-    res.json().then(data => {
-      const token = data.access_token;
-    })
-  })
+  window.location.href = "http://localhost:8000/api/login?redirect_url=http://" + window.location.host + "&email=" + encodeURIComponent("test@example.com") + "&password=" + encodeURIComponent("test");
 }
 </script>
