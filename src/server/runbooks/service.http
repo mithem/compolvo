@@ -17,10 +17,10 @@ POST http://localhost:8000/api/service
 POST http://localhost:8000/api/service
 
 {
-  "name": "compolvo-server4",
+  "name": "compolvo-server2",
   "description": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.",
-  "license": "MIT3",
-  "download_count": 4,
+  "license": "MIT2",
+  "download_count": 4000,
   "retrieval_method": 1,
   "retrieval_data": {
     "link": "http://localhost:8000/api/version",

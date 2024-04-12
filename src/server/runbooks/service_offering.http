@@ -1,10 +1,10 @@
 POST http://localhost:8000/api/service/offering
 
 {
-  "name": "month",
-  "price": 1290.99,
-  "duration_days": 30,
-  "service": "0bf5f457-df08-4025-ac14-c79707648807"
+  "name": "second",
+  "price": 19.99,
+  "duration_days": 20,
+  "service": "d558f02e-8684-419d-856b-4b4f61c29e45"
 }
 
 ###

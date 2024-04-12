@@ -63,7 +63,7 @@ export default defineComponent({
         const offering = offerings[0]; // Assuming we're only interested in the first offering
         return `$${offering.price.toFixed(2)} / ${offering.name}`; // Formats the price with duration
       }
-      return 'Free';  // Default to 'Free' if no offerings
+      return 'N/A';  // Default to 'Free' if no offerings
     };
 
     onMounted(fetchData);
