@@ -1,0 +1,42 @@
+name: compolvo
+services:
+  frontend:
+    image: compolvo-frontend:latest
+    container_name: compolvo-frontend
+    build: ../src/frontend/compolvo
+    ports:
+      - 3000:3000
+  mariadb:
+    container_name: compolvo-mariadb
+    image: mariadb:11.3
+    ports:
+      - target: 3306
+        published: 3306
+    environment:
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: true
+      MARIADB_DATABASE: compolvo
+  server:
+    container_name: compolvo-server
+    image: compolvo-server:latest
+    build: ../src/server
+    depends_on:
+      - mariadb
+    ports:
+      - target: 8000
+        published: 8000
+    environment:
+      DB_HOSTNAME: mariadb
+      DB_USERNAME: root
+      DB_PASSWORD: ""
+      DB_PORT: 3306
+      DB_DATABASE: compolvo
+      CORS_ORIGIN: http://localhost:8080
+      SERVER_NAME: http://localhost:8080
+  nginx:
+    container_name: compolvo-nginx
+    image: nginx:latest
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - target: 80
+        published: 8080

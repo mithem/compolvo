@@ -20,12 +20,19 @@ HTTP_HEADER_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
 
 app = Sanic("compolvo")
 
+app.config.SERVER_NAME = os.environ["SERVER_NAME"]
+
 app.config.SECRET_KEY = "".join(secrets.choice(string.ascii_letters) for i in range(32))
 app.config.SESSION_TIMEOUT = 60 * 60
 
 db_hostname = os.environ[
     "DB_HOSTNAME"]  # TODO: Make other parameters configurable via environment variables
-register_tortoise(app, db_url=f'mysql://root:@{db_hostname}:3306/compolvo',
+db_username = os.environ["DB_USERNAME"]
+db_password = os.environ["DB_PASSWORD"]
+db_database = os.environ["DB_DATABASE"]
+db_port = os.environ["DB_PORT"]
+register_tortoise(app,
+                  db_url=f'mysql://{db_username}:{db_password}@{db_hostname}:{db_port}/{db_database}',
                   modules={'models': ['compolvo.models']}, generate_schemas=True)
 
 user = Blueprint("user", url_prefix="/api/user")

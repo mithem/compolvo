@@ -23,8 +23,9 @@
 
 </template>
 <script lang="ts">
-import { defineComponent, ref, onMounted } from 'vue';
-import CompactCard from '@/components/compact_card.vue'; // Adjust the path as necessary
+import {defineComponent, ref} from 'vue';
+import CompactCard from '@/components/compact_card.vue';
+import Constants from "../components/Constants"; // Adjust the path as necessary
 
 export default defineComponent({
   components: {
@@ -75,7 +76,7 @@ export default defineComponent({
       },
     ]);
     const data = ref(null);
-    const apiHost = "http://localhost:8000/api/";
+    const apiHost = Constants.HOST_URL + "/api/";
 
     const fetchData = async () => {
       try {

@@ -25,7 +25,8 @@ export default {
       menuItems: [
         {title: "Home", path: "/home", icon: "mdi-home"},
         {title: "Compare", path: "/compare", icon: "mdi-scale-balance"},
-        {title: "Profile", path: "/profile", icon: "mdi-account"}
+        {title: "Profile", path: "/profile", icon: "mdi-account"},
+        {title: "Login", path: "/login", icon: "mdi-account"}
       ]
     }
   }

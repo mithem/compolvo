@@ -23,6 +23,7 @@
 </style>
 <script setup lang="ts">
 import {defineComponent} from "vue";
+import Constants from "./Constants";
 
 defineComponent({
   name: 'LoginForm',
@@ -31,6 +32,6 @@ defineComponent({
 });
 
 function login() {
-  window.location.href = "http://localhost:8000/api/login?redirect_url=http://" + window.location.host + "&email=" + encodeURIComponent("test@example.com") + "&password=" + encodeURIComponent("test");
+  window.location.href = Constants.HOST_URL + "/api/login?redirect_url=" + Constants.HOST_URL + "&email=" + encodeURIComponent("test@example.com") + "&password=" + encodeURIComponent("test");
 }
 </script>
