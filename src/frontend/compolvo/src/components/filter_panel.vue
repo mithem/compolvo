@@ -1,5 +1,5 @@
 <template>
-  <v-card  class="float-left custom-card" max-width="300">
+  <v-card  class="float-left custom-card" max-width="300" min-width="300">
     <v-list density="compact">
       <v-list-item>
 

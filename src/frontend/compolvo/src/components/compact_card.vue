@@ -63,7 +63,10 @@ export default defineComponent({
 
 <style scoped>
 .compact-card {
-  max-width: 400px;
+  min-width: auto;
+  max-width: 100%;
+  max-height: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
 }

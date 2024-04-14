@@ -1,27 +1,26 @@
 <template>
   <filter_panel/>
+  <!-- TODO:Delete Button when finished with testing-->
   <v-btn @click="fetchData">Load Data</v-btn>
-  <v-container>
-    <div v-if="data">{{ data }}</div>
-  </v-container>
-  <v-container>
+  <!-- TODO:Center the div (the container) -->
+  <v-container fluid>
     <v-row>
       <v-col cols="12" md="6" lg="4" v-for="service in services" :key="service.id">
         <compact-card
           :serviceName="service.name"
-          :serviceVersion="service.version"
+          :serviceVersion="service.latestVersion"
           :serviceDescription="service.description"
           :license="service.license"
           :serviceImage="service.image"
           :tags="service.tags"
-          :downloads="service.downloads"
+          :downloadCount="service.download_count"
           :price="service.price"
         />
       </v-col>
     </v-row>
   </v-container>
-
 </template>
+
 <script lang="ts">
 import {defineComponent, ref} from 'vue';
 import CompactCard from '@/components/compact_card.vue';
@@ -77,19 +76,45 @@ export default defineComponent({
     ]);
     const data = ref(null);
     const apiHost = Constants.HOST_URL + "/api/";
+    // const services = ref([]);
 
+    const apiHost = "http://localhost:8000/api/";
     const fetchData = async () => {
       try {
         const response = await fetch(`${apiHost}service`);
-        data.value = await response.json();
+        if (response.ok) {
+          const jsonData = await response.json();
+          services.value = jsonData.map(service => ({
+            id: service.id,
+            name: service.name,
+            description: service.description,
+            license: service.license,
+            download_count: service.download_count,
+            tags: service.tags,
+            image: service.image || 'https://cdn.vuetifyjs.com/images/cards/sunshine.jpg', // Default image if none is provided
+            latestVersion: service.latest_version || 'N/A', // Updated to use latest_version and provide default if absent
+            price: formatPriceWithDuration(service.offerings)  // Format price with duration
+          }));
+          console.log(jsonData);  // Debugging line to see what's fetched
+        } else {
+          throw new Error('Failed to fetch');
+        }
       } catch (error) {
         console.error('Fetch error:', error);
       }
     };
 
-    //onMounted(fetchData);
+    const formatPriceWithDuration = (offerings) => {
+      if (offerings && offerings.length > 0) {
+        const offering = offerings[0]; // Assuming we're only interested in the first offering
+        return `$${offering.price.toFixed(2)} / ${offering.name}`; // Formats the price with duration
+      }
+      return 'Free';  // Default to 'Free' if no offerings
+    };
 
-    return { services, data, fetchData };
+    onMounted(fetchData);
+
+    return { services, fetchData };
   }
 });
 </script>
