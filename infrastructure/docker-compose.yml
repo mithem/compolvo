@@ -5,7 +5,7 @@ services:
     container_name: compolvo-frontend
     build: ../src/frontend/compolvo
     ports:
-      - 3000:3000
+      - 3000:80
   mariadb:
     container_name: compolvo-mariadb
     image: mariadb:11.3
@@ -40,3 +40,6 @@ services:
     ports:
       - target: 80
         published: 8080
+    depends_on:
+      - frontend
+      - server
