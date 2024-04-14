@@ -31,7 +31,7 @@ export default defineComponent({
     CompactCard
   },
   setup() {
-    const services = ref([
+    /*const services = ref([
       {
         id: 1,
         name: "Example Service",
@@ -73,12 +73,11 @@ export default defineComponent({
         downloads: 1500,
         price: "$19.99"
       },
-    ]);
+    ]);*/
+    const services = ref([]);
     const data = ref(null);
     const apiHost = Constants.HOST_URL + "/api/";
-    // const services = ref([]);
 
-    const apiHost = "http://localhost:8000/api/";
     const fetchData = async () => {
       try {
         const response = await fetch(`${apiHost}service`);

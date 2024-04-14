@@ -4,6 +4,7 @@
       <v-form @submit.prevent="login">
         <v-col>
           <v-text-field
+            type="email"
             class="vert-input-field"
             v-model="email"
             :counter="50"
@@ -12,6 +13,7 @@
             required
           ></v-text-field>
           <v-text-field
+            type="password"
             class="vert-input-field"
             v-model="password"
             :counter="50"

@@ -193,27 +193,27 @@ async def create_service(request, user):
 @service.patch("/")
 @protected({UserRole.Role.ADMIN})
 @patch_endpoint(Service)
-async def update_service(request, svc):
+async def update_service(request, svc, user):
     pass
 
 
 @service.delete("/")
 @protected({UserRole.Role.ADMIN})
 @delete_endpoint(Service)
-async def delete_service(request, svc):
+async def delete_service(request, svc, user):
     pass
 
 
 @service_offering.get("/")
 @protected()
 @get_endpoint(ServiceOffering)
-async def get_service_offerings(request, user, offerings):
+async def get_service_offerings(request, offerings, user):
     pass
 
 
 @service_offering.post("/")
 @protected({UserRole.Role.ADMIN})
-async def create_service_offering(request):
+async def create_service_offering(request, user):
     try:
         svc = await Service.get_or_none(id=request.json["service"])
         if svc is None:
@@ -234,14 +234,14 @@ async def create_service_offering(request):
 @service_offering.patch("/")
 @protected({UserRole.Role.ADMIN})
 @patch_endpoint(ServiceOffering)
-async def update_service_offering(request, offering):
+async def update_service_offering(request, offering, user):
     pass
 
 
 @service_offering.delete("/")
 @protected({UserRole.Role.ADMIN})
 @delete_endpoint(ServiceOffering)
-async def delete_service_offering(request, offering):
+async def delete_service_offering(request, offering, user):
     pass
 
 
@@ -274,14 +274,14 @@ async def create_service_plan(request, user):
 @service_plan.patch("/")
 @protected({UserRole.Role.ADMIN})
 @patch_endpoint(ServicePlan)
-async def update_service_plan(request, plan):
+async def update_service_plan(request, plan, user):
     pass  # TODO: Make so users can cancel their own service plans
 
 
 @service_plan.delete("/")
 @protected({UserRole.Role.ADMIN})
 @delete_endpoint(ServicePlan)
-async def delete_service_plan(request):
+async def delete_service_plan(request, plan, user):
     pass
 
 
@@ -294,7 +294,7 @@ async def get_tags(request, tags, user):
 
 @tag.post("/")
 @protected({UserRole.Role.ADMIN})
-async def create_tag(request):
+async def create_tag(request, user):
     try:
         label = request.json["label"]
         tag = await Tag.create(label=label)
@@ -306,29 +306,33 @@ async def create_tag(request):
 @tag.patch("/")
 @protected({UserRole.Role.ADMIN})
 @patch_endpoint(Tag)
-async def update_tag(request, tag):
+async def update_tag(request, tag, user):
     pass
 
 
 @tag.delete("/")
 @protected({UserRole.Role.ADMIN})
 @delete_endpoint(Tag)
-async def delete_tag(request, tag):
+async def delete_tag(request, tag, user):
     pass
 
 
 async def _get_svc_and_tag(request):
     try:
-        service = await Service.get(id=request.json["service"])
-        tag = await Tag.get(id=request.json["tag"])
+        service = await Service.get_or_none(id=request.json["service"])
+        if service is None:
+            raise NotFound("Service not found.")
+        tag = await Tag.get_or_none(id=request.json["tag"])
+        if tag is None:
+            raise NotFound("Tag not found.")
         return service, tag
     except KeyError:
-        raise BadRequest("Missing parameter(s). Required: service, tag (both as ids).")
+        raise BadRequest("Missing paramete)r(s). Required: service, tag (both as ids).")
 
 
 @service.post("/tag")
 @protected({UserRole.Role.ADMIN})
-async def associate_tag_with_service(request):
+async def associate_tag_with_service(request, user):
     svc, tag = await _get_svc_and_tag(request)
     await svc.tags.add(tag)
     return HTTPResponse(status=204)
@@ -336,7 +340,7 @@ async def associate_tag_with_service(request):
 
 @service.delete("/tag")
 @protected({UserRole.Role.ADMIN})
-async def deassociate_tag_with_service(request):
+async def deassociate_tag_with_service(request, user):
     svc, tag = await _get_svc_and_tag(request)
     await svc.tags.remove(tag)
     return HTTPResponse(status=204)
@@ -351,7 +355,7 @@ async def get_payments(request, payments, user):
 
 @payment.post("/")
 @protected({UserRole.Role.ADMIN})
-async def create_payment(request):
+async def create_payment(request, user):
     try:
         plan = await ServicePlan.get(id=request.json["service_plan"])
         date_str = request.json.get("date")
@@ -372,14 +376,14 @@ async def create_payment(request):
 @payment.patch("/")
 @protected({UserRole.Role.ADMIN})
 @patch_endpoint(Payment)
-async def update_payment(request, payment):
+async def update_payment(request, payment, user):
     pass
 
 
 @payment.delete("/")
 @protected({UserRole.Role.ADMIN})
 @delete_endpoint(Payment)
-async def delete_payment(request, payment):
+async def delete_payment(request, payment, user):
     pass
 
 
