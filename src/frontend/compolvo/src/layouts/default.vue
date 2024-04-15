@@ -17,3 +17,4 @@ body, #app, .v-application {
   background-color: #E0E0E0;  /* Light grey background; change hex as needed */
 }
 </style>
+<style src="@/styles/global.scss"></style>
