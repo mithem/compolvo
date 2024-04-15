@@ -10,3 +10,5 @@ RUN pip3 install -r requirements.txt
 COPY . .
 
 ENTRYPOINT sleep 5 && python3 server.py
+
+HEALTHCHECK CMD curl http://localhost:8000/

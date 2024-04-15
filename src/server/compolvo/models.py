@@ -5,7 +5,6 @@ from uuid import UUID
 
 import tortoise.queryset
 from sanic import json
-from tortoise import run_async
 from tortoise.fields import UUIDField, TextField, CharField, IntEnumField, FloatField, IntField, \
     DatetimeField, BooleanField, ForeignKeyField, ManyToManyField
 from tortoise.models import Model
@@ -50,33 +49,12 @@ class Serializable:
 
 class User(Model, Serializable):
     id = UUIDField(pk=True)
-    name = TextField(null=True)
+    first_name = TextField(null=True)
+    last_name = TextField(null=True)
     email = CharField(255, unique=True)
     password = TextField(null=True)
 
-    fields = ["id", "name", "email"]
-
-    @property
-    def rolenames(self):
-        return ["user"]  # TODO: Find a way to actually get user's roles
-        return list(map(lambda role: role.role, run_async(UserRole.filter(user=self.id).all())))
-
-    @classmethod
-    async def lookup(cls, username=None, email=None):
-        if username is not None:
-            return await cls.filter(name=username).get_or_none()
-        elif email is not None:
-            return await cls.filter(email=email).get_or_none()
-        else:
-            return None
-
-    @classmethod
-    async def identify(cls, id):
-        return await cls.filter(id=id).get_or_none()
-
-    @property
-    def identity(self):
-        return self.id
+    fields = ["id", "first_name", "last_name", "email"]
 
 
 class UserRole(Model, Serializable):

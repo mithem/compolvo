@@ -9,6 +9,7 @@ from sanic import Sanic, redirect, Request, text, Blueprint, json, HTTPResponse
 from sanic.exceptions import BadRequest, NotFound, Unauthorized
 from sanic_openapi import openapi
 from tortoise.contrib.sanic import register_tortoise
+from tortoise.exceptions import IntegrityError
 
 from compolvo import cors
 from compolvo import options
@@ -58,12 +59,14 @@ async def index(request):
 
 @app.listener("before_server_start")
 async def test_user(request):
-    async def create_user(email: str, name: str, password: str, role: UserRole.Role = None):
+    async def create_user(email: str, first: str, last: str, password: str,
+                          role: UserRole.Role = None):
         user = await User.get_or_none(email=email)
         if user is None:
             user = await User.create(
                 email=email,
-                name=name,
+                first_name=first,
+                last_name=last,
                 password=password
             )
         if role is None:
@@ -76,8 +79,8 @@ async def test_user(request):
             )
 
     options.setup_options(app, request)
-    await create_user("test@example.com", "Test user", "test")
-    await create_user("admin@example.com", "Admin", "admin", UserRole.Role.ADMIN)
+    await create_user("test@example.com", "Test", "user", "test")
+    await create_user("admin@example.com", "Admin", "Istrator", "admin", UserRole.Role.ADMIN)
 
 
 @app.get("/api/login")
@@ -127,7 +130,8 @@ async def get_user(request, user):
 async def create_user(request):
     try:
         user = await User.create(
-            name=request.json["name"],
+            first_name=request.json.get("first_name"),
+            last_name=request.json.get("last_name"),
             email=request.json["email"],
             password=request.json["password"]
         )
@@ -135,22 +139,24 @@ async def create_user(request):
             user=user,
             role=UserRole.Role.USER
         )
-        return user.json()
+        return await user.json()
     except KeyError:
         raise BadRequest("Missing name, email, or password.")
+    except IntegrityError:
+        return HTTPResponse("Email already taken.", 409)
 
 
 @user.patch("/")
 @protected({UserRole.Role.ADMIN})
 @patch_endpoint(User)
-async def update_user(request, user):
+async def update_user(request, patched_user, user):
     pass  # TODO: Make, so that authenticated user can update themselves, but not others
 
 
 @user.delete("/")
 @protected({UserRole.Role.ADMIN})
 @delete_endpoint(User)
-async def delete_user(request, user):
+async def delete_user(request, deleted_user, user):
     pass  # TODO: Make, so that admins can delete anyone, but everyone themselves
 
 
