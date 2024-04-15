@@ -1,0 +1,4 @@
+agent:
+  id: a4eb2ca8-bcc5-4ecb-ab80-84902b74baa8
+compolvo:
+  host: ws://localhost:8080

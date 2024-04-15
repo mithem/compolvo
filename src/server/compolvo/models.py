@@ -47,6 +47,7 @@ class Serializable:
         assert Model in cls.__mro__, "`cls` must be a subclass of `Model`."
         return await cls.list_json(await cls.all())  # typing: ignore
 
+
 class User(Model, Serializable):
     id = UUIDField(pk=True)
     first_name = TextField(null=True)
@@ -97,6 +98,7 @@ class Tag(Model, Serializable):
 
     fields = ["id", "label"]
 
+
 class ServiceOffering(Model, Serializable):
     id = UUIDField(pk=True)
     name = TextField()
@@ -125,15 +127,19 @@ class Payment(Model, Serializable):
     amount = FloatField()
     date = DatetimeField()
 
-    fields = ["service_plan", "amount", "date"]
+    fields = ["id", "service_plan", "amount", "date"]
 
 
 class Agent(Model, Serializable):
     id = UUIDField(pk=True)
     user = ForeignKeyField("models.User", "agents")
     last_connection_start = DatetimeField(null=True)
+    last_connection_end = DatetimeField(null=True)
+    connected = BooleanField(default=False)
+    connection_interrupted = BooleanField(default=False)
 
-    fields = ["user", "last_connection_start"]
+    fields = ["id", "user", "last_connection_start", "last_connection_end", "connected",
+              "connection_interrupted"]
 
 
 class AgentSoftware(Model):
@@ -143,4 +149,4 @@ class AgentSoftware(Model):
     installed_version = TextField(null=True)
     corrupt = BooleanField(default=False)
 
-    fields = ["agent", "service_plan", "installed_version", "corrupt"]
+    fields = ["id", "agent", "service_plan", "installed_version", "corrupt"]
