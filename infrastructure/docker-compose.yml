@@ -35,6 +35,7 @@ services:
       DB_DATABASE: ${DB_DATABASE}
       CORS_ORIGIN: ${CORS_ORIGIN}
       SERVER_NAME: ${SERVER_NAME}
+      COMPOLVO_SECRET_KEY: ${COMPOLVO_SECRET_KEY}
   reverse-proxy:
     container_name: compolvo-reverse-proxy
     image: nginx:latest

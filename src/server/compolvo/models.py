@@ -53,6 +53,7 @@ class User(Model, Serializable):
     last_name = TextField(null=True)
     email = CharField(255, unique=True)
     password = TextField(null=True)
+    salt = TextField(null=True)
 
     fields = ["id", "first_name", "last_name", "email"]
 

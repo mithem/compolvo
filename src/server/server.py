@@ -1,7 +1,5 @@
 import datetime
 import os
-import secrets
-import string
 
 import jwt
 import jwt.exceptions
@@ -16,6 +14,7 @@ from compolvo import options
 from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, protected
 from compolvo.models import User, Service, ServiceOffering, ServicePlan, Tag, Payment, \
     Agent, AgentSoftware, UserRole
+from compolvo.utils import hash_password, verify_password, generate_secret
 
 HTTP_HEADER_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
 
@@ -23,7 +22,7 @@ app = Sanic("compolvo")
 
 app.config.SERVER_NAME = os.environ["SERVER_NAME"]
 
-app.config.SECRET_KEY = "".join(secrets.choice(string.ascii_letters) for i in range(32))
+app.config.SECRET_KEY = os.environ["COMPOLVO_SECRET_KEY"]
 app.config.SESSION_TIMEOUT = 60 * 60
 
 db_hostname = os.environ[
@@ -63,11 +62,13 @@ async def test_user(request):
                           role: UserRole.Role = None):
         user = await User.get_or_none(email=email)
         if user is None:
+            salt = generate_secret()
             user = await User.create(
                 email=email,
                 first_name=first,
                 last_name=last,
-                password=password
+                password=hash_password(password, salt),
+                salt=salt,
             )
         if role is None:
             role = UserRole.Role.USER
@@ -92,7 +93,7 @@ async def login(request: Request):
     user = await User.get_or_none(email=email)
     if not user:
         raise NotFound("User not found.")
-    if password != user.password:
+    if not verify_password(password, user.password, user.salt):
         raise Unauthorized()
     expires = datetime.datetime.now() + datetime.timedelta(seconds=app.config.SESSION_TIMEOUT)
     token = jwt.encode({"id": str(user.id), "expires": expires.isoformat()}, app.config.SECRET_KEY,
@@ -129,11 +130,14 @@ async def get_user(request, user):
 @user.post("/")
 async def create_user(request):
     try:
+        salt = generate_secret()
+        password = hash_password(request.json["password"], salt)
         user = await User.create(
             first_name=request.json.get("first_name"),
             last_name=request.json.get("last_name"),
             email=request.json["email"],
-            password=request.json["password"]
+            password=password,
+            salt=salt
         )
         await UserRole.create(
             user=user,
