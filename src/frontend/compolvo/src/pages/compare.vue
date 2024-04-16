@@ -23,7 +23,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from 'vue';
+import {defineComponent, ref, onMounted} from 'vue';
 import CompactCard from '@/components/compact_card.vue'; // Adjust the path as necessary
 import Constants from "../components/Constants"; // Adjust the path as necessary
 
