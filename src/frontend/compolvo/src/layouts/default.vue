@@ -2,10 +2,9 @@
   <v-app>
     <Navbar/>
     <v-main>
-      <router-view />
+      <router-view/>
     </v-main>
-
-    <AppFooter />
+    <AppFooter/>
   </v-app>
 </template>
 
@@ -16,6 +15,6 @@
 <style>
 /* Global styles */
 body, #app, .v-application {
-  background-color: #E0E0E0;  /* Light grey background; change hex as needed */
+  background-color: #E0E0E0; /* Light grey background; change hex as needed */
 }
 </style>

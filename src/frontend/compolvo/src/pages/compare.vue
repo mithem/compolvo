@@ -1,28 +1,29 @@
 <template>
-  <filter_panel/>
-  <!-- TODO:Delete Button when finished with testing-->
-  <v-btn @click="fetchData">Load Data</v-btn>
-  <!-- TODO:Center the div (the container) -->
   <v-container fluid>
-    <v-row>
-      <v-col cols="12" md="6" lg="4" v-for="service in services" :key="service.id">
-        <compact-card
-          :serviceName="service.name"
-          :serviceVersion="service.latestVersion"
-          :serviceDescription="service.description"
-          :license="service.license"
-          :serviceImage="service.image"
-          :tags="service.tags"
-          :downloadCount="service.download_count"
-          :price="service.price"
-        />
-      </v-col>
+    <v-row style="margin: 0">
+      <filter_panel style="flex-grow: 1"/>
+      <v-container style="flex-grow: 3; margin:0; padding-top: 0">
+        <v-row>
+          <v-col cols="12" md="6" lg="4" v-for="service in services" :key="service.id">
+            <compact-card
+              :serviceName="service.name"
+              :serviceVersion="service.latestVersion"
+              :serviceDescription="service.description"
+              :license="service.license"
+              :serviceImage="service.image"
+              :tags="service.tags"
+              :downloadCount="service.download_count"
+              :price="service.price"
+            />
+          </v-col>
+        </v-row>
+      </v-container>
     </v-row>
   </v-container>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from 'vue';
+import {defineComponent, ref, onMounted} from 'vue';
 import CompactCard from '@/components/compact_card.vue'; // Adjust the path as necessary
 
 export default defineComponent({
@@ -68,7 +69,7 @@ export default defineComponent({
 
     onMounted(fetchData);
 
-    return { services, fetchData };
+    return {services, fetchData};
   }
 });
 </script>
