@@ -2,8 +2,6 @@ import asyncio
 import datetime
 import os
 import re
-import secrets
-import string
 
 import jwt
 import jwt.exceptions
@@ -20,7 +18,7 @@ from compolvo import cors
 from compolvo import options
 from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, protected
 from compolvo.models import User, Service, ServiceOffering, ServicePlan, Tag, Payment, \
-    Agent, AgentSoftware, UserRole
+    Agent, AgentSoftware, UserRole, Serializable
 from compolvo.utils import hash_password, verify_password, generate_secret
 
 HTTP_HEADER_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
@@ -403,10 +401,16 @@ async def update_payment(request, payment, user):
 async def delete_payment(request, payment, user):
     pass
 
-
 @agent.get("/")
 @protected()
-@get_endpoint(Agent, {UserRole.Role.ADMIN})
+async def get_own_agents(request, user):
+    agents = await Agent.filter(user=user).all()
+    return await Serializable.list_json(agents)
+
+
+@agent.get("/all")
+@protected({UserRole.Role.ADMIN})
+@get_endpoint(Agent)
 async def get_agents(request, agents, user):
     pass
 
@@ -414,14 +418,10 @@ async def get_agents(request, agents, user):
 @agent.post("/")
 @protected()
 async def create_agent(request, user):
-    try:
-        agent = await Agent.create(
-            user=user
-        )
-        return await agent.json()
-    except KeyError:
-        raise BadRequest("Missing parameters. Required: user")
-
+    agent = await Agent.create(
+        user=user
+    )
+    return await agent.json()
 
 @agent.patch("/")
 @protected({UserRole.Role.ADMIN})
@@ -431,11 +431,22 @@ async def update_agent(request, agent, user):
 
 
 @agent.delete("/")
-@protected({UserRole.Role.ADMIN})
+@protected()
 @delete_endpoint(Agent)
 async def delete_agent(request, agent, user):
     pass
 
+
+@agent.delete("/bulk")
+@protected()
+async def bulk_delete_agents(request, user):
+    try:
+        ids = request.json["ids"]
+        print("Ids: ", ids)
+        await Agent.filter(id__in=ids).all().delete()  # TODO: Check RBAC
+        return HTTPResponse(status=204)
+    except KeyError:
+        raise BadRequest("Missing parameters. Required: ids")
 
 @agent_software.get("/")
 @protected({UserRole.Role.ADMIN})

@@ -57,12 +57,16 @@ async function login() {
   loading.value = true
   const params = new URLSearchParams(window.location.search)
   const redirectUrl = params.get("redirect_url") || Constants.HOST_URL
-  const res = await fetch(Constants.HOST_URL + "/api/login?redirect_url=" + redirectUrl + "&email=" + encodeURIComponent(email.value) + "&password=" + encodeURIComponent(password.value));
-  loading.value = false
-  if (res.ok) {
-    document.location.href = redirectUrl
-  } else {
-    alert(await res.text())
+  try {
+    const res = await fetch(Constants.HOST_URL + "/api/login?redirect_url=" + redirectUrl + "&email=" + encodeURIComponent(email.value) + "&password=" + encodeURIComponent(password.value));
+    if (res.ok) {
+      document.location.href = redirectUrl
+    } else {
+      alert(await res.text())
+    }
+  } catch (err) {
+    alert(err);
   }
+  loading.value = false
 }
 </script>

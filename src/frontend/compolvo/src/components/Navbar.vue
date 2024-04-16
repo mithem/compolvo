@@ -23,8 +23,7 @@ export default {
     return {
       appTitle: "Compolvo",
       sidebar: true,
-      menuItems: [
-      ]
+      menuItems: []
     }
   },
   mounted() {
@@ -41,27 +40,29 @@ export default {
       }
     },
     async setMenuItems() {
+      let items = []
       if (await this.isLoggedIn()) {
-        this.menuItems = [
+        items.push(
           {title: "Home", path: "/home", icon: "mdi-home"},
           {title: "Compare", path: "/compare", icon: "mdi-scale-balance"},
+          {title: "Agents", path: "/agents", icon: "mdi-dns"},
           {title: "Profile", path: "/profile", icon: "mdi-account"},
           {title: "Logout", path: "/logout", "icon": "mdi-account"}
-        ]
+        )
       } else {
-        this.menuItems = [
+        items.push(
           {
             title: "Login",
             path: "/login?redirect_url=" + document.location.pathname,
             icon: "mdi-account"
           }
-        ]
+        )
       }
+      this.menuItems = items;
     }
   }
 }
 </script>
 
 <style scoped>
-
 </style>
