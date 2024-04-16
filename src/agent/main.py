@@ -39,7 +39,7 @@ def load_config(config: Dict):
 
 async def run_websocket(config: Config):
     uri = config.compolvo.host + "/api/agent/ws"
-    logger.debug("logger in to WebSocket at %s", uri)
+    logger.debug("logging in to WebSocket at %s", uri)
     async with websockets.connect(uri) as ws:
         login_msg = f"login agent {config.agent.id}"
         await ws.send(login_msg)
