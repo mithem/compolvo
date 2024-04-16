@@ -1,0 +1,62 @@
+name: compolvo
+services:
+  frontend:
+    image: compolvo-frontend:latest
+    container_name: compolvo-frontend
+    build: ../src/frontend/compolvo
+    ports:
+      - 3000:80
+  mariadb:
+    container_name: compolvo-mariadb
+    image: mariadb:11.3
+    command: --port ${DB_PORT}
+    ports:
+      - target: ${DB_PORT}
+        published: ${DB_PORT}
+    environment:
+      MARIADB_USER: ${DB_USERNAME}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+      MARIADB_DATABASE: ${DB_DATABASE}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+  server:
+    container_name: compolvo-server
+    image: compolvo-server:latest
+    build: ../src/server
+    depends_on:
+      - mariadb
+    ports:
+      - target: 8000
+        published: 8000
+    environment:
+      DB_HOSTNAME: ${DB_HOSTNAME}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: ${DB_PORT}
+      DB_DATABASE: ${DB_DATABASE}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      SERVER_NAME: ${SERVER_NAME}
+      COMPOLVO_SECRET_KEY: ${COMPOLVO_SECRET_KEY}
+  reverse-proxy:
+    container_name: compolvo-reverse-proxy
+    image: nginx:latest
+    volumes:
+      - ./reverse-proxy.conf:/etc/nginx/nginx.conf
+    ports:
+      - target: 8080
+        published: 8080
+    depends_on:
+      - frontend
+      - server
+  ssl-terminal:
+    container_name: compolvo-ssl
+    image: nginx:latest
+    volumes:
+      - ./ssl-terminal.conf:/etc/nginx/nginx.conf
+      - /etc/letsencrypt:/ssl
+    ports:
+      - target: 80
+        published: 80
+      - target: 443
+        published: 443
+    depends_on:
+      - reverse-proxy

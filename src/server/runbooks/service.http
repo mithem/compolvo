@@ -1,4 +1,5 @@
 POST http://localhost:8000/api/service
+Cookie: token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImUwODE0NDgzLTJkNWYtNGMzNS1iMGVmLWUwYjgzMjdmM2QxMCIsImV4cGlyZXMiOiIyMDI0LTA0LTEyVDIzOjA5OjMyLjU3NjUwOSJ9.aj8sSoB3RqfTQWgj1dH1emmh-NHg9-hf8oFhAnzCNCk; textwrapon=false; textautoformat=false; wysiwyg=textarea; PHPSESSID=012aeb86ac95ea530dabb8783cacb497
 
 {
   "name": "compolvo-server",
