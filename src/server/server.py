@@ -1,13 +1,20 @@
+import asyncio
 import datetime
 import os
+import re
+import secrets
+import string
 
 import jwt
 import jwt.exceptions
+import websockets
 from sanic import Sanic, redirect, Request, text, Blueprint, json, HTTPResponse
 from sanic.exceptions import BadRequest, NotFound, Unauthorized
+from sanic.log import logger
 from sanic_openapi import openapi
 from tortoise.contrib.sanic import register_tortoise
 from tortoise.exceptions import IntegrityError
+from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 
 from compolvo import cors
 from compolvo import options
@@ -465,6 +472,49 @@ async def update_agent_software(request, software, user):
 async def delete_agent_software(request, software, user):
     pass
 
+
+async def websocket_handler(ws: websockets.WebSocketServerProtocol):
+    login_msg = await ws.recv()
+    match = re.match(r"^login agent (?P<id>[\w-]{36})$", login_msg)
+    if match is None:
+        return await ws.close(4000, "Invalid login message.")
+    agent_id = match.group("id")
+    agent = await Agent.get_or_none(id=agent_id)
+    if agent is None:
+        return await ws.close(4004, "Agent not found.")
+    if agent.connected:
+        return await ws.close(4003, "Agent is already connected.")
+    agent.last_connection_start = datetime.datetime.now()
+    agent.connected = True
+    agent.connection_interrupted = False
+    await agent.save()
+    await ws.send("login successful")
+    try:
+        while True:
+            msg = await ws.recv()
+            await ws.send(msg)
+    except ConnectionClosedOK:
+        pass
+    except ConnectionClosedError:
+        agent.connection_interrupted = True
+    finally:
+        agent.last_connection_end = datetime.datetime.now()
+        agent.connected = False
+        await agent.save()
+
+
+async def run_websocket_server(app):
+    logger.info("Preparing agents' connected attributes...")
+    agents = await Agent.filter(connected=True).all()
+    for agent in agents:
+        agent.connected = False
+        await agent.save()
+    async with websockets.serve(websocket_handler, "0.0.0.0", 8001):
+        logger.info("Started websocket server")
+        await asyncio.Future()
+
+
+app.add_task(run_websocket_server(app))
 
 if __name__ == "__main__":
     app.run("0.0.0.0")
