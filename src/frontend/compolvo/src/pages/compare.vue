@@ -1,10 +1,10 @@
 <template>
   <v-container fluid>
     <v-row style="margin: 0">
-      <filter_panel style="flex-grow: 1"/>
+      <filter_panel @applyFilter="filterServices($event)" style="flex-grow: 1"/>
       <v-container style="flex-grow: 3; margin:0; padding-top: 0">
         <v-row>
-          <v-col cols="12" md="6" lg="4" v-for="service in services" :key="service.id">
+          <v-col cols="12" md="6" lg="4" v-for="service in filteredServices" :key="service.id">
             <compact-card
               :serviceName="service.name"
               :serviceVersion="service.latestVersion"
@@ -33,6 +33,7 @@ export default defineComponent({
   },
   setup() {
     const services = ref([]);
+    const filteredServices = ref([]);
 
     const apiHost = Constants.HOST_URL + "/api/";
     const fetchData = async () => {
@@ -52,6 +53,7 @@ export default defineComponent({
             price: formatPriceWithDuration(service.offerings)  // Format price with duration
           }));
           console.log(jsonData);  // Debugging line to see what's fetched
+          await filterServices(null)
         } else {
           throw new Error('Failed to fetch');
         }
@@ -65,12 +67,37 @@ export default defineComponent({
         const offering = offerings[0]; // Assuming we're only interested in the first offering
         return `$${offering.price.toFixed(2)} / ${offering.name}`; // Formats the price with duration
       }
-      return 'N/A';  // Default to 'Free' if no offerings
+      return 'N/A';
     };
 
     onMounted(fetchData);
 
-    return {services, fetchData};
+    const filterServices = async function (filter) {
+      let result = services.value;
+      if (filter) {
+        if (filter.tags.length > 0) {
+          result = result.filter(service => filter.tags.some(tag => service.tags.includes(tag)));
+        }
+        result = result.filter(service => {
+          const priceNumber = parseFloat(service.price.replace(/[^0-9\.]+/g, ""));
+          return priceNumber >= filter.priceRange[0] && priceNumber <= filter.priceRange[1];
+        });
+        if (filter.owned !== '') {
+          result = result.filter(service => service.owned === filter.owned);
+        }
+        if (filter.license !== '') {
+          result = result.filter(service => service.license === filter.license);
+        }
+        if (filter.os !== '') {
+          result = result.filter(service => service.os && service.os.includes(filter.os));
+        }
+        console.log(result)
+      }
+      filteredServices.value = result
+      console.log(filter);
+    }
+
+    return {services, filteredServices, fetchData, filterServices};
   }
 });
 </script>

@@ -91,20 +91,21 @@ export default defineComponent({
   data: () => ({
     filters: {
       tags: [],
-      priceRange: [0, 100],
+      priceRange: [0, 10000],
       owned: '',
       license: '',
       os: ''
     } as Filters,
     tagsOptions: ['foo', 'bar', 'fizz', 'buzz', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
     minPrice: 0,
-    maxPrice: 100,
+    maxPrice: 10000,
     licenseOptions: ['GPL', 'MIT', 'Apache'],
     osOptions: ['Windows', 'macOS', 'Linux']
   }),
   methods: {
     applyFilters(): void {
       console.log('Applied Filters:', this.filters);
+      this.$emit('applyFilter', this.filters)
     }
   }
 });
