@@ -1,19 +1,24 @@
+import asyncio
 import datetime
 import os
+import re
 
 import jwt
 import jwt.exceptions
+import websockets
 from sanic import Sanic, redirect, Request, text, Blueprint, json, HTTPResponse
 from sanic.exceptions import BadRequest, NotFound, Unauthorized
+from sanic.log import logger
 from sanic_openapi import openapi
 from tortoise.contrib.sanic import register_tortoise
 from tortoise.exceptions import IntegrityError
+from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 
 from compolvo import cors
 from compolvo import options
 from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, protected
 from compolvo.models import User, Service, ServiceOffering, ServicePlan, Tag, Payment, \
-    Agent, AgentSoftware, UserRole
+    Agent, AgentSoftware, UserRole, Serializable
 from compolvo.utils import hash_password, verify_password, generate_secret
 
 HTTP_HEADER_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
@@ -396,10 +401,16 @@ async def update_payment(request, payment, user):
 async def delete_payment(request, payment, user):
     pass
 
-
 @agent.get("/")
 @protected()
-@get_endpoint(Agent, {UserRole.Role.ADMIN})
+async def get_own_agents(request, user):
+    agents = await Agent.filter(user=user).all()
+    return await Serializable.list_json(agents)
+
+
+@agent.get("/all")
+@protected({UserRole.Role.ADMIN})
+@get_endpoint(Agent)
 async def get_agents(request, agents, user):
     pass
 
@@ -407,14 +418,10 @@ async def get_agents(request, agents, user):
 @agent.post("/")
 @protected()
 async def create_agent(request, user):
-    try:
-        agent = await Agent.create(
-            user=user
-        )
-        return await agent.json()
-    except KeyError:
-        raise BadRequest("Missing parameters. Required: user")
-
+    agent = await Agent.create(
+        user=user
+    )
+    return await agent.json()
 
 @agent.patch("/")
 @protected({UserRole.Role.ADMIN})
@@ -424,11 +431,22 @@ async def update_agent(request, agent, user):
 
 
 @agent.delete("/")
-@protected({UserRole.Role.ADMIN})
+@protected()
 @delete_endpoint(Agent)
 async def delete_agent(request, agent, user):
     pass
 
+
+@agent.delete("/bulk")
+@protected()
+async def bulk_delete_agents(request, user):
+    try:
+        ids = request.json["ids"]
+        print("Ids: ", ids)
+        await Agent.filter(id__in=ids).all().delete()  # TODO: Check RBAC
+        return HTTPResponse(status=204)
+    except KeyError:
+        raise BadRequest("Missing parameters. Required: ids")
 
 @agent_software.get("/")
 @protected({UserRole.Role.ADMIN})
@@ -465,6 +483,49 @@ async def update_agent_software(request, software, user):
 async def delete_agent_software(request, software, user):
     pass
 
+
+async def websocket_handler(ws: websockets.WebSocketServerProtocol):
+    login_msg = await ws.recv()
+    match = re.match(r"^login agent (?P<id>[\w-]{36})$", login_msg)
+    if match is None:
+        return await ws.close(4000, "Invalid login message.")
+    agent_id = match.group("id")
+    agent = await Agent.get_or_none(id=agent_id)
+    if agent is None:
+        return await ws.close(4004, "Agent not found.")
+    if agent.connected:
+        return await ws.close(4003, "Agent is already connected.")
+    agent.last_connection_start = datetime.datetime.now()
+    agent.connected = True
+    agent.connection_interrupted = False
+    await agent.save()
+    await ws.send("login successful")
+    try:
+        while True:
+            msg = await ws.recv()
+            await ws.send(msg)
+    except ConnectionClosedOK:
+        pass
+    except ConnectionClosedError:
+        agent.connection_interrupted = True
+    finally:
+        agent.last_connection_end = datetime.datetime.now()
+        agent.connected = False
+        await agent.save()
+
+
+async def run_websocket_server(app):
+    logger.info("Preparing agents' connected attributes...")
+    agents = await Agent.filter(connected=True).all()
+    for agent in agents:
+        agent.connected = False
+        await agent.save()
+    async with websockets.serve(websocket_handler, "0.0.0.0", 8001):
+        logger.info("Started websocket server")
+        await asyncio.Future()
+
+
+app.add_task(run_websocket_server(app))
 
 if __name__ == "__main__":
     app.run("0.0.0.0")
