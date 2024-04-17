@@ -83,7 +83,7 @@ def protected(requires_roles: Set[UserRole.Role] = None):
                 user = await check_token(request)
                 assert user
                 if requires_roles is not None:
-                    assert user_has_roles(user, requires_roles)
+                    assert await user_has_roles(user, requires_roles)
 
                 response = await func(request, user, *args, **kwargs)
                 return response
