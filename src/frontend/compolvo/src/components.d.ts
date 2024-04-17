@@ -7,6 +7,7 @@ export {}
 
 declare module 'vue' {
   export interface GlobalComponents {
+    AgentSoftwareCard: typeof import('./components/AgentSoftwareCard.vue')['default']
     AppFooter: typeof import('./components/AppFooter.vue')['default']
     Compact_card: typeof import('./components/compact_card.vue')['default']
     CreateAgentDialog: typeof import('./components/CreateAgentDialog.vue')['default']

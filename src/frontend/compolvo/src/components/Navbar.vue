@@ -33,6 +33,9 @@ export default {
     async isLoggedIn(): Promise<boolean> {
       try {
         const res = await fetch("/api/user/me")
+        if (!res.ok) {
+          return false
+        }
         const data = JSON.parse(await res.text())
         return data.id !== undefined
       } catch (err) {

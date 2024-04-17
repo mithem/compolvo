@@ -119,6 +119,7 @@ async def logout(request: Request):
 async def admin(request, user):
     return text("Admin page")
 
+
 @user.get("/")
 @protected()
 @get_endpoint(User, {UserRole.Role.ADMIN})
@@ -131,6 +132,7 @@ async def get_users(request, users, user):
 async def get_user(request, user):
     return json(
         {**await user.to_dict(), "roles": [await role.to_dict() for role in await user.roles]})
+
 
 @user.post("/")
 async def create_user(request):
@@ -272,7 +274,9 @@ async def get_service_plans(request, plans, user):
 async def create_service_plan(request, user):
     try:
         service_offering_id = request.json["service_offering"]
-        offering = await ServiceOffering.get(id=service_offering_id)
+        offering = await ServiceOffering.get_or_none(id=service_offering_id)
+        if offering is None:
+            raise NotFound("Specified service offering not found.")
         start_date = request.json.get("start_date")
         start = datetime.date.fromisoformat(
             start_date) if start_date is not None else datetime.datetime.now()
@@ -282,7 +286,7 @@ async def create_service_plan(request, user):
             data = {**data, "end_date": datetime.datetime.fromisoformat(end)}
         plan = await ServicePlan.create(**data)
         return await plan.json()
-    except KeyError:
+    except (KeyError, AttributeError):
         raise BadRequest("Missing parameters. Required: service_offering, and user.")
 
 
@@ -384,7 +388,7 @@ async def create_payment(request, user):
             amount=request.json["amount"]
         )
         return await payment.json()
-    except KeyError:
+    except (KeyError, AttributeError):
         raise BadRequest("Missing parameters. Required: servcice_plan")
 
 
@@ -400,6 +404,7 @@ async def update_payment(request, payment, user):
 @delete_endpoint(Payment)
 async def delete_payment(request, payment, user):
     pass
+
 
 @agent.get("/")
 @protected()
@@ -418,10 +423,13 @@ async def get_agents(request, agents, user):
 @agent.post("/")
 @protected()
 async def create_agent(request, user):
+    name = request.json.get("name") if request.json is not None else None
     agent = await Agent.create(
-        user=user
+        user=user,
+        name=name
     )
     return await agent.json()
+
 
 @agent.patch("/")
 @protected({UserRole.Role.ADMIN})
@@ -448,19 +456,44 @@ async def bulk_delete_agents(request, user):
     except KeyError:
         raise BadRequest("Missing parameters. Required: ids")
 
-@agent_software.get("/")
+
+@agent_software.get("/all")
 @protected({UserRole.Role.ADMIN})
 @get_endpoint(AgentSoftware)
 async def get_agent_software(request, software, user):
     pass
 
 
+@agent_software.get("/")
+@protected()
+async def get_own_agent_software(request, user):
+    softwares = await AgentSoftware.filter(agent__user=user).all()
+    data = []
+    for software in softwares:
+        offering = await (await software.service_plan).service_offering
+        service = await offering.service
+        agent = await software.agent
+        data.append(
+            {
+                **await software.to_dict(),
+                "latest_version": service.latest_version,
+                "offering": await offering.to_dict(),
+                "service": await service.to_dict(),
+                "agent": await agent.to_dict()
+            })
+    return json(data)
+
+
 @agent_software.post("/")
 @protected({UserRole.Role.ADMIN})
 async def create_agent_software(request, user):
     try:
-        agent = await Agent.get(id=request.json["agent"])
-        service_plan = await ServicePlan.get(id=request.json["service_plan"])
+        agent = await Agent.get_or_none(id=request.json["agent"])
+        if agent is None:
+            raise NotFound("Agent not found.")
+        service_plan = await ServicePlan.get_or_none(id=request.json["service_plan"])
+        if service_plan is None:
+            raise NotFound("Service plan not found.")
         software = await AgentSoftware.create(
             agent=agent,
             service_plan=service_plan,
