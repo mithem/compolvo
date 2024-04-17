@@ -76,8 +76,18 @@
   </v-card>
 </template>
 
-<script>
-export default {
+<script lang="ts">
+import {defineComponent} from 'vue';
+
+interface Filters {
+  tags: string[];
+  priceRange: number[];
+  owned: string;
+  license: string;
+  os: string;
+}
+
+export default defineComponent({
   data: () => ({
     filters: {
       tags: [],
@@ -85,7 +95,7 @@ export default {
       owned: '',
       license: '',
       os: ''
-    },
+    } as Filters,
     tagsOptions: ['foo', 'bar', 'fizz', 'buzz', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
     minPrice: 0,
     maxPrice: 100,
@@ -93,11 +103,11 @@ export default {
     osOptions: ['Windows', 'macOS', 'Linux']
   }),
   methods: {
-    applyFilters() {
+    applyFilters(): void {
       console.log('Applied Filters:', this.filters);
     }
   }
-}
+});
 </script>
 
 <style scoped>
@@ -118,7 +128,6 @@ export default {
   color: rgba(0, 0, 0, .87);
   margin-bottom: 8px;
 }
-
 
 .price-slider .v-slider__thumb-label {
   background: white;
