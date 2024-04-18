@@ -283,7 +283,7 @@ async def create_service_plan(request, user):
         data = {"user": user, "service_offering": offering, "start_date": start}
         end = request.json.get("end_date")
         if end is not None:
-            data = {**data, "end_date": datetime.datetime.fromisoformat(end)}
+            data["end_date"] = datetime.datetime.fromisoformat(end)
         plan = await ServicePlan.create(**data)
         return await plan.json()
     except (KeyError, AttributeError):

@@ -5,16 +5,34 @@ export interface AgentSoftware {
   installed_version: string
   corrupt: boolean
   latest_version: string
-  offering: Offering
-  service: Service
+  offering: ServiceOffering
+  service: AgentService
 }
 
-export interface Offering {
+export interface ServiceOffering {
+  id: string
   name: string
   description: string
   price: number
   duration_days: number
   service: string
+}
+
+export interface AgentService {
+  id: string
+  name: string
+  description: string | null
+  license: string | null
+  download_count: number | null
+  retrieval_method: number | null
+  retrieval_data: string | null
+  latest_version: string | null
+  image: string | null
+}
+
+export interface Tag {
+  id: string
+  label: string
 }
 
 export interface Service {
@@ -27,6 +45,8 @@ export interface Service {
   retrieval_data: string | null
   latest_version: string | null
   image: string | null
+  tags: Tag[]
+  offerings: ServiceOffering[]
 }
 
 export interface Agent {

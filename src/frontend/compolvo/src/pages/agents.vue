@@ -173,9 +173,10 @@ export default defineComponent({
                 <v-col>
                   <h1>Create Agent</h1>
                   <v-progress-linear v-if="creating" indeterminate :height="5"></v-progress-linear>
-                  <div>The new agent's ID is:</div>
-                  <v-skeleton-loader v-if="creating" type="text"></v-skeleton-loader>
-                  <div v-else>{{ newAgentID }}</div>
+                  <div>The new agent's ID is:
+                    <v-skeleton-loader v-if="creating" type="text"></v-skeleton-loader>
+                    <div v-else>{{ newAgentID }}</div>
+                  </div>
                   <br/>
                   <div>Please run the following command on the machine you want to install the agent
                     on.
