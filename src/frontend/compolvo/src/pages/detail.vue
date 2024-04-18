@@ -1,6 +1,6 @@
 <script lang="ts">
 import {defineComponent, ref} from "vue";
-import {Service, ServiceOffering} from "../components/models";
+import {ServiceOffering} from "../components/models";
 
 interface SelectableOffering {
   props: { title: string, subtitle: string },

@@ -262,11 +262,25 @@ async def delete_service_offering(request, offering, user):
     pass
 
 
-@service_plan.get("/")
+@service_plan.get("/all")
 @protected()
 @get_endpoint(ServicePlan, {UserRole.Role.ADMIN})
 async def get_service_plans(request, plans, user):
     pass
+
+
+@service_plan.get("/")
+@protected()
+async def get_own_service_plans(request, user):
+    plans = await ServicePlan.filter(user=user).all()
+    data = []
+    for plan in plans:
+        offering: ServiceOffering = await plan.service_offering
+        service: Service = await offering.service
+        offering_dict = {**await offering.to_dict(), "service": await service.to_dict()}
+        plan_dict = {**await plan.to_dict(), "service_offering": offering_dict}
+        data.append(plan_dict)
+    return json(data)
 
 
 @service_plan.post("/")

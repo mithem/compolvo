@@ -6,7 +6,7 @@ export interface AgentSoftware {
   corrupt: boolean
   latest_version: string
   offering: ServiceOffering
-  service: AgentService
+  service: Service
 }
 
 export interface ServiceOffering {
@@ -18,7 +18,16 @@ export interface ServiceOffering {
   service: string
 }
 
-export interface AgentService {
+export interface DetailedServiceOffering {
+  id: string
+  name: string
+  description: string
+  price: number
+  duration_days: number
+  service: Service
+}
+
+export interface Service {
   id: string
   name: string
   description: string | null
@@ -35,7 +44,7 @@ export interface Tag {
   label: string
 }
 
-export interface Service {
+export interface DetailedService {
   id: string
   name: string
   description: string | null
@@ -57,6 +66,15 @@ export interface Agent {
   lastConnectionEnd: Date;
   connected: boolean;
   connectionInterrupted: boolean;
+}
+
+export interface ServicePlan {
+  id: string
+  user: string
+  service_offering: DetailedServiceOffering
+  start_date: string
+  end_date: string
+  canceled_by_user: boolean
 }
 
 export interface User {
