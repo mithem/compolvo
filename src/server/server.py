@@ -61,6 +61,100 @@ async def index(request):
     return redirect("/docs")
 
 
+@app.post("/api/setup")
+@protected({UserRole.Role.ADMIN})
+async def db_setup(request, user):
+    if request.json is not None and request.json.get("services", False):
+        tag_developer = await Tag.create(
+            label="Developer"
+        )
+        tag_enthusiast = await Tag.create(
+            label="Enthusiast"
+        )
+        svc_docker = await Service.create(
+            name="Docker Desktop",
+            description="The ultimate Docker experience.",
+            license="Proprietary",
+            download_count=42069,
+            retrieval_method=Service.RetrievalMethod.APT,
+            retrieval_data='{"hello": "world"}',
+            image=""
+        )
+        await svc_docker.tags.add(
+            tag_developer,
+            tag_enthusiast
+        )
+        await svc_docker.save()
+        svc_git = await Service.create(
+            name="Git",
+            description="The ultimate version control system.",
+            license="MIT",
+            download_count=42069,
+            retrieval_method=Service.RetrievalMethod.COMMAND,
+            retrieval_data='{"hello": "world"}',
+            image=""
+        )
+        await svc_git.tags.add(
+            tag_developer
+        )
+        await svc_git.save()
+        svc_nextcloud = await Service.create(
+            name="Nextcloud",
+            description="The comprehensive cloud - right from your home",
+            license="MIT",
+            download_count=42069,
+            retrieval_method=Service.RetrievalMethod.COMMAND,
+            retrieval_data='{"hello": "world"}',
+            image=""
+        )
+        await svc_nextcloud.tags.add(
+            tag_enthusiast
+        )
+        await svc_nextcloud.save()
+        if request.json is not None and request.json.get("service_offerings", False):
+            off_docker_month = await ServiceOffering.create(
+                service=svc_docker,
+                name="month",
+                price=9.99,
+                duration_days=30
+            )
+            off_docker_year = await ServiceOffering.create(
+                service=svc_docker,
+                name="year",
+                price=99.99,
+                duration_days=360
+            )
+            off_git_month = await ServiceOffering.create(
+                service=svc_git,
+                name="month",
+                price=2.99,
+                duration_days=30
+            )
+            off_nextcloud_year = await ServiceOffering.create(
+                service=svc_nextcloud,
+                name="year",
+                price=29.00,
+                duration_days=360
+            )
+            if request.json is not None and request.json.get("service_plans", False):
+                plan_docker = await ServicePlan.create(
+                    user=user,
+                    service_offering=off_docker_month,
+                    start_date=datetime.datetime.now()
+                )
+                plan_git = await ServicePlan.create(
+                    user=user,
+                    service_offering=off_git_month,
+                    start_date=datetime.datetime.now() - datetime.timedelta(days=7)
+                )
+                plan_nextcloud = await ServicePlan.create(
+                    user=user,
+                    service_offering=off_nextcloud_year,
+                    start_date=datetime.datetime.now() - datetime.timedelta(days=45)
+                )
+    return HTTPResponse("Created.", status=201)
+
+
 @app.listener("before_server_start")
 async def test_user(request):
     async def create_user(email: str, first: str, last: str, password: str,

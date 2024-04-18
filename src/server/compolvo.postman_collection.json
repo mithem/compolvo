@@ -166,6 +166,18 @@
     },
     {
       "name": "service/offering",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.variables.set(\"SERVICE_OFFERING\", pm.response.json().id);;"
+            ],
+            "type": "text/javascript",
+            "packages": {}
+          }
+        }
+      ],
       "request": {
         "method": "POST",
         "header": [],
@@ -289,6 +301,172 @@
           "path": [
             "api",
             "tag"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "agent",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/agent",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "agent"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "agent",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"user\": \"45851e6d-afd0-4ae2-9d44-ce25c536efc2\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{HOST}}/api/agent",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "agent"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "agent/software",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"agent\": \"40e23b1d-4a47-4ca6-893a-55a3b9ef82bc\",\n    \"service_plan\": \"89b79da1-bd05-4b84-b921-c407da7ac064\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{HOST}}/api/agent/software",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "agent",
+            "software"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "service/plan",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/service/plan",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "service",
+            "plan"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "agent/software",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/agent/software",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "agent",
+            "software"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "service/plan",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"user\": \"176bb5cd-4c0c-4572-9843-b40b9f949bcc\",\n    \"service_offering\": \"ec899731-0e7f-4e6a-85e8-f1415d03e69a\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{HOST}}/api/service/plan",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "service",
+            "plan"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "setup",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"services\": true,\n    \"service_offerings\": true,\n    \"service_plans\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{HOST}}/api/setup",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "setup"
           ]
         }
       },
