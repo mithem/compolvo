@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import os
 import re
+from typing import Set
 
 import jwt
 import jwt.exceptions
@@ -376,7 +377,17 @@ async def get_own_service_plans(request, user):
         offering: ServiceOffering = await plan.service_offering
         service: Service = await offering.service
         offering_dict = {**await offering.to_dict(), "service": await service.to_dict()}
-        plan_dict = {**await plan.to_dict(), "service_offering": offering_dict}
+        if plan.canceled_by_user:
+            installable = False
+        else:
+            agent_count = await Agent.filter(user=user).count()
+            software_instances_count = await AgentSoftware.filter(service_plan=plan).count()
+            installable = software_instances_count < agent_count
+        plan_dict = {
+            **await plan.to_dict(),
+            "service_offering": offering_dict,
+            "installable": installable
+        }
         data.append(plan_dict)
     return json(data)
 
@@ -521,6 +532,16 @@ async def delete_payment(request, payment, user):
 @agent.get("/")
 @protected()
 async def get_own_agents(request, user):
+    plan = request.args.get("installable_for_service_plan")
+    if plan is not None:
+        plan = await ServicePlan.get_or_none(id=plan)
+        if plan is None:
+            raise NotFound("Service plan not found.")
+        softwares = await AgentSoftware.filter(service_plan=plan).all()
+        agents = {await software.agent for software in softwares}
+        installable_agents: Set[Serializable] = set(await Agent.filter(user=user).all()) - agents
+        return await Serializable.list_json(installable_agents)
+
     agents = await Agent.filter(user=user).all()
     return await Serializable.list_json(agents)
 
@@ -613,6 +634,49 @@ async def create_agent_software(request, user):
         return await software.json()
     except KeyError:
         raise BadRequest("Missing parameters. Required: agent, service_plan")
+
+
+@agent_software.post("/bulk")
+@protected()
+async def bulk_create_agent_software(request, user):
+    missing_params = BadRequest("Missing parameters. Required: agents, service_plan.")
+    agents = []
+    if request.json is None:
+        raise missing_params
+    try:
+        plan = await ServicePlan.get_or_none(id=request.json["service_plan"])
+        if plan is None:
+            raise NotFound("Service plan not found.")
+        offering: ServiceOffering = await plan.service_offering
+        service: Service = await offering.service
+        offerings = await ServiceOffering.filter(service=service).all()
+        offering_ids = list(map(lambda offering: offering.id, offerings))
+        existing_plans = list(map(lambda plan: plan.id, await ServicePlan.filter(user=user,
+                                                                                 service_offering_id__in=offering_ids).all()))
+        existing_softwares = await AgentSoftware.filter(
+            service_plan_id__in=existing_plans).all().prefetch_related("agent")
+        if (await plan.user).id != user.id:
+            raise BadRequest(
+                "You can't bulk-create agent software for another user's service plan.")
+        for id in request.json.get("agents", []):
+            agent = await Agent.get_or_none(id=id)
+            if agent is None:
+                raise NotFound(f"Agent {id} not found.")
+            if (await agent.user).id != user.id:
+                raise BadRequest("You can't bulk-create agent software for other user's agents.")
+            for software in existing_softwares:
+                potentially_already_installed_agent = await software.agent
+                if str(potentially_already_installed_agent.id) == id:
+                    raise BadRequest(
+                        f"The software you want to install via the service plan is already installed on agent {id} (possibly by another service plan).")
+            agents.append(agent)
+        softwares = [AgentSoftware(agent=agent, service_plan=plan) for agent in agents]
+        await AgentSoftware.bulk_create(softwares)
+        return HTTPResponse(status=201)
+    except KeyError:
+        raise missing_params
+    except IntegrityError:
+        raise BadRequest("Service plan is already installed on at least one agent.")
 
 
 @agent_software.patch("/")

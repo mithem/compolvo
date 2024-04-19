@@ -1,6 +1,6 @@
 import datetime
 from enum import IntEnum
-from typing import List, Type
+from typing import List, Type, Iterable
 from uuid import UUID
 
 import tortoise.queryset
@@ -38,7 +38,7 @@ class Serializable:
         return json(await self.to_dict())
 
     @staticmethod
-    async def list_json(objects: List["Serializable"]):
+    async def list_json(objects: Iterable["Serializable"]):
         return json([await object.to_dict() for object in objects])
 
     @staticmethod
@@ -152,3 +152,6 @@ class AgentSoftware(Model, Serializable):
     corrupt = BooleanField(default=False)
 
     fields = ["id", "agent", "service_plan", "installed_version", "corrupt"]
+
+    class Meta:
+        unique_together = (("agent", "service_plan"),)

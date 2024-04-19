@@ -75,6 +75,7 @@ export interface ServicePlan {
   start_date: string
   end_date: string
   canceled_by_user: boolean
+  installable: boolean
 }
 
 export interface User {
