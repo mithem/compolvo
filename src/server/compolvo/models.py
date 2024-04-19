@@ -133,17 +133,18 @@ class Payment(Model, Serializable):
 
 class Agent(Model, Serializable):
     id = UUIDField(pk=True)
+    name = TextField(null=True)
     user = ForeignKeyField("models.User", "agents")
     last_connection_start = DatetimeField(null=True)
     last_connection_end = DatetimeField(null=True)
     connected = BooleanField(default=False)
     connection_interrupted = BooleanField(default=False)
 
-    fields = ["id", "user", "last_connection_start", "last_connection_end", "connected",
+    fields = ["id", "name", "user", "last_connection_start", "last_connection_end", "connected",
               "connection_interrupted"]
 
 
-class AgentSoftware(Model):
+class AgentSoftware(Model, Serializable):
     id = UUIDField(pk=True)
     agent = ForeignKeyField("models.Agent", "agent_softwares")
     service_plan = ForeignKeyField("models.ServicePlan", "agent_softwares")

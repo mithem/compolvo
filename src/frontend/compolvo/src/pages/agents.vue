@@ -1,25 +1,7 @@
 <script lang="ts">
-import {defineComponent, ref} from "vue";
+import {defineComponent, onMounted, ref} from "vue";
+import {Agent} from "../components/models";
 
-
-class Agent {
-  id: string;
-  user: string;
-  lastConnectionStart: Date;
-  lastConnectionEnd: Date;
-  connected: boolean;
-  connectionInterrupted: boolean;
-
-
-  constructor(id: string, user: string, lastConnectionStart: Date, lastConnectionEnd: Date, connected: boolean, connectionInterrupted: boolean) {
-    this.id = id;
-    this.user = user;
-    this.lastConnectionStart = lastConnectionStart;
-    this.lastConnectionEnd = lastConnectionEnd;
-    this.connected = connected;
-    this.connectionInterrupted = connectionInterrupted;
-  }
-}
 
 export default defineComponent({
   data() {
@@ -32,6 +14,7 @@ export default defineComponent({
           align: "start",
           key: "id"
         },
+        {title: "Name", key: "name"},
         {title: "User", key: "user"},
         {title: "Last connection start", key: "lastConnectionStart"},
         {title: "Last connection end", key: "lastConnectionEnd"},
@@ -41,9 +24,9 @@ export default defineComponent({
     }
   },
   setup() {
-    const agents = ref([]);
-    const filteredAgents = ref([]);
-    const selectedAgents = ref([]);
+    const agents = ref<Agent[]>([]);
+    const filteredAgents = ref<Agent[]>([]);
+    const selectedAgents = ref<string[]>([]);
     const searchQuery = ref("");
     const loading = ref(false);
     const deleting = ref(false);
@@ -55,16 +38,7 @@ export default defineComponent({
       if (!res.ok) {
         alert(await res.text());
       } else {
-        agents.value = JSON.parse(await res.text()).map((agent) => {
-          return new Agent(
-            agent.id,
-            agent.user,
-            agent.last_connection_start,
-            agent.last_connection_end,
-            agent.connected,
-            agent.connection_interrupted
-          );
-        });
+        agents.value = JSON.parse(await res.text());
         await filterAgents();
       }
       loading.value = false
@@ -199,9 +173,10 @@ export default defineComponent({
                 <v-col>
                   <h1>Create Agent</h1>
                   <v-progress-linear v-if="creating" indeterminate :height="5"></v-progress-linear>
-                  <div>The new agent's ID is:</div>
-                  <v-skeleton-loader v-if="creating" type="text"></v-skeleton-loader>
-                  <div v-else>{{ newAgentID }}</div>
+                  <div>The new agent's ID is:
+                    <v-skeleton-loader v-if="creating" type="text"></v-skeleton-loader>
+                    <div v-else>{{ newAgentID }}</div>
+                  </div>
                   <br/>
                   <div>Please run the following command on the machine you want to install the agent
                     on.
