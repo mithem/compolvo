@@ -11,13 +11,16 @@ export default defineComponent({
     const svcPlans = ref<ServicePlan[]>([]);
 
     const fetchServicePlans = async function () {
+      console.log("Fetching service plans")
       loading.value = true
       try {
         const res = await fetch("/api/service/plan")
         if (!res.ok) {
           alert(await res.text())
         } else {
-          svcPlans.value = JSON.parse(await res.text())
+          let text = await res.text();
+          console.log(text)
+          svcPlans.value = JSON.parse(text)
         }
       } catch (err) {
         alert(err)
@@ -54,7 +57,7 @@ export default defineComponent({
     <v-container>
       <v-row>
         <v-col cols="12" md="6" lg="4" v-for="plan in svcPlans" :key="plan.id">
-          <ServicePlanCard :service_plan="plan" @reload="fetchServicePlans"></ServicePlanCard>
+          <ServicePlanCard :service_plan="plan"></ServicePlanCard>
         </v-col>
       </v-row>
     </v-container>

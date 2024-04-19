@@ -366,7 +366,11 @@ async def get_service_plans(request, plans, user):
 @service_plan.get("/")
 @protected()
 async def get_own_service_plans(request, user):
-    plans = await ServicePlan.filter(user=user).all()
+    filter_data = {"user": user}
+    id = request.args.get("id")
+    if id is not None:
+        filter_data["id"] = id
+    plans = await ServicePlan.filter(**filter_data).all()
     data = []
     for plan in plans:
         offering: ServiceOffering = await plan.service_offering

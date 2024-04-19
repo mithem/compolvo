@@ -21,7 +21,7 @@ export default defineComponent({
         if (!res.ok) {
           alert(await res.text());
         } else {
-          this.$emit("reload")
+          await fetchData();
         }
       } catch (err) {
         alert(err)
@@ -29,7 +29,20 @@ export default defineComponent({
       cancelling.value = false;
     }
 
-    return {plan, cancelling, cancel}
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/service/plan?id=" + plan.value.id)
+        if (!res.ok) {
+          alert(await res.text())
+        } else {
+          plan.value = JSON.parse(await res.text())[0];
+        }
+      } catch (err) {
+        alert(err)
+      }
+    }
+
+    return {plan, cancelling, cancel, fetchData}
   }
 })
 </script>
