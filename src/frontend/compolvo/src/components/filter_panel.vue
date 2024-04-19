@@ -9,6 +9,8 @@
           label="Tags"
           multiple
           dense
+          clearable
+          key="id"
         >
           <template v-slot:selection="{ item, index }">
             <v-chip v-if="index < 2" class="chip-custom">
@@ -40,13 +42,18 @@
         </v-container>
       </v-list-item>
 
-      <!-- Owned Filter -->
-      <v-list-item>
-        <v-radio-group v-model="filters.owned" label="Owned" dense>
-          <v-radio label="Yes" value="yes"></v-radio>
-          <v-radio label="No" value="no"></v-radio>
-        </v-radio-group>
-      </v-list-item>
+
+      <v-container class="slider-list-item">
+        <div class="label">Period:</div>
+        <v-slider
+          v-model="filters.period"
+          :max="2"
+          :ticks="periodOptions"
+          show-ticks="always"
+          step="1"
+          tick-size="4"
+        ></v-slider>
+      </v-container>
 
       <!-- License Filter -->
       <v-list-item>
@@ -55,6 +62,7 @@
           :items="licenseOptions"
           label="License"
           dense
+          clearable
         ></v-select>
       </v-list-item>
 
@@ -65,10 +73,9 @@
           :items="osOptions"
           label="OS"
           dense
+          clearable
         ></v-select>
       </v-list-item>
-
-      <!-- Add Slider with labels for duration <v-slider:max="3":ticks="tickLabels"show-ticks="always"step="1"tick-size="4"></v-slider> -->
 
       <!-- Apply Filters Button -->
       <v-list-item>
@@ -80,26 +87,34 @@
 
 <script lang="ts">
 import {defineComponent} from 'vue';
+import {Tag} from "./models";
 
-interface Filters {
-  tags: string[];
+export interface Filters {
+  tags: Tag[];
   priceRange: number[];
-  owned: string;
   license: string;
   os: string;
+  period: number;
 }
-
 export default defineComponent({
   //TODO add duration filter
   data: () => ({
     filters: {
       tags: [],
       priceRange: [0, 10000],
-      owned: '',
       license: '',
-      os: ''
+      os: '',
+      period: 1
     } as Filters,
-    tagsOptions: ['foo', 'bar', 'fizz', 'buzz', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+    tagsOptions: [
+      {id: "f9040a1d-d539-4c22-b2dc-b86c7c0ec085", label: "Developer", props: {title: "Developer"}},
+      {id: "98d664b5-b5a2-4fe8-bd81-f63023e916a5", label: "Enthusiast", props: {title: "Enthusiast"}},
+    ],
+    periodOptions: {
+      0: "Day",
+      1: "Month",
+      2: "Year",
+    },
     minPrice: 0,
     maxPrice: 10000,
     licenseOptions: ['GPL', 'MIT', 'Apache'],
@@ -117,6 +132,7 @@ export default defineComponent({
 <style scoped>
 .filter-card {
   max-height: 100%;
+  max-width: 20%;
 }
 
 .filter-list {

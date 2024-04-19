@@ -1,3 +1,4 @@
+compact_card.vue
 <template>
   <v-card class="compact-card">
     <v-card-title>
@@ -7,90 +8,70 @@
             height="200"
             aspect-ratio="16/9"
             cover
-            :src="detailedService.image"
+            :src="filteredService.service.image"
           ></v-img>
         </v-col>
         <v-col cols="12" class="py-2 text-h6">
-          {{ detailedService.name }}
+          {{ filteredService.service.name }}
         </v-col>
       </v-row>
     </v-card-title>
 
     <!-- Service Version -->
-    <v-card-subtitle class="version">{{ detailedService.latest_version }}</v-card-subtitle>
+    <v-card-subtitle class="version">{{ filteredService.service.latest_version }}</v-card-subtitle>
 
     <!-- Service Description -->
-    <v-card-text class="desc">{{ detailedService.description }}</v-card-text>
+    <v-card-text class="desc">{{ filteredService.service.description }}</v-card-text>
 
     <!-- License -->
-    <v-card-text>License: {{ detailedService.license }}</v-card-text>
+    <v-card-text>License: {{ filteredService.service.license }}</v-card-text>
 
     <!-- Tags -->
     <v-card-text>
       <div class="tags">
-        <span v-for="tag in detailedService.tags" key="id" class="tag">{{ tag.label }}</span>
+        <span v-for="tag in filteredService.service.tags" key="tag.id" class="tag">{{ tag.label }}</span>
       </div>
     </v-card-text>
 
     <!-- Download Count and Price -->
     <v-card-actions class="bottom-right">
-      <div>Downloads: {{ detailedService.download_count }}</div>
-      <div>Price: {{ getPriceForService(detailedService.offerings) }}</div>
+      <div>Downloads: {{ filteredService.service.download_count }}</div>
+      <div>Price: {{formatPriceMean(filteredService.calculatedPrice,filteredService.selectedOffering)}}</div>
     </v-card-actions>
   </v-card>
 </template>
 
 <script lang="ts">
 import {defineComponent, ref} from 'vue';
-import {DetailedService, ServiceOffering} from "./models";
+import { FilteredService } from '../pages/compare.vue';
 
 export default defineComponent({
   name: 'CompactCard',
+  props:["filteredService","targetDurationDays"],
   setup(
     props: {
-      detailedService: DetailedService
+      filteredService: FilteredService,
       targetDurationDays: number
     }) {
-
+    const filteredService = ref<FilteredService>(props.filteredService);
     const targetDurationDays = ref(props.targetDurationDays)
 
-    const getPriceForService = (offerings: ServiceOffering[]) => {
-      const filtered = offerings.filter((offering: ServiceOffering) => {
-        return offering.duration_days === props.targetDurationDays
-      }).sort((a, b) => {
-        if (a.price < b.price) {
-          return -1
-        }
-        if (a.price > b.price) {
-          return 1
-        }
-        return 0;
-      })
-      if (filtered.length > 0) {
-        return formatPriceWithDuration(offerings[0])
+    const formatPriceMean = (calcPrice,offering) => {
+      let periodName = "";
+      switch (targetDurationDays.value) {
+        case 1: periodName = "day"; break
+        case 30: periodName = "month"; break
+        case 360: periodName = "year"; break
       }
-      const offering = offerings.sort((a, b) => {
-        if (a.duration_days > b.duration_days) {
-          return -1
-        }
-        if (a.duration_days < b.duration_days) {
-          return 1
-        }
-        return 0;
-      })[0]
-      return (targetDurationDays.value / offering.duration_days * offering.price).toString()
-      //TODO: add formating for offering without specified duration (mean of price for selected day range)
+      return `$${calcPrice.toFixed(2)} / ${periodName} (paid each ${offering.name})`;
     }
-
-
-    const formatPriceWithDuration = (offering) => {
-      return `$${offering.price.toFixed(2)} / ${offering.name}`;
-    }
+    console.log("Oberknecht")
+    console.log(filteredService)
+    console.log(targetDurationDays)
 
     return {
-      formatPriceWithDuration,
-      getPriceForService,
-      targetDurationDays
+      filteredService,
+      formatPriceMean
     };
   }
 });
