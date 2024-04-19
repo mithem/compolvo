@@ -1,3 +1,4 @@
+compact_card.vue
 <template>
   <v-card class="compact-card">
     <v-card-title>
@@ -7,58 +8,73 @@
             height="200"
             aspect-ratio="16/9"
             cover
-            :src="serviceImage"
+            :src="filteredService.service.image"
           ></v-img>
         </v-col>
         <v-col cols="12" class="py-2 text-h6">
-          {{ serviceName }}
+          {{ filteredService.service.name }}
         </v-col>
       </v-row>
     </v-card-title>
 
     <!-- Service Version -->
-    <v-card-subtitle class="version">{{ serviceVersion }}</v-card-subtitle>
+    <v-card-subtitle class="version">{{ filteredService.service.latest_version }}</v-card-subtitle>
 
     <!-- Service Description -->
-    <v-card-text class="desc">{{ serviceDescription }}</v-card-text>
+    <v-card-text class="desc">{{ filteredService.service.description }}</v-card-text>
 
     <!-- License -->
-    <v-card-text>License: {{ license }}</v-card-text>
+    <v-card-text>License: {{ filteredService.service.license }}</v-card-text>
 
     <!-- Tags -->
     <v-card-text>
       <div class="tags">
-        <span v-for="tag in tags" :key="tag" class="tag">{{ tag }}</span>
+        <span v-for="tag in filteredService.service.tags" key="tag.id" class="tag">{{ tag.label }}</span>
       </div>
     </v-card-text>
 
     <!-- Download Count and Price -->
     <v-card-actions class="bottom-right">
-      <div>Downloads: {{ downloadCount }}</div>
-      <div>Price: {{ price }}</div>
+      <div>Downloads: {{ filteredService.service.download_count }}</div>
+      <div>Price: {{formatPriceMean(filteredService.calculatedPrice,filteredService.selectedOffering)}}</div>
     </v-card-actions>
   </v-card>
 </template>
 
 <script lang="ts">
-import {defineComponent} from 'vue';
+import {defineComponent, ref} from 'vue';
+import { FilteredService } from '../pages/compare.vue';
 
 export default defineComponent({
   name: 'CompactCard',
-  props: {
-    serviceImage: String,
-    serviceName: String,
-    serviceVersion: String,
-    serviceDescription: String,
-    license: String,
-    tags: {
-      type: Array as () => string[],
-      default: () => []
-    },
-    downloadCount: Number,
-    price: Number,
+  props:["filteredService","targetDurationDays"],
+  setup(
+    props: {
+      filteredService: FilteredService,
+      targetDurationDays: number
+    }) {
+    const filteredService = ref<FilteredService>(props.filteredService);
+    const targetDurationDays = ref(props.targetDurationDays)
+
+    const formatPriceMean = (calcPrice,offering) => {
+      let periodName = "";
+      switch (targetDurationDays.value) {
+        case 1: periodName = "day"; break
+        case 30: periodName = "month"; break
+        case 360: periodName = "year"; break
+      }
+      return `$${calcPrice.toFixed(2)} / ${periodName} (paid each ${offering.name})`;
+    }
+    console.log("Oberknecht")
+    console.log(filteredService)
+    console.log(targetDurationDays)
+
+    return {
+      filteredService,
+      formatPriceMean
+    };
   }
-})
+});
 </script>
 
 <style scoped>
