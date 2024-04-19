@@ -68,6 +68,8 @@
         ></v-select>
       </v-list-item>
 
+      <!-- Add Slider with labels for duration <v-slider:max="3":ticks="tickLabels"show-ticks="always"step="1"tick-size="4"></v-slider> -->
+
       <!-- Apply Filters Button -->
       <v-list-item>
         <v-btn block @click="applyFilters">Select</v-btn>
@@ -88,6 +90,7 @@ interface Filters {
 }
 
 export default defineComponent({
+  //TODO add duration filter
   data: () => ({
     filters: {
       tags: [],

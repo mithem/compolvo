@@ -26,13 +26,14 @@
 import {defineComponent, ref, onMounted} from 'vue';
 import CompactCard from '@/components/compact_card.vue'; // Adjust the path as necessary
 import Constants from "../components/Constants"; // Adjust the path as necessary
+import {DetailedService} from '../components/models';
 
 export default defineComponent({
   components: {
     CompactCard
   },
   setup() {
-    const services = ref([]);
+    const services = ref<DetailedService[]>([]);
     const filteredServices = ref([]);
 
     const apiHost = Constants.HOST_URL + "/api/";
@@ -40,19 +41,8 @@ export default defineComponent({
       try {
         const response = await fetch(`${apiHost}service`);
         if (response.ok) {
-          const jsonData = await response.json();
-          services.value = jsonData.map(service => ({
-            id: service.id,
-            name: service.name,
-            description: service.description,
-            license: service.license,
-            download_count: service.download_count,
-            tags: service.tags,
-            image: service.image || 'https://cdn.vuetifyjs.com/images/cards/sunshine.jpg', // Default image if none is provided
-            latestVersion: service.latest_version || 'N/A', // Updated to use latest_version and provide default if absent
-            price: formatPriceWithDuration(service.offerings)  // Format price with duration
-          }));
-          console.log(jsonData);  // Debugging line to see what's fetched
+          services.value = await response.json();
+          console.log(services.value);  // Debugging line to see what's fetched
           await filterServices(null)
         } else {
           throw new Error('Failed to fetch');
@@ -60,15 +50,7 @@ export default defineComponent({
       } catch (error) {
         console.error('Fetch error:', error);
       }
-    };
-
-    const formatPriceWithDuration = (offerings) => {
-      if (offerings && offerings.length > 0) {
-        const offering = offerings[0]; // Assuming we're only interested in the first offering
-        return `$${offering.price.toFixed(2)} / ${offering.name}`; // Formats the price with duration
-      }
-      return 'N/A';
-    };
+    }
 
     onMounted(fetchData);
 

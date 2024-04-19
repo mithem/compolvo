@@ -8,7 +8,6 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AgentSoftwareCard: typeof import('./components/AgentSoftwareCard.vue')['default']
-    AppFooter: typeof import('./components/AppFooter.vue')['default']
     Compact_card: typeof import('./components/compact_card.vue')['default']
     Detailed_card: typeof import('./components/detailed_card.vue')['default']
     Filter_panel: typeof import('./components/filter_panel.vue')['default']
@@ -16,7 +15,6 @@ declare module 'vue' {
     HelloWorld: typeof import('./components/HelloWorld.vue')['default']
     LoginForm: typeof import('./components/LoginForm.vue')['default']
     Navbar: typeof import('./components/Navbar.vue')['default']
-    PlaceOrderView: typeof import('./components/PlaceOrderView.vue')['default']
     RegisterForm: typeof import('./components/RegisterForm.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
