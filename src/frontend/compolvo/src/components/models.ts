@@ -53,7 +53,7 @@ export interface DetailedService {
   retrieval_method: number | null
   retrieval_data: string | null
   latest_version: string | null
-  image: string | null
+  image: string | "https://upload.wikimedia.org/wikipedia/commons/6/65/No-Image-Placeholder.svg"
   tags: Tag[]
   offerings: ServiceOffering[]
 }
