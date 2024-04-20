@@ -10,6 +10,17 @@ on:
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+  
+env:
+  DB_PORT: ${{vars.DB_PORT}}
+  DB_HOSTNAME: ${{vars.DB_HOSTNAME}}
+  DB_DATABASE: ${{vars.DB_DATABASE}}
+  CORS_ORIGIN: ${{vars.CORS_ORIGIN}}
+  SERVER_NAME: ${{vars.SERVER_NAME}}
+  DB_USERNAME: ${{secrets.DB_USERNAME}}
+  DB_PASSWORD: ${{secrets.DB_PASSWORD}}
+  DB_ROOT_PASSWORD: ${{secrets.DB_ROOT_PASSWORD}}
+  COMPOLVO_SECRET_KEY: ${{secrets.COMPOLVO_SECRET_KEY}}
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
