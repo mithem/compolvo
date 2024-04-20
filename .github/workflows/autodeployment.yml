@@ -27,6 +27,6 @@ jobs:
       - name: Pull latest version
         run: cd $GITHUB_WORKSPACE/infrastructure && git switch dev && git pull
       - name: Compose down
-        run: cd $GITHUB_WORKSPACE/infrastructure && docker compose down
+        run: cd $GITHUB_WORKSPACE/infrastructure && docker compose --env-file $GITHUB_WORKSPACE/infrastructure/.env down
       - name: Compose up
-        run: cd $GITHUB_WORKSPACE/infrastructure && docker compose up -d --build
+        run: cd $GITHUB_WORKSPACE/infrastructure && docker compose up --env-file $GITHUB_WORKSPACE/infrastructure/.env -d --build
