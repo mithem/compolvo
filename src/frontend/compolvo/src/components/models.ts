@@ -33,8 +33,6 @@ export interface Service {
   description: string | null
   license: string | null
   download_count: number | null
-  retrieval_method: number | null
-  retrieval_data: string | null
   latest_version: string | null
   image: string | null
 }
@@ -50,8 +48,6 @@ export interface DetailedService {
   description: string | null
   license: string | null
   download_count: number | null
-  retrieval_method: number | null
-  retrieval_data: string | null
   latest_version: string | null
   image: string | "https://upload.wikimedia.org/wikipedia/commons/6/65/No-Image-Placeholder.svg"
   tags: Tag[]
@@ -66,6 +62,7 @@ export interface Agent {
   lastConnectionEnd: Date;
   connected: boolean;
   connectionInterrupted: boolean;
+  initialized: boolean;
 }
 
 export interface ServicePlan {

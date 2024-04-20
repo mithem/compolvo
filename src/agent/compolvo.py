@@ -84,6 +84,7 @@ async def run_websocket():
         try:
             while True:
                 data = await ws.recv()
+                logger.info("received %s", data)
                 await ws.send(data)
         except Exception as e:
             logger.exception(e)
@@ -109,7 +110,6 @@ def init(compolvo_host: str, agent_id: str, overwrite: bool, insecure: bool):
     }, config_filename)
     if not overwrite and os.path.isfile(config.config_file):
         overwrite = click.confirm("Overwrite existing config?", default=True)
-        # override = input("Override existing config? (Y/n) ")
         if not overwrite:
             return
     logger.info(f"Writing config into {config_filename}")
@@ -146,8 +146,10 @@ def cli(config_file: str, verbose: bool):
     global config_filename
     config_filename = config_file
 
-    logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
+    log_level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(level=log_level)
     logger = logging.getLogger("agent")
+    logger.setLevel(log_level)
     try:
         config = load_config(config_file)
         logger.debug("Using config: %s", config.to_dict())

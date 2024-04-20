@@ -768,10 +768,12 @@ async def delete_agent_software(request, software, user):
 @protected({UserRole.Role.ADMIN})
 async def send_agent_queue_message(request, user):
     try:
-        agent_id = request.json["agent_id"]
+        agent_id = request.json["agent"]
         message = request.json["message"]
-        await send_websocket_msg(agent_id, message)
-        return HTTPResponse(status=202)
+        count = request.json.get("count", 1)
+        for i in range(count):
+            queue_websocket_msg(agent_id, message)
+        return text("Accepted.", status=202)
     except KeyError:
         raise BadRequest("Missing parameters. Expected `agent`, `message`")
 
@@ -779,7 +781,8 @@ async def send_agent_queue_message(request, user):
 websocket_message_queue: Dict[str, Queue[str]] = dict()
 
 
-async def send_websocket_msg(agent_id: str, message: str):
+def queue_websocket_msg(agent_id: str, message: str):
+    global websocket_message_queue
     queue = websocket_message_queue.get(agent_id)
     if queue is None:
         queue = Queue()
@@ -802,17 +805,23 @@ async def websocket_handler(ws: websockets.WebSocketServerProtocol):
     agent.connection_interrupted = False
     await agent.save()
     await ws.send("login successful")
+    logger.debug("Agent logged in successfully: %s", agent_id)
     try:
         while True:
-            queue = websocket_message_queue.get(agent.id)
+            queue = websocket_message_queue.get(agent_id)
+            if ws.closed:
+                if ws.close_code != 1000:
+                    raise ConnectionClosedError(ws.close_rcvd, ws.close_sent)
+                raise ConnectionClosedOK(ws.close_rcvd, ws.close_sent)
             if queue is not None:
                 while not queue.empty():
                     msg = queue.get()
                     await ws.send(msg)
             await asyncio.sleep(1)
     except ConnectionClosedOK:
-        pass
+        logger.debug("Connection to agent %s closed ok", agent_id)
     except ConnectionClosedError:
+        logger.warning("Connection to agent %s closed unexpectedly", agent_id)
         agent.connection_interrupted = True
     finally:
         agent.last_connection_end = datetime.datetime.now()
