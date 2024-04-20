@@ -17,16 +17,14 @@ jobs:
   build:
     # The type of runner that the job will run on
     runs-on: debian-4gb-nbg1-1
-    environment:
-      name: Dev environment
-      url: https://github.com
+    environment: Dev environment
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
       - name: Debug
-        run: "echo Env: $env; echo GithubEnv: $GITHUB_ENV; echo Port: $DB_PORT"
+        run: "echo Port: ${{variables.DB_PORT}}"
       # Runs a single command using the runners shell
       - name: Pull latest version
         run: cd $GITHUB_WORKSPACE/infrastructure && git switch dev && git pull
