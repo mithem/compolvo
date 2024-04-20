@@ -2,7 +2,8 @@ import asyncio
 import datetime
 import os
 import re
-from typing import Set
+from queue import Queue
+from typing import Set, Dict
 
 import jwt
 import jwt.exceptions
@@ -587,6 +588,35 @@ async def get_own_agents(request, user):
     return await Serializable.list_json(agents)
 
 
+@agent.get("/name")
+async def get_agent_name(request):
+    try:
+        agent_id = request.args["id"][0]
+        agent = await Agent.get_or_none(id=agent_id)
+        if agent is None:
+            raise NotFound("Agent not found.")
+        if not agent.initialized:
+            agent.initialized = True
+            await agent.save()
+        return json({"name": agent.name})
+    except KeyError:
+        raise BadRequest("Expected `id` query param.")
+
+
+@agent.patch("/name")
+async def update_agent_name(request):
+    try:
+        id = request.json["id"]
+        new_name = request.json["name"]
+        agent = await Agent.get_or_none(id=id)
+        if agent is None:
+            raise NotFound("Agent not found.")
+        agent.name = new_name
+        await agent.save()
+        return json({"name": new_name})
+    except (KeyError, AttributeError):
+        raise BadRequest("Missing parameter. Expected 'id' and 'name'")
+
 @agent.get("/all")
 @protected({UserRole.Role.ADMIN})
 @get_endpoint(Agent)
@@ -734,6 +764,31 @@ async def delete_agent_software(request, software, user):
     pass
 
 
+@app.post("/api/agent/ws/queue")
+@protected({UserRole.Role.ADMIN})
+async def send_agent_queue_message(request, user):
+    try:
+        agent_id = request.json["agent"]
+        message = request.json["message"]
+        count = request.json.get("count", 1)
+        for i in range(count):
+            queue_websocket_msg(agent_id, message)
+        return text("Accepted.", status=202)
+    except KeyError:
+        raise BadRequest("Missing parameters. Expected `agent`, `message`")
+
+
+websocket_message_queue: Dict[str, Queue[str]] = dict()
+
+
+def queue_websocket_msg(agent_id: str, message: str):
+    global websocket_message_queue
+    queue = websocket_message_queue.get(agent_id)
+    if queue is None:
+        queue = Queue()
+    queue.put(message)
+    websocket_message_queue[agent_id] = queue
+
 async def websocket_handler(ws: websockets.WebSocketServerProtocol):
     login_msg = await ws.recv()
     match = re.match(r"^login agent (?P<id>[\w-]{36})$", login_msg)
@@ -750,13 +805,23 @@ async def websocket_handler(ws: websockets.WebSocketServerProtocol):
     agent.connection_interrupted = False
     await agent.save()
     await ws.send("login successful")
+    logger.debug("Agent logged in successfully: %s", agent_id)
     try:
         while True:
-            msg = await ws.recv()
-            await ws.send(msg)
+            queue = websocket_message_queue.get(agent_id)
+            if ws.closed:
+                if ws.close_code != 1000:
+                    raise ConnectionClosedError(ws.close_rcvd, ws.close_sent)
+                raise ConnectionClosedOK(ws.close_rcvd, ws.close_sent)
+            if queue is not None:
+                while not queue.empty():
+                    msg = queue.get()
+                    await ws.send(msg)
+            await asyncio.sleep(1)
     except ConnectionClosedOK:
-        pass
+        logger.debug("Connection to agent %s closed ok", agent_id)
     except ConnectionClosedError:
+        logger.warning("Connection to agent %s closed unexpectedly", agent_id)
         agent.connection_interrupted = True
     finally:
         agent.last_connection_end = datetime.datetime.now()

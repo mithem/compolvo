@@ -155,9 +155,10 @@ class Agent(Model, Serializable):
     last_connection_end = DatetimeField(null=True)
     connected = BooleanField(default=False)
     connection_interrupted = BooleanField(default=False)
+    initialized = BooleanField(default=False)
 
     fields = ["id", "name", "user", "last_connection_start", "last_connection_end", "connected",
-              "connection_interrupted"]
+              "connection_interrupted", "initialized"]
 
 
 class AgentSoftware(Model, Serializable):

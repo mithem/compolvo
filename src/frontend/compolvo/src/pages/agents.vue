@@ -20,6 +20,7 @@ export default defineComponent({
         {title: "Last connection end", key: "lastConnectionEnd"},
         {title: "Connected", key: "connected"},
         {title: "Connection interrupted", key: "connectionInterrupted"},
+        {title: "Initialized", key: "initialized"}
       ]
     }
   },
@@ -82,11 +83,16 @@ export default defineComponent({
         } else {
           const data = JSON.parse(await res.text())
           newAgentID.value = data.id
+          await copyAgentID()
         }
       } catch (err) {
         alert(err)
       }
       creating.value = false;
+    }
+
+    const copyAgentID = async function () {
+      await navigator.clipboard.writeText(newAgentID.value);
     }
 
     onMounted(loadAgents);
@@ -102,7 +108,8 @@ export default defineComponent({
       loadAgents,
       filterAgents,
       deleteAgents,
-      createAgent
+      createAgent,
+      copyAgentID
     };
   },
   watch: {
@@ -175,9 +182,14 @@ export default defineComponent({
                   <v-progress-linear v-if="creating" indeterminate :height="5"></v-progress-linear>
                   <div>The new agent's ID is:
                     <v-skeleton-loader v-if="creating" type="text"></v-skeleton-loader>
-                    <div v-else>{{ newAgentID }}</div>
+                    <div v-else>{{ newAgentID }}
+                    </div>
                   </div>
-                  <br/>
+                  <span style="vertical-align: middle">
+                    <v-icon color="green">mdi-check</v-icon>
+                    copied to clipboard
+                  </span>
+                  <br/><br/>
                   <div>Please run the following command on the machine you want to install the agent
                     on.
                   </div>
