@@ -25,7 +25,7 @@ jobs:
 
       # Runs a single command using the runners shell
       - name: Pull latest version
-        run: cd $GITHUB_WORKSPACE/infrastructure && git switch dev && pull
+        run: cd $GITHUB_WORKSPACE/infrastructure && git switch dev && git pull
       - name: Compose down
         run: docker compose down
       - name: Compose up
