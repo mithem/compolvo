@@ -26,7 +26,7 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
       - name: Debug
-        run: "echo Env: $env; echo GithubEnv: $GITHUB_ENV"
+        run: "echo Env: $env; echo GithubEnv: $GITHUB_ENV; echo Port: $DB_PORT"
       # Runs a single command using the runners shell
       - name: Pull latest version
         run: cd $GITHUB_WORKSPACE/infrastructure && git switch dev && git pull
