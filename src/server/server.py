@@ -19,7 +19,7 @@ from compolvo import cors
 from compolvo import options
 from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, protected
 from compolvo.models import User, Service, ServiceOffering, ServicePlan, Tag, Payment, \
-    Agent, AgentSoftware, UserRole, Serializable
+    Agent, AgentSoftware, UserRole, Serializable, License, OperatingSystem
 from compolvo.utils import hash_password, verify_password, generate_secret
 
 HTTP_HEADER_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
@@ -72,10 +72,25 @@ async def db_setup(request, user):
         tag_enthusiast = await Tag.create(
             label="Enthusiast"
         )
+        lic_propr = await License.create(
+            name="Proprietary"
+        )
+        lic_mit = await License.create(
+            name="MIT"
+        )
+        os_lin = await OperatingSystem.create(
+            name="Linux"
+        )
+        os_win = await OperatingSystem.create(
+            name="Windows"
+        )
+        os_mac = await OperatingSystem.create(
+            name="macOS"
+        )
         svc_docker = await Service.create(
             name="Docker Desktop",
             description="The ultimate Docker experience.",
-            license="Proprietary",
+            license=lic_propr,
             download_count=42069,
             retrieval_method=Service.RetrievalMethod.APT,
             retrieval_data='{"hello": "world"}',
@@ -85,11 +100,16 @@ async def db_setup(request, user):
             tag_developer,
             tag_enthusiast
         )
+        await svc_docker.operating_systems.add(
+            os_lin,
+            os_win,
+            os_mac
+        )
         await svc_docker.save()
         svc_git = await Service.create(
             name="Git",
             description="The ultimate version control system.",
-            license="MIT",
+            license=lic_mit,
             download_count=42069,
             retrieval_method=Service.RetrievalMethod.COMMAND,
             retrieval_data='{"hello": "world"}',
@@ -98,11 +118,16 @@ async def db_setup(request, user):
         await svc_git.tags.add(
             tag_developer
         )
+        await svc_git.operating_systems.add(
+            os_lin,
+            os_win,
+            os_mac
+        )
         await svc_git.save()
         svc_nextcloud = await Service.create(
             name="Nextcloud",
             description="The comprehensive cloud - right from your home",
-            license="MIT",
+            license=lic_mit,
             download_count=42069,
             retrieval_method=Service.RetrievalMethod.COMMAND,
             retrieval_data='{"hello": "world"}',
@@ -110,6 +135,10 @@ async def db_setup(request, user):
         )
         await svc_nextcloud.tags.add(
             tag_enthusiast
+        )
+        await svc_nextcloud.operating_systems.add(
+            os_lin,
+            os_mac
         )
         await svc_nextcloud.save()
         if request.json is not None and request.json.get("service_offerings", False):
@@ -275,9 +304,13 @@ async def delete_user(request, deleted_user, user):
 # @openapi.response(200, {"application/json": Union[List[Service], Service]})
 async def get_services(request, services, user):
     async def expand(svc: Service) -> dict:
-        return {**await svc.to_dict(), "tags": [await tag.to_dict() for tag in await svc.tags],
-                "offerings": [await offering.to_dict() for offering in
-                              await ServiceOffering.filter(service=svc).all()]}
+        return {
+            **await svc.to_dict(),
+            "tags": [await tag.to_dict() for tag in await svc.tags],
+            "offerings": [await offering.to_dict() for offering in
+                          await ServiceOffering.filter(service=svc).all()],
+            "operating_systems": await Serializable.list_dict(await svc.operating_systems)
+        }
 
     if isinstance(services, list):
         return json(
@@ -290,15 +323,22 @@ async def get_services(request, services, user):
 @service.post("/")
 @protected({UserRole.Role.ADMIN})
 async def create_service(request, user):
+    lic = request.json.get("license")
+    license = await License.get_or_none(id=lic) if lic is not None else None
     service = await Service.create(
         name=request.json["name"],
         description=request.json.get("description"),
-        license=request.json.get("license"),
+        license=license,
         download_count=request.json.get("download_count"),
         retrieval_method=request.json["retrieval_method"],
         retrieval_data=request.json["retrieval_data"],
         image=request.json.get("image")
     )
+    oses = request.json.get("operating_systems")
+    if oses is not None:
+        await service.operating_systems.add(
+            *await OperatingSystem.filter(id__in=oses).all()
+        )
     return await service.json()
 
 
@@ -389,6 +429,7 @@ async def get_own_service_plans(request, user):
             "installable": installable
         }
         data.append(plan_dict)
+    print(data)
     return json(data)
 
 

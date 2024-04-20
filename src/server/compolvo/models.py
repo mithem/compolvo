@@ -39,7 +39,11 @@ class Serializable:
 
     @staticmethod
     async def list_json(objects: Iterable["Serializable"]):
-        return json([await object.to_dict() for object in objects])
+        return json(await Serializable.list_dict(objects))
+
+    @staticmethod
+    async def list_dict(objects: Iterable["Serializable"]):
+        return [await object.to_dict() for object in objects]
 
     @staticmethod
     async def all_json(cls: Type[Model]):
@@ -80,17 +84,29 @@ class Service(Model, Serializable):
     id = UUIDField(pk=True)
     name = TextField()
     description = TextField(null=True)
-    license = TextField(null=True)
+    license = ForeignKeyField("models.License", "services")
+    operating_systems = ManyToManyField("models.OperatingSystem", related_name="services")
     download_count = IntField(null=True)
-    retrieval_method = IntEnumField(RetrievalMethod)
-    retrieval_data = TextField()
     latest_version = TextField(null=True)
     image = TextField(null=True)
     tags = ManyToManyField("models.Tag", related_name="services")
 
-    fields = ["id", "name", "description", "license", "download_count", "retrieval_method",
-              "retrieval_data", "latest_version", "image"]
+    fields = ["id", "name", "description", "license", "download_count",
+              "latest_version", "image"]
 
+
+class OperatingSystem(Model, Serializable):
+    id = UUIDField(pk=True)
+    name = TextField()
+
+    fields = ["id", "name"]
+
+
+class License(Model, Serializable):
+    id = UUIDField(pk=True)
+    name = TextField()
+
+    fields = ["id", "name"]
 
 class Tag(Model, Serializable):
     id = UUIDField(pk=True)
