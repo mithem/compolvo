@@ -89,12 +89,14 @@ async def db_setup(request, user):
             name="macOS"
         )
         svc_docker = await Service.create(
+            system_name="docker-desktop",
             name="Docker Desktop",
             description="The ultimate Docker experience.",
             license=lic_propr,
             download_count=42069,
             retrieval_method=Service.RetrievalMethod.APT,
             retrieval_data='{"hello": "world"}',
+            latest_version="1.2.5",
             image=""
         )
         await svc_docker.tags.add(
@@ -108,6 +110,7 @@ async def db_setup(request, user):
         )
         await svc_docker.save()
         svc_git = await Service.create(
+            system_name="git",
             name="Git",
             description="The ultimate version control system.",
             license=lic_mit,
@@ -126,6 +129,7 @@ async def db_setup(request, user):
         )
         await svc_git.save()
         svc_nextcloud = await Service.create(
+            system_name="nextcloud",
             name="Nextcloud",
             description="The comprehensive cloud - right from your home",
             license=lic_mit,
@@ -327,6 +331,7 @@ async def create_service(request, user):
     lic = request.json.get("license")
     license = await License.get_or_none(id=lic) if lic is not None else None
     service = await Service.create(
+        system_name=request.json["system_name"],
         name=request.json["name"],
         description=request.json.get("description"),
         license=license,
@@ -430,7 +435,6 @@ async def get_own_service_plans(request, user):
             "installable": installable
         }
         data.append(plan_dict)
-    print(data)
     return json(data)
 
 
@@ -729,7 +733,8 @@ async def bulk_create_agent_software(request, user):
         if (await plan.user).id != user.id:
             raise BadRequest(
                 "You can't bulk-create agent software for another user's service plan.")
-        for id in request.json.get("agents", []):
+        agent_ids = request.json.get("agents", [])
+        for id in agent_ids:
             agent = await Agent.get_or_none(id=id)
             if agent is None:
                 raise NotFound(f"Agent {id} not found.")
@@ -743,6 +748,9 @@ async def bulk_create_agent_software(request, user):
             agents.append(agent)
         softwares = [AgentSoftware(agent=agent, service_plan=plan) for agent in agents]
         await AgentSoftware.bulk_create(softwares)
+        for (software, agent) in zip(softwares, agents):
+            queue_websocket_msg(str(agent.id),
+                                f"install {service.system_name} v{service.latest_version}")
         return HTTPResponse(status=201)
     except KeyError:
         raise missing_params
@@ -782,12 +790,15 @@ websocket_message_queue: Dict[str, Queue[str]] = dict()
 
 
 def queue_websocket_msg(agent_id: str, message: str):
+    assert type(
+        agent_id) == str, "agent id isn't of type str. Don't search further why messages don't get delivered"
     global websocket_message_queue
     queue = websocket_message_queue.get(agent_id)
     if queue is None:
         queue = Queue()
     queue.put(message)
     websocket_message_queue[agent_id] = queue
+    logger.info(f"Queued message for {agent_id}: {message}")
 
 async def websocket_handler(ws: websockets.WebSocketServerProtocol):
     login_msg = await ws.recv()

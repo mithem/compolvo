@@ -83,6 +83,7 @@ class Service(Model, Serializable):
 
     id = UUIDField(pk=True)
     name = TextField()
+    system_name = TextField()
     description = TextField(null=True)
     license = ForeignKeyField("models.License", "services")
     operating_systems = ManyToManyField("models.OperatingSystem", related_name="services")
@@ -91,7 +92,7 @@ class Service(Model, Serializable):
     image = TextField(null=True)
     tags = ManyToManyField("models.Tag", related_name="services")
 
-    fields = ["id", "name", "description", "license", "download_count",
+    fields = ["id", "system_name", "name", "description", "license", "download_count",
               "latest_version", "image"]
 
 
