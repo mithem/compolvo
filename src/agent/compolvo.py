@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import sys
 from logging import Logger
 from typing import Dict, Any
@@ -9,6 +10,12 @@ import click
 import requests
 import websockets
 import yaml
+from ansible import context
+from ansible.executor.playbook_executor import PlaybookExecutor
+from ansible.inventory.manager import InventoryManager
+from ansible.module_utils.common.collections import ImmutableDict
+from ansible.parsing.dataloader import DataLoader
+from ansible.vars.manager import VariableManager
 
 config: "Config"
 logger: Logger
@@ -70,6 +77,58 @@ def save_config(config: Config, config_file: str):
         yaml.safe_dump(config.to_dict(), f)
 
 
+def handle_websocket_command(command: str) -> str | None:
+    install_pattern = r"^install (?P<system_name>.+) (?P<software_id>[\w\d_-]{36}) v(?P<version>.+)$"
+    install_match = re.match(install_pattern, command)
+    if install_match:
+        system_name = install_match.group("system_name")
+        software_id = install_match.group("software_id")
+        version = install_match.group("version")
+        return install_agent_software(system_name, software_id, version)
+    else:
+        logger.error("Got websocket message that can't be interpreted: %s", command)
+    return None
+
+
+def install_agent_software(system_name: str, software_id: str, version: str):
+    playbook_url = f"http{'s' if config.compolvo.secure else ''}://{config.compolvo.host}/ansible/playbooks/{system_name}/{version}.yml"
+    response = requests.get(playbook_url)
+    if not response.ok:
+        logger.error("Error fetching playbook from %s: %s", playbook_url, response.text)
+        return None
+    with open(system_name + ".yml", "w") as f:
+        f.write(response.text)
+    context.CLIARGS = ImmutableDict(
+        connection='smart',
+        become=None,
+        become_method=None,
+        become_user=None,
+        check=False,
+        diff=False,
+        verbosity=0,
+        syntax=None,
+        start_at_task=None
+    )
+    loader = DataLoader()
+    inventory = InventoryManager(loader=loader)
+    inventory.add_host("localhost")
+    var_manager = VariableManager(loader=loader, inventory=inventory)
+    var_manager.set_host_variable("localhost", "ansible_python_interpreter",
+                                  "./venv/bin/python3")
+    playbook_executor = PlaybookExecutor(
+        inventory=inventory,
+        variable_manager=var_manager,
+        playbooks=[f"{system_name}.yml"],
+        loader=loader,
+        passwords={}
+    )
+    data = playbook_executor.run()
+    os.remove(system_name + ".yml")
+    if data == 0:
+        return f"software status {software_id} installed_version={version};corrupt=false"
+    return f"software status {software_id} installed_version={version};corrupt=true"
+
+
 async def run_websocket():
     uri = f"ws{'s' if config.compolvo.secure else ''}://{config.compolvo.host}/api/agent/ws"
     logger.debug("logging in to WebSocket at %s", uri)
@@ -84,8 +143,11 @@ async def run_websocket():
         try:
             while True:
                 data = await ws.recv()
-                logger.info("received %s", data)
-                await ws.send(data)
+                logger.debug("received %s", data)
+                data = handle_websocket_command(data)
+                if data is not None:
+                    logger.debug("Sending %s", data)
+                    await ws.send(data)
         except Exception as e:
             logger.exception(e)
 

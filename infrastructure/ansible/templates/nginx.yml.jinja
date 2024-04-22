@@ -1,0 +1,14 @@
+- name: nginx
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: debian
+      when: ansible_distribution == "Debian"
+      ansible.builtin.apt:
+        name: nginx={{ version }}
+        state: present
+    - name: macos
+      when: ansible_distribution == "MacOSX"
+      ansible.builtin.homebrew:
+        name: nginx@{{ version }}
+        state: present
