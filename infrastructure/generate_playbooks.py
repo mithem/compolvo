@@ -33,5 +33,12 @@ def generate_playbooks(config: str, verbose: bool):
     logging.info("Generated %s playbooks across %s versions", len(services), version_counter)
 
 
+@click.group()
+def cli():
+    pass
+
+
+cli.add_command(generate_playbooks)
+
 if __name__ == "__main__":
-    generate_playbooks()
+    cli()
