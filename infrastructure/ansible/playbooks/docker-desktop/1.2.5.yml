@@ -1,8 +1,0 @@
-- name: gunicorn-1.25.5
-  hosts: localhost
-  connection: local
-  tasks:
-    - name: gunicorn
-      ansible.builtin.pip:
-        name: gunicorn==20.1.0
-        state: present
