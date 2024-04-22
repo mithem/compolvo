@@ -25,7 +25,7 @@ def generate_playbooks(config: str, verbose: bool):
             content = template.render(version=version)
             service_dir = f"ansible/playbooks/{name}"
             if not os.path.isdir(service_dir):
-                os.mkdir(service_dir)
+                os.makedirs(service_dir)
             with open(f"ansible/playbooks/{name}/{version}.yml", "w") as stream:
                 stream.write(content)
             logging.debug("Generated playbook for %s version %s", name, version)
