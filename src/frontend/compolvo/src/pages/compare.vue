@@ -1,13 +1,15 @@
 <template>
   <v-container fluid>
     <v-row style="margin: 0">
-      <filter_panel @applyFilter="filterServices($event)" style="flex-grow: 1"/>
+      <filter_panel @applyFilter="filterServices($event)" style="flex-grow: 1" :licenses=licenses :oses=oses/>
       <v-container style="flex-grow: 3; margin:0; padding-top: 0; max-width: 80%">
         <v-row>
           <v-col cols="12" md="6" lg="4" v-for="service in filteredServices" :key="service.service.id">
             <compact-card
               :filteredService=service
               :targetDurationDays=targetDurationDays
+              :licenses=licenses
+              :oses=oses
             />
           </v-col>
         </v-row>
@@ -20,7 +22,7 @@
 import {defineComponent, ref, onMounted, getCurrentInstance} from 'vue';
 import CompactCard from '@/components/compact_card.vue';
 import Constants from "../components/Constants";
-import {DetailedService, ServiceOffering} from '../components/models';
+import {DetailedService, License, OperatingSystem, ServiceOffering} from '../components/models';
 import {Filters} from '../components/filter_panel.vue';
 
 export interface FilteredService {
@@ -38,14 +40,16 @@ export default defineComponent({
     const services = ref<DetailedService[]>([]);
     const filteredServices = ref<FilteredService[]>([]);
     const targetDurationDays = ref(30)
+    const licenses = ref<License[]>([])
+    const oses = ref<OperatingSystem[]>([])
 
     const apiHost = Constants.HOST_URL + "/api/";
     const fetchData = async () => {
       try {
         const response = await fetch(`${apiHost}service`);
         if (response.ok) {
-          services.value = await response.json();
-          console.log(services.value);  // Debugging line to see what's fetched
+          services.value = await response.json()
+          console.log("Services Maped", services.value);  // Debugging line to see what's fetched
           await filterServices(null)
         } else {
           throw new Error('Failed to fetch');
@@ -55,7 +59,43 @@ export default defineComponent({
       }
     }
 
-    onMounted(fetchData);
+    const fetchOsOptions = async () => {
+      try {
+        const response = await fetch(`/api/operating-system`);
+        if (response.ok) {
+          oses.value = (await response.json()).map((os) => {
+            return {props: {title: os.name}, id: os.id}
+          });
+          console.log("oses", oses.value);  // Debugging line to see what's fetched
+        } else {
+          throw new Error('Failed to fetch');
+        }
+      } catch (error) {
+        console.error('Fetch error:', error);
+      }
+    }
+    const fetchLicenseOptions = async () => {
+      try {
+        const response = await fetch(`/api/license`);
+        if (response.ok) {
+          licenses.value = (await response.json()).map((license) => {
+            return {props: {title: license.name}, id: license.id}
+          });
+          console.log("licenses", licenses.value);  // Debugging line to see what's fetched
+        } else {
+          throw new Error('Failed to fetch');
+        }
+      } catch (error) {
+        console.error('Fetch error:', error);
+      }
+    }
+
+
+    onMounted(async () => {
+      await fetchLicenseOptions()
+      await fetchOsOptions()
+      await fetchData()
+    });
 
     const filterServices = async function (filter: Filters) {
       if (filter != null) {
@@ -70,8 +110,6 @@ export default defineComponent({
             targetDurationDays.value = 360;
             break;
         }
-        console.log("Knechter")
-        console.log(targetDurationDays.value)
       }
       filteredServices.value = services.value.map((service: DetailedService) => {
         const priceForService = getPriceForService(service.offerings);
@@ -91,19 +129,14 @@ export default defineComponent({
         result = result.filter(service => {
           return service.calculatedPrice >= filter.priceRange[0] && service.calculatedPrice <= filter.priceRange[1];
         });
-        if (filter.license !== '') {
-          result = result.filter(service => service.service.license === filter.license);
+        if (filter.license !== null) {
+          result = result.filter(service => service.service.license === filter.license.id);
         }
-        if (filter.os !== '') {
-          /* Kommt noch trust */
-          result = result.filter(service => service.service.os && service.service.os.includes(filter.os));
+        if (filter.os !== null) {
+          result = result.filter(service => service.service.os === filter.os.id);
         }
       }
-      filteredServices.value = result
-      console.log("Knecht");
-      console.log(filteredServices);
-      console.log(filter);
-      /* instance.proxy.$forceUpdate() */
+
       /* TODO: add reload after pressing the select button  */
     }
 
@@ -134,7 +167,16 @@ export default defineComponent({
       return [targetDurationDays.value / offering.duration_days * offering.price, offering]
     }
 
-    return {services, filteredServices, targetDurationDays, fetchData, filterServices, getPriceForService};
+    return {
+      services,
+      filteredServices,
+      targetDurationDays,
+      fetchData,
+      filterServices,
+      getPriceForService,
+      licenses,
+      oses
+    };
   }
 });
 </script>

@@ -41,13 +41,25 @@ export interface Service {
 
 export interface Tag {
   id: string
-  label: string
+  props: { title: string }
 }
+
+export interface License {
+  id: string
+  props: { title: string }
+}
+
+export interface OperatingSystem {
+  id: string
+  props: { name: string }
+}
+
 
 export interface DetailedService {
   id: string
   name: string
   description: string | null
+  os: OperatingSystem[] | null
   license: string | null
   download_count: number | null
   latest_version: string | null

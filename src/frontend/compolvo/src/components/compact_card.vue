@@ -24,7 +24,18 @@ compact_card.vue
     <v-card-text class="desc">{{ filteredService.service.description }}</v-card-text>
 
     <!-- License -->
-    <v-card-text>License: {{ filteredService.service.license }}</v-card-text>
+    <v-card-text>License: {{ formatedLicense }}</v-card-text>
+
+    <!-- Os
+    <v-card-text>Os: {{ formatedOs }}</v-card-text>
+    -->
+
+    <v-card-text>
+      <div class="tags">
+        <span>{{ filteredService.service.os }}</span>
+        <span v-for="os in filteredService.service.os" key="os.id" class="tag">{{ os.id }}</span>
+      </div>
+    </v-card-text>
 
     <!-- Tags -->
     <v-card-text>
@@ -44,17 +55,32 @@ compact_card.vue
 <script lang="ts">
 import {defineComponent, ref} from 'vue';
 import { FilteredService } from '../pages/compare.vue';
+import {License, OperatingSystem} from "./models";
 
 export default defineComponent({
   name: 'CompactCard',
-  props:["filteredService","targetDurationDays"],
+  props: ["filteredService", "targetDurationDays", "licenses", "oses"],
   setup(
     props: {
       filteredService: FilteredService,
       targetDurationDays: number
+      licenses: License[]
+      oses: OperatingSystem[]
     }) {
     const filteredService = ref<FilteredService>(props.filteredService);
     const targetDurationDays = ref(props.targetDurationDays)
+    const formatedLicense = ref<string>(null)
+    const formatedOs = ref<string[]>(null)
+
+    // TODO: fix (filteredService is not empty and shows os but filteredService.value.service.os doesnt)
+    console.log("compactCard", filteredService)
+    console.log("compactCardOS", filteredService.value.service.os)
+
+    const optLicense = props.licenses.filter(license => license.id == filteredService.value.service.license)
+    console.log("optLicense", optLicense)
+    console.log("optLicense length", optLicense.length)
+    formatedLicense.value = optLicense.length > 0 ? optLicense[0].props.title : "N/A"
+
 
     const formatPriceMean = (calcPrice,offering) => {
       let periodName = "";
@@ -71,7 +97,8 @@ export default defineComponent({
 
     return {
       filteredService,
-      formatPriceMean
+      formatPriceMean,
+      formatedLicense
     };
   }
 });

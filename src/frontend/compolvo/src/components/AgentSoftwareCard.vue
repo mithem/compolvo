@@ -15,7 +15,6 @@ export default defineComponent({
     const instance = getCurrentInstance();
 
     const startUpdate = async function () {
-      // TODO: Actually start upgrade process
       upgrading.value = true;
       try {
         const res = await fetch("/api/agent/software/update?id=" + software.value.id, {

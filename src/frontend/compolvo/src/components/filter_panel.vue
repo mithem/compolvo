@@ -5,7 +5,7 @@
       <v-list-item>
         <v-select
           v-model="filters.tags"
-          :items="tagsOptions"
+          :items="tags"
           label="Tags"
           multiple
           dense
@@ -14,7 +14,7 @@
         >
           <template v-slot:selection="{ item, index }">
             <v-chip v-if="index < 2" class="chip-custom">
-              <span>{{ item.title }}</span>
+              <span>{{ item.value.props.title }}</span>
             </v-chip>
             <span
               v-if="index === 2"
@@ -42,7 +42,7 @@
         </v-container>
       </v-list-item>
 
-
+      <!-- Period Filter -->
       <v-container class="slider-list-item">
         <div class="label">Period:</div>
         <v-slider
@@ -59,7 +59,7 @@
       <v-list-item>
         <v-select
           v-model="filters.license"
-          :items="licenseOptions"
+          :items="licenses"
           label="License"
           dense
           clearable
@@ -70,7 +70,7 @@
       <v-list-item>
         <v-select
           v-model="filters.os"
-          :items="osOptions"
+          :items="oses"
           label="OS"
           dense
           clearable
@@ -86,30 +86,58 @@
 </template>
 
 <script lang="ts">
-import {defineComponent} from 'vue';
-import {Tag} from "./models";
+import {defineComponent, onMounted, ref} from 'vue';
+import {License, OperatingSystem, Tag} from "./models";
+
 
 export interface Filters {
   tags: Tag[];
   priceRange: number[];
-  license: string;
-  os: string;
+  license: License | null;
+  os: OperatingSystem | null;
   period: number;
 }
+
 export default defineComponent({
-  //TODO add duration filter
+  name: 'Filter',
+  props: ['licenses', 'oses'],
+  setup(
+    props: {
+      licenses: License[]
+      oses: OperatingSystem[]
+    }) {
+    const tags = ref<Tag[]>([])
+
+    const fetchTagOptions = async () => {
+      try {
+        const response = await fetch(`/api/tag`);
+        if (response.ok) {
+          tags.value = (await response.json()).map((tag) => {
+            return {props: {title: tag.label}, id: tag.id}
+          });
+          console.log(tags.value);  // Debugging line to see what's fetched
+        } else {
+          throw new Error('Failed to fetch');
+        }
+      } catch (error) {
+        console.error('Fetch error:', error);
+      }
+    }
+
+    onMounted(fetchTagOptions)
+
+
+    return {fetchTagOptions, tags};
+  },
+
   data: () => ({
     filters: {
       tags: [],
       priceRange: [0, 10000],
-      license: '',
-      os: '',
+      license: null,
+      os: null,
       period: 1
     } as Filters,
-    tagsOptions: [
-      {id: "f9040a1d-d539-4c22-b2dc-b86c7c0ec085", label: "Developer", props: {title: "Developer"}},
-      {id: "98d664b5-b5a2-4fe8-bd81-f63023e916a5", label: "Enthusiast", props: {title: "Enthusiast"}},
-    ],
     periodOptions: {
       0: "Day",
       1: "Month",
@@ -117,14 +145,13 @@ export default defineComponent({
     },
     minPrice: 0,
     maxPrice: 10000,
-    licenseOptions: ['GPL', 'MIT', 'Apache'],
-    osOptions: ['Windows', 'macOS', 'Linux']
   }),
   methods: {
     applyFilters(): void {
       console.log('Applied Filters:', this.filters);
       this.$emit('applyFilter', this.filters)
     }
+
   }
 });
 </script>
