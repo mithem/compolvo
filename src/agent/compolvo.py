@@ -4,7 +4,7 @@ import os
 import re
 import sys
 from logging import Logger
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import click
 import requests
@@ -80,18 +80,27 @@ def save_config(config: Config, config_file: str):
 def handle_websocket_command(command: str) -> str | None:
     install_pattern = r"^install (?P<system_name>.+) (?P<software_id>[\w\d_-]{36}) v(?P<version>.+)$"
     install_match = re.match(install_pattern, command)
+
+    uninstall_pattern = r"^uninstall (?P<system_name>.+) (?P<software_id>[\w\d_-]{36})$"
+
     if install_match:
         system_name = install_match.group("system_name")
         software_id = install_match.group("software_id")
         version = install_match.group("version")
-        return install_agent_software(system_name, software_id, version)
+        return run_playbook(system_name, software_id, version)
     else:
-        logger.error("Got websocket message that can't be interpreted: %s", command)
+        uninstall_match = re.match(uninstall_pattern, command)
+        if uninstall_match:
+            system_name = uninstall_match.group("system_name")
+            software_id = uninstall_match.group("software_id")
+            return run_playbook(system_name, software_id, "uninstall")
+        else:
+            logger.error("Got websocket message that can't be interpreted: %s", command)
     return None
 
 
-def install_agent_software(system_name: str, software_id: str, version: str):
-    playbook_url = f"http{'s' if config.compolvo.secure else ''}://{config.compolvo.host}/ansible/playbooks/{system_name}/{version}.yml"
+def run_playbook(system_name: str, software_id: str, playbook_name: str):
+    playbook_url = f"http{'s' if config.compolvo.secure else ''}://{config.compolvo.host}/ansible/playbooks/{system_name}/{playbook_name}.yml"
     response = requests.get(playbook_url)
     if not response.ok:
         logger.error("Error fetching playbook from %s: %s", playbook_url, response.text)
@@ -124,32 +133,45 @@ def install_agent_software(system_name: str, software_id: str, version: str):
     )
     data = playbook_executor.run()
     os.remove(system_name + ".yml")
+    installed_version = playbook_name if playbook_name != 'uninstall' else None
     if data == 0:
-        return f"software status {software_id} installed_version={version};corrupt=false"
-    return f"software status {software_id} installed_version={version};corrupt=true"
+        return f"software status {software_id} installed_version={installed_version};corrupt=false;installing=false;uninstalling=false"
+    return f"software status {software_id} installed_version={installed_version};corrupt=true;installing=false;uninstalling=false"
 
 
-async def run_websocket():
+async def run_websocket(retries: Optional[int] = 5):
     uri = f"ws{'s' if config.compolvo.secure else ''}://{config.compolvo.host}/api/agent/ws"
     logger.debug("logging in to WebSocket at %s", uri)
-    async with websockets.connect(uri) as ws:
-        login_msg = f"login agent {config.agent.id}"
-        await ws.send(login_msg)
-        response = await ws.recv()
-        if response == "login successful":
-            logger.info("Logged in successfully.")
-        else:
-            logger.info("Error logger in: %s", response)
-        try:
-            while True:
-                data = await ws.recv()
-                logger.debug("received %s", data)
-                data = handle_websocket_command(data)
-                if data is not None:
-                    logger.debug("Sending %s", data)
-                    await ws.send(data)
-        except Exception as e:
-            logger.exception(e)
+    retry = False
+    try:
+        async with websockets.connect(uri) as ws:
+            login_msg = f"login agent {config.agent.id}"
+            await ws.send(login_msg)
+            response = await ws.recv()
+            if response == "login successful":
+                logger.info("Logged in successfully.")
+            else:
+                logger.info("Error logger in: %s", response)
+            try:
+                while True:
+                    data = await ws.recv()
+                    logger.debug("received %s", data)
+                    data = handle_websocket_command(data)
+                    if data is not None:
+                        logger.debug("Sending %s", data)
+                        await ws.send(data)
+            except KeyboardInterrupt:
+                return
+            except Exception as e:
+                logger.error(e)
+                retry = True
+    except Exception as e:
+        logger.error(e)
+        retry = True
+    if retry and (retries is None or retries > 0):
+        await asyncio.sleep(1)
+        return await run_websocket(None if retries is None else retries - 1)
+
 
 
 @click.command("init")
@@ -195,8 +217,13 @@ def init(compolvo_host: str, agent_id: str, overwrite: bool, insecure: bool):
 
 
 @click.command("run")
-def run():
-    asyncio.run(run_websocket())
+@click.option("--infinite-retries", "-r", is_flag=True, default=False,
+              help="Infinite retries when connection fails (default 5)")
+def run(infinite_retries: bool):
+    args = {}
+    if infinite_retries:
+        args["retries"] = None
+    asyncio.run(run_websocket(**args))
 
 
 @click.group()

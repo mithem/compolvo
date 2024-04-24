@@ -17,9 +17,19 @@ export default defineComponent({
     const startUpdate = async function () {
       // TODO: Actually start upgrade process
       upgrading.value = true;
-      setTimeout(() => {
-        upgrading.value = false;
-      }, 5000);
+      try {
+        const res = await fetch("/api/agent/software/update?id=" + software.value.id, {
+          method: "POST"
+        })
+        if (!res.ok) {
+          alert(await res.text())
+        } else {
+          instance.proxy.$emit("reload")
+        }
+      } catch (err) {
+        alert(err)
+      }
+      upgrading.value = false;
     }
 
     const checkForUpdate = function () {
@@ -29,7 +39,7 @@ export default defineComponent({
     const uninstall = async function () {
       uninstalling.value = true;
       try {
-        const res = await fetch("/api/agent/software?id=" + software.value.id, {
+        const res = await fetch("/api/agent/software/uninstall?id=" + software.value.id, {
           method: "DELETE"
         })
         if (!res.ok) {
@@ -73,6 +83,17 @@ export default defineComponent({
       </div>
     </v-card-subtitle>
     <v-card-text>
+      <div v-if="software.installing || software.uninstalling">
+        <span v-if="software.installing">
+          Installing...
+        </span>
+        <span v-else>Uninstalling...</span>
+        <v-progress-linear indeterminate>
+        </v-progress-linear>
+      </div>
+      <div v-if="software.corrupt" style="color: red; font-weight: bold;">
+        Corrupt
+      </div>
       <span v-if="software.installed_version != null">Installed: {{
           software.installed_version
         }}<br/></span>

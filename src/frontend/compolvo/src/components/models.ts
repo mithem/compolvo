@@ -7,6 +7,8 @@ export interface AgentSoftware {
   latest_version: string
   offering: ServiceOffering
   service: Service
+  installing: boolean
+  uninstalling: boolean
 }
 
 export interface ServiceOffering {

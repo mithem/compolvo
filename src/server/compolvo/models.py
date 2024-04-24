@@ -168,8 +168,11 @@ class AgentSoftware(Model, Serializable):
     service_plan = ForeignKeyField("models.ServicePlan", "agent_softwares")
     installed_version = TextField(null=True)
     corrupt = BooleanField(default=False)
+    installing = BooleanField(default=False)
+    uninstalling = BooleanField(default=False)
 
-    fields = ["id", "agent", "service_plan", "installed_version", "corrupt"]
+    fields = ["id", "agent", "service_plan", "installed_version", "corrupt", "installing",
+              "uninstalling"]
 
     class Meta:
         unique_together = (("agent", "service_plan"),)

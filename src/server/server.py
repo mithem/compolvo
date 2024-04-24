@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import enum
 import os
 import queue
 import re
@@ -185,6 +186,18 @@ async def db_setup(request, user):
                 price=29.00,
                 duration_days=360
             )
+            off_nginx_year = await ServiceOffering.create(
+                service=svc_nginx,
+                name="year",
+                price=89.99,
+                duration_days=360
+            )
+            off_nginx_quarter = await ServiceOffering.create(
+                service=svc_nginx,
+                name="quarter",
+                price=29.99,
+                duration_days=90
+            )
             if request.json is not None and request.json.get("service_plans", False):
                 plan_docker = await ServicePlan.create(
                     user=user,
@@ -199,6 +212,11 @@ async def db_setup(request, user):
                 plan_nextcloud = await ServicePlan.create(
                     user=user,
                     service_offering=off_nextcloud_year,
+                    start_date=datetime.datetime.now() - datetime.timedelta(days=45)
+                )
+                plan_nginx = await ServicePlan.create(
+                    user=user,
+                    service_offering=off_nginx_quarter,
                     start_date=datetime.datetime.now() - datetime.timedelta(days=45)
                 )
     return HTTPResponse("Created.", status=201)
@@ -761,11 +779,12 @@ async def bulk_create_agent_software(request, user):
                     raise BadRequest(
                         f"The software you want to install via the service plan is already installed on agent {id} (possibly by another service plan).")
             agents.append(agent)
-        softwares = [AgentSoftware(agent=agent, service_plan=plan) for agent in agents]
+        softwares = [AgentSoftware(agent=agent, service_plan=plan, installing=True) for agent in
+                     agents]
         await AgentSoftware.bulk_create(softwares)
         for (software, agent) in zip(softwares, agents):
-            queue_websocket_msg(str(agent.id),
-                                f"install {service.system_name} {software.id} v{service.latest_version}")
+            await send_agent_software_notification(AgentSoftwareAgentCommand.INSTALL, agent,
+                                                   service, software)
         return HTTPResponse(status=201)
     except KeyError:
         raise missing_params
@@ -773,10 +792,29 @@ async def bulk_create_agent_software(request, user):
         raise BadRequest("Service plan is already installed on at least one agent.")
 
 
+class AgentSoftwareAgentCommand(enum.StrEnum):
+    INSTALL = "install"
+    UNINSTALL = "uninstall"
+
+
+async def send_agent_software_notification(command: AgentSoftwareAgentCommand, agent: Agent,
+                                           service: Service,
+                                           software: AgentSoftware):
+    match command:
+        case AgentSoftwareAgentCommand.INSTALL:
+            version_info = f" v{service.latest_version}"
+        case AgentSoftwareAgentCommand.UNINSTALL:
+            version_info = ""
+        case _:
+            raise ValueError("Unexpected AgentSoftwareAgentCommand.")
+    message = f"{command.value} {service.system_name} {software.id}{version_info}"
+    queue_websocket_msg(str(agent.id), message)
+
+
 @agent_software.patch("/")
 @protected({UserRole.Role.ADMIN})
 @patch_endpoint(AgentSoftware)
-async def update_agent_software(request, software, user):
+async def patch_agent_software(request, software, user):
     pass
 
 
@@ -785,6 +823,40 @@ async def update_agent_software(request, software, user):
 @delete_endpoint(AgentSoftware)
 async def delete_agent_software(request, software, user):
     pass
+
+
+@agent_software.post("/update")
+@protected()
+async def update_agent_software(request, user):
+    id = request.args.get("id")
+    software = await AgentSoftware.get_or_none(id=id)
+    if software is None:
+        raise NotFound("AgentSoftware not found.")
+    agent = await software.agent
+    service = await (await (await software.service_plan).service_offering).service
+    await send_agent_software_notification(AgentSoftwareAgentCommand.INSTALL, agent, service,
+                                           software)
+    software.installing = True
+    await software.save()
+    return HTTPResponse(status=201)
+
+
+@agent_software.delete("/uninstall")
+@protected()
+async def uninstall_agent_software(request, user):
+    id = request.args.get("id")
+    software = await AgentSoftware.get_or_none(id=id)
+    if software is None:
+        raise NotFound("AgentSoftware not found.")
+    agent: Agent = await software.agent
+    if str(await (agent.user).id) != user.id:
+        raise BadRequest("You can only uninstall software on your own agents.")
+    service: Service = await (await (await software.service_plan).service_offering).service
+    await send_agent_software_notification(AgentSoftwareAgentCommand.UNINSTALL, agent, service,
+                                           software)
+    software.uninstalling = True
+    await software.save()
+    return HTTPResponse(status=204)
 
 
 @app.post("/api/agent/ws/queue")
@@ -829,15 +901,15 @@ async def handle_websocket_msg(agent_id: str, message: str) -> str | None:
         software_id = software_status_match.group("software_id")
         status = software_status_match.group("status")
         stati = status.split(";")
-        print("Stati: " + str(stati))
         status_data = {}
         for status_entry in stati:
             match = re.match(status_pattern, status_entry)
             if match is not None:
                 status_data[match.group("status_key")] = match.group("status_value")
-        print("Status data: " + str(status_data))
         software = await AgentSoftware.get_or_none(id=software_id)
-        if set(status_data.keys()).issubset({"corrupt", "installed_version"}):
+        was_uninstalling = software.uninstalling
+        if set(status_data.keys()).issubset(
+                {"corrupt", "installed_version", "installing", "uninstalling"}):
             for key, value in status_data.items():
                 if value in ["true", "false"]:
                     value = value == "true"
@@ -845,6 +917,8 @@ async def handle_websocket_msg(agent_id: str, message: str) -> str | None:
                     value = None
                 setattr(software, key, value)
             await software.save()
+        if software.installed_version is None and software.uninstalling == False and was_uninstalling:
+            await software.delete()
     return None
 
 
@@ -918,7 +992,6 @@ async def run_websocket_handler_queue_worker():
             await handle_websocket_msg(agent_id, msg)
         except queue.Empty:
             await asyncio.sleep(1)
-
 
 
 app.add_task(run_websocket_server(app))
