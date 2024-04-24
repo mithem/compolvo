@@ -53,6 +53,7 @@ export default defineComponent({
         if (!res.ok) {
           alert(await res.text());
         } else {
+          softwares.value = []
           softwares.value = JSON.parse(await res.text())
           calculateAvailableUpdates()
         }

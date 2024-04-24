@@ -849,7 +849,8 @@ async def uninstall_agent_software(request, user):
     if software is None:
         raise NotFound("AgentSoftware not found.")
     agent: Agent = await software.agent
-    if str(await (agent.user).id) != user.id:
+    agent_id = (await agent.user).id
+    if str(agent_id) != str(user.id):
         raise BadRequest("You can only uninstall software on your own agents.")
     service: Service = await (await (await software.service_plan).service_offering).service
     await send_agent_software_notification(AgentSoftwareAgentCommand.UNINSTALL, agent, service,
