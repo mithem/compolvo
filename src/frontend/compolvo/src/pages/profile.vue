@@ -9,6 +9,8 @@ export default defineComponent({
     const loading = ref(false);
     const deleting = ref(false);
     const svcPlans = ref<ServicePlan[]>([]);
+    const monthlyPrice = ref<number>(null);
+    const agentCount = ref<number>(null);
 
     const fetchServicePlans = async function () {
       console.log("Fetching service plans")
@@ -21,6 +23,10 @@ export default defineComponent({
           let text = await res.text();
           console.log(text)
           svcPlans.value = JSON.parse(text)
+          monthlyPrice.value = Math.round(svcPlans.value.map((plan) => {
+            return plan.service_offering.price / plan.service_offering.duration_days
+          })
+            .reduce((cost, newCost) => cost + newCost, 0) * 30 * 100) / 100
         }
       } catch (err) {
         alert(err)
@@ -43,9 +49,26 @@ export default defineComponent({
       }
     }
 
-    onMounted(fetchServicePlans)
+    const getAgentCount = async function () {
+      try {
+        const res = await fetch("/api/agent/count")
+        if (!res.ok) {
+          alert(await res.text())
+        } else {
+          const data = JSON.parse(await res.text())
+          agentCount.value = data.count
+        }
+      } catch (err) {
+        alert(err)
+      }
+    }
 
-    return {loading, svcPlans, deleting, fetchServicePlans, deleteAccount}
+    onMounted(async () => {
+      await getAgentCount()
+      await fetchServicePlans()
+    })
+
+    return {loading, svcPlans, deleting, monthlyPrice, agentCount, fetchServicePlans, deleteAccount}
   }
 })
 </script>
@@ -54,6 +77,18 @@ export default defineComponent({
   <v-container fluid>
     <h1>Profile (+ Status)</h1>
     <v-progress-linear v-if="loading" indeterminate></v-progress-linear>
+    <v-container class="stats-container">
+      <v-card class="stat-card" title="Total service plans">
+        <v-card-text class="stat-card-text">{{ svcPlans.length }}</v-card-text>
+      </v-card>
+      <v-card class="stat-card" title="Total cost">
+        <v-card-text class="stat-card-text">{{ monthlyPrice }}€/month
+        </v-card-text>
+      </v-card>
+      <v-card class="stat-card" title="Agent count">
+        <v-card-text class="stat-card-text">{{ agentCount }}</v-card-text>
+      </v-card>
+    </v-container>
     <v-container>
       <v-row>
         <v-col cols="12" md="6" lg="4" v-for="plan in svcPlans" :key="plan.id">
@@ -69,3 +104,21 @@ export default defineComponent({
     </v-btn>
   </v-container>
 </template>
+
+<style scoped>
+.stats-container {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.stat-card {
+  flex-basis: 100%;
+  border-radius: 10px;
+}
+
+.stat-card-text {
+  font-size: 20px;
+  font-weight: bold;
+}
+</style>

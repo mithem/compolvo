@@ -151,7 +151,7 @@ async def run_websocket(retries: Optional[int] = 5):
             if response == "login successful":
                 logger.info("Logged in successfully.")
             else:
-                logger.info("Error logger in: %s", response)
+                logger.info("Error logging in: %s", response)
             try:
                 while True:
                     data = await ws.recv()
