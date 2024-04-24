@@ -112,7 +112,6 @@ class License(Model, Serializable):
 class Tag(Model, Serializable):
     id = UUIDField(pk=True)
     label = TextField()
-    # services = ManyToManyField("models.Service", related_name="tags")
 
     fields = ["id", "label"]
 

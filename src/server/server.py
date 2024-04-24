@@ -53,7 +53,8 @@ service_group = Blueprint.group(service, service_offering, service_plan)
 payment = Blueprint("payment", url_prefix="/api/payment")
 agent = Blueprint("agent", url_prefix="/api/agent")
 agent_software = Blueprint("agent_software", url_prefix="/api/agent/software")
-api = Blueprint.group(user, service_group, tag, payment, agent, agent_software)
+license = Blueprint("license", url_prefix="/api/license")
+api = Blueprint.group(user, service_group, tag, payment, agent, agent_software, license)
 
 app.blueprint(api)
 
@@ -874,6 +875,14 @@ async def send_agent_queue_message(request, user):
         raise BadRequest("Missing parameters. Expected `agent`, `message`")
 
 
+@app.get("/api/license")
+@protected()
+@get_endpoint(License)
+async def get_licenses(request, user, licenses):
+    pass
+
+
+# TODO: Add endpoints for creating, updating and deleting licenses
 # Queue for messages pending to be sent to respective agents
 websocket_message_queue: Dict[str, Queue[str]] = dict()
 # Queue for handling messages sent by agents (as that might require expensive database calls)
