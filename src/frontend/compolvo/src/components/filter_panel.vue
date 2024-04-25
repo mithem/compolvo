@@ -144,7 +144,7 @@ export default defineComponent({
       2: "Year",
     },
     minPrice: 0,
-    maxPrice: 10000,
+    maxPrice: 1000,
   }),
   methods: {
     applyFilters(): void {

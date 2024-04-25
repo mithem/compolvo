@@ -32,8 +32,7 @@ compact_card.vue
 
     <v-card-text>
       <div class="tags">
-        <span>{{ filteredService.service.os }}</span>
-        <span v-for="os in filteredService.service.os" key="os.id" class="tag">{{ os.id }}</span>
+        <span v-for="os in formatedOs" key="formatedOs" class="tag">{{os}}</span>
       </div>
     </v-card-text>
 
@@ -72,13 +71,15 @@ export default defineComponent({
     const formatedLicense = ref<string>(null)
     const formatedOs = ref<string[]>(null)
 
-    // TODO: fix (filteredService is not empty and shows os but filteredService.value.service.os doesnt)
-    console.log("compactCard", filteredService)
-    console.log("compactCardOS", filteredService.value.service.os)
+    console.log("cards",filteredService)
+
+
+    formatedOs.value = filteredService.value.service.operating_systems.map(osId => {
+      const foundOs = props.oses.find(os => os.id === osId)
+      return foundOs ? foundOs.props.title : 'N/A'
+    })
 
     const optLicense = props.licenses.filter(license => license.id == filteredService.value.service.license)
-    console.log("optLicense", optLicense)
-    console.log("optLicense length", optLicense.length)
     formatedLicense.value = optLicense.length > 0 ? optLicense[0].props.title : "N/A"
 
 
@@ -91,14 +92,12 @@ export default defineComponent({
       }
       return `$${calcPrice.toFixed(2)} / ${periodName} (paid each ${offering.name})`;
     }
-    console.log("Oberknecht")
-    console.log(filteredService)
-    console.log(targetDurationDays)
 
     return {
       filteredService,
       formatPriceMean,
-      formatedLicense
+      formatedLicense,
+      formatedOs
     };
   }
 });

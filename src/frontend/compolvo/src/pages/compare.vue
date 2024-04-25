@@ -1,8 +1,8 @@
 <template>
   <v-container fluid>
     <v-row style="margin: 0">
-      <filter_panel @applyFilter="filterServices($event)" style="flex-grow: 1" :licenses=licenses :oses=oses/>
-      <v-container style="flex-grow: 3; margin:0; padding-top: 0; max-width: 80%">
+      <filter_panel @applyFilter="filterServices($event)" style="flex-grow: 1" :licenses=licenses :oses="oses"/>
+      <v-container style="flex-grow: 3; margin:0; padding-top: 0; max-width: 80%"  class="container">
         <v-row>
           <v-col cols="12" md="6" lg="4" v-for="service in filteredServices" :key="service.service.id">
             <compact-card
@@ -90,7 +90,6 @@ export default defineComponent({
       }
     }
 
-
     onMounted(async () => {
       await fetchLicenseOptions()
       await fetchOsOptions()
@@ -113,6 +112,7 @@ export default defineComponent({
       }
       filteredServices.value = services.value.map((service: DetailedService) => {
         const priceForService = getPriceForService(service.offerings);
+        console.log("priceForService",priceForService)
         return {
           service: service,
           calculatedPrice: priceForService[0] as number,
@@ -133,15 +133,22 @@ export default defineComponent({
           result = result.filter(service => service.service.license === filter.license.id);
         }
         if (filter.os !== null) {
-          result = result.filter(service => service.service.os === filter.os.id);
+          result = result.filter(service => service.service.operating_systems.some(os => (os === filter.os.id)));
         }
       }
-
-      /* TODO: add reload after pressing the select button  */
+      // ensures that the cards are getting reloaded if the period is changed in the filter
+      filteredServices.value = []
+      setTimeout(()=>{
+        filteredServices.value = result
+      },0)
     }
 
     const getPriceForService = (offerings: ServiceOffering[]) => {
       const filtered = offerings.filter((offering: ServiceOffering) => {
+        console.log(offering.service)
+        console.log("offering.duration_days",offering.duration_days )
+        console.log("targetDurationDays.value",targetDurationDays.value)
+        console.log("---------------------------------------------------")
         return offering.duration_days === targetDurationDays.value
       }).sort((a, b) => {
         if (a.price < b.price) {
@@ -152,8 +159,9 @@ export default defineComponent({
         }
         return 0;
       })
+      console.log("filtered",filtered)
       if (filtered.length > 0) {
-        return [offerings[0].price, offerings[0]]
+        return [filtered[0].price, filtered[0]]
       }
       const offering = offerings.sort((a, b) => {
         if (a.duration_days > b.duration_days) {
@@ -182,4 +190,10 @@ export default defineComponent({
 </script>
 
 <style scoped>
+
+.container{
+  overflow-y: scroll;
+  flex: 1;
+}
+
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <v-app>
+  <v-app style="height: 100vh">
     <v-main>
       <router-view />
     </v-main>
@@ -9,3 +9,4 @@
 <script lang="ts" setup>
   //
 </script>
+
