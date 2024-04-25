@@ -349,7 +349,7 @@ async def get_services(request, services, user):
             "tags": [await tag.to_dict() for tag in await svc.tags],
             "offerings": [await offering.to_dict() for offering in
                           await ServiceOffering.filter(service=svc).all()],
-            "operating_systems": await Serializable.list_dict(await svc.operating_systems)
+            "operating_systems": [str(os.id) for os in await svc.operating_systems]
         }
 
     if isinstance(services, list):

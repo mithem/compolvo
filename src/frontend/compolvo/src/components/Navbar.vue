@@ -7,7 +7,7 @@
       <v-btn
         v-for="item in menuItems"
         :key="item.title"
-        :to="{path: item.path}">
+        :to="{path: item.path, query: item.query }">
         <v-icon left dark class="mr-2">{{ item.icon }}</v-icon>
         {{ item.title }}
       </v-btn>
@@ -56,7 +56,8 @@ export default {
         items.push(
           {
             title: "Login",
-            path: "/login?redirect_url=" + document.location.pathname,
+            path: "/login",
+            query: {redirect_url: this.$route.fullPath},
             icon: "mdi-account"
           }
         )
