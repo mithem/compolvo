@@ -35,7 +35,6 @@ export interface Service {
   description: string | null
   license: string | null
   download_count: number | null
-  latest_version: string | null
   image: string | null
 }
 

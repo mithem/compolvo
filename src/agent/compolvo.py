@@ -1,4 +1,5 @@
 import asyncio
+import enum
 import logging
 import os
 import re
@@ -7,6 +8,7 @@ from logging import Logger
 from typing import Dict, Any, Optional
 
 import click
+import distro
 import requests
 import websockets
 import yaml
@@ -144,6 +146,28 @@ async def run_websocket(retries: Optional[int] = 5):
         return await run_websocket(None if retries is None else retries - 1)
 
 
+class OperatingSystem(enum.StrEnum):
+    debian = "debian"
+    macos = "macOS"
+    windows = "windows"
+
+
+class UnsupportedOperatingSystem(Exception):
+    pass
+
+
+def detect_operating_system(id: str = None) -> OperatingSystem:
+    dist = distro.id() if id is None else id
+    match dist:
+        case "debian":
+            return OperatingSystem.debian
+        case "darwin" | "macOS":
+            return OperatingSystem.macos
+        case "windows":
+            return OperatingSystem.windows
+    raise UnsupportedOperatingSystem(
+        f"Unsupported operating system detected ({dist}). Please add a agent with a supported one.")
+
 
 @click.command("init")
 @click.option("--compolvo-host", default="localhost:8080", help="hostname where Compolvo is hosted")
@@ -153,38 +177,52 @@ async def run_websocket(retries: Optional[int] = 5):
               help="Overwrite existing config file")
 @click.option("--insecure", is_flag=True, default=False, help="Insecure websocket connection")
 def init(compolvo_host: str, agent_id: str, overwrite: bool, insecure: bool):
-    logger.info("Initializing compolvo...")
-    config = Config({
-        "agent": {
-            "id": agent_id
-        },
-        "compolvo": {
-            "host": compolvo_host,
-            "secure": not insecure
-        }
-    }, config_filename)
-    if not overwrite and os.path.isfile(config.config_file):
-        overwrite = click.confirm("Overwrite existing config?", default=True)
-        if not overwrite:
-            return
-    logger.info(f"Writing config into {config_filename}")
-    save_config(config, config_filename)
-    agent_endpoint = f"http{'s' if config.compolvo.secure else ''}://{config.compolvo.host}/api/agent/name?id={agent_id}"
-    response = requests.get(agent_endpoint)
-    if not response.ok:
-        logger.error("Error getting current agent status: %s", response.text)
-        return
-    name = response.json().get("name")
-    error = False
-    if name is None:
-        new_name = click.prompt("Enter new name", type=click.STRING, default="")
-        if new_name != "":
-            response = requests.patch(agent_endpoint, json={"id": agent_id, "name": new_name})
-            if not response.ok:
-                logger.error("Error updating agent's name: %s.", response.text)
-                error = True
-            name = response.json().get("name")
-    logger.info(f"Initialized {'successfully' if not error else 'with errors'} as agent '{name}'.")
+    try:
+        operating_system = detect_operating_system()
+        logger.info("Initializing compolvo...")
+        config = Config({
+            "agent": {
+                "id": agent_id
+            },
+            "compolvo": {
+                "host": compolvo_host,
+                "secure": not insecure
+            }
+        }, config_filename)
+        if not overwrite and os.path.isfile(config.config_file):
+            overwrite = click.confirm("Overwrite existing config?", default=True)
+            if not overwrite:
+                return
+        logger.info(f"Writing config into {config_filename}")
+        save_config(config, config_filename)
+        api_base = f"http{'s' if config.compolvo.secure else ''}://{config.compolvo.host}"
+        agent_endpoint = f"{api_base}/api/agent/name?id={agent_id}"
+        response = requests.get(agent_endpoint)
+        if not response.ok:
+            logger.error("Error getting current agent status: %s", response.text)
+            exit(1)
+        json = response.json()
+        name = json.get("name")
+        existing_os = detect_operating_system(json.get("operating_system"))
+        if existing_os != operating_system:
+            logger.warning(
+                "Agent configured previously on different operating system (was %s, now %s)",
+                existing_os, operating_system)
+        error = False
+        payload = {"id": agent_id, "operating_system": operating_system.value}
+        if name is None:
+            new_name = click.prompt("Enter new name", type=click.STRING, default="")
+            if new_name != "":
+                payload["name"] = new_name
+        response = requests.patch(f"{api_base}/api/agent/init?id={agent_id}", json=payload)
+        if not response.ok:
+            logger.error("Error initializing agent: %s.", response.text)
+            error = True
+        name = response.json().get("name")
+        logger.info(
+            f"Initialized {'successfully' if not error else 'with errors'} as agent '{name}'.")
+    except UnsupportedOperatingSystem as e:
+        logger.error(e)
 
 
 @click.command("run")

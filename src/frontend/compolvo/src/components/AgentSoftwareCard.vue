@@ -98,7 +98,7 @@ export default defineComponent({
           software.installed_version
         }}<br/></span>
       <span v-if="software.latest_version != null">Latest: {{
-          software.service.latest_version
+          software.latest_version
         }}</span>
     </v-card-text>
     <v-card-actions :v-if="updateAvailable">

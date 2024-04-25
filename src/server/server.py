@@ -16,13 +16,15 @@ from sanic.log import logger
 from sanic_openapi import openapi
 from tortoise.contrib.sanic import register_tortoise
 from tortoise.exceptions import IntegrityError
+from tortoise.functions import Coalesce
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 
 from compolvo import cors
 from compolvo import options
 from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, protected
 from compolvo.models import User, Service, ServiceOffering, ServicePlan, Tag, Payment, \
-    Agent, AgentSoftware, UserRole, Serializable, License, OperatingSystem
+    Agent, AgentSoftware, UserRole, Serializable, License, OperatingSystem, PackageManager, \
+    PackageManagerAvailableVersion
 from compolvo.utils import hash_password, verify_password, generate_secret
 
 HTTP_HEADER_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
@@ -84,14 +86,26 @@ async def db_setup(request, user):
         lic_mit = await License.create(
             name="MIT"
         )
-        os_lin = await OperatingSystem.create(
-            name="Linux"
+        os_deb = await OperatingSystem.create(
+            name="Debian",
+            system_name="debian"
         )
         os_win = await OperatingSystem.create(
-            name="Windows"
+            name="Windows",
+            system_name="windows"
         )
         os_mac = await OperatingSystem.create(
-            name="macOS"
+            name="macOS",
+            system_name="macOS"
+        )
+        pm_apt = await PackageManager.create(
+            name="apt (debian stable)"
+        )
+        pm_brew = await PackageManager.create(
+            name="brew"
+        )
+        pm_choco = await PackageManager.create(
+            name="choco"
         )
         svc_docker = await Service.create(
             system_name="docker-desktop",
@@ -106,12 +120,27 @@ async def db_setup(request, user):
             tag_developer,
             tag_enthusiast
         )
-        await svc_docker.operating_systems.add(
-            os_lin,
-            os_win,
-            os_mac
+        v_docker_1 = await PackageManagerAvailableVersion.create(
+            service=svc_docker,
+            operating_system=os_win,
+            package_manager=pm_choco,
+            version="1.2.5",
+            latest=True
         )
-        await svc_docker.save()
+        v_docker_2 = await PackageManagerAvailableVersion.create(
+            service=svc_docker,
+            operating_system=os_deb,
+            package_manager=pm_apt,
+            version="1.2.5",
+            latest=True
+        )
+        v_docker_3 = await PackageManagerAvailableVersion.create(
+            service=svc_docker,
+            operating_system=os_mac,
+            package_manager=pm_brew,
+            version="1.2.5",
+            latest=True
+        )
         svc_nginx = await Service.create(
             system_name="nginx",
             name="Nginx",
@@ -124,11 +153,21 @@ async def db_setup(request, user):
         await svc_nginx.tags.add(
             tag_developer
         )
-        await svc_nginx.operating_systems.add(
-            os_lin,
-            os_mac
-        )
         await svc_nginx.save()
+        v_nginx_1 = await PackageManagerAvailableVersion.create(
+            service=svc_nginx,
+            operating_system=os_deb,
+            package_manager=pm_apt,
+            version="1.22.1-9",
+            latest=True
+        )
+        v_nginx_2 = await PackageManagerAvailableVersion.create(
+            service=svc_nginx,
+            operating_system=os_mac,
+            package_manager=pm_brew,
+            version="1.25.5",
+            latest=True
+        )
         svc_git = await Service.create(
             system_name="git",
             name="Git",
@@ -139,11 +178,6 @@ async def db_setup(request, user):
         )
         await svc_git.tags.add(
             tag_developer
-        )
-        await svc_git.operating_systems.add(
-            os_lin,
-            os_win,
-            os_mac
         )
         await svc_git.save()
         svc_nextcloud = await Service.create(
@@ -158,10 +192,6 @@ async def db_setup(request, user):
         )
         await svc_nextcloud.tags.add(
             tag_enthusiast
-        )
-        await svc_nextcloud.operating_systems.add(
-            os_lin,
-            os_mac
         )
         await svc_nextcloud.save()
         if request.json is not None and request.json.get("service_offerings", False):
@@ -344,12 +374,25 @@ async def delete_user(request, deleted_user, user):
 # @openapi.response(200, {"application/json": Union[List[Service], Service]})
 async def get_services(request, services, user):
     async def expand(svc: Service) -> dict:
+        query = (
+            Service
+            .filter(id=svc.id)
+            .annotate(
+                os_id=Coalesce("available_versions__operating_system__id")
+                # just so this field is resolved, as pure strings aren't supported
+            )
+            .filter(os_id__isnull=False)
+            .values("os_id")
+        )
+        results = await query
+        oses = [os.get("os_id") for os in results]
+
         return {
             **await svc.to_dict(),
             "tags": [await tag.to_dict() for tag in await svc.tags],
             "offerings": [await offering.to_dict() for offering in
                           await ServiceOffering.filter(service=svc).all()],
-            "operating_systems": [str(os.id) for os in await svc.operating_systems]
+            "operating_systems": oses,
         }
 
     if isinstance(services, list):
@@ -637,22 +680,35 @@ async def get_agent_name(request):
         if not agent.initialized:
             agent.initialized = True
             await agent.save()
-        return json({"name": agent.name})
+        operating_sys = await agent.operating_system
+        os_name = operating_sys.system_name if operating_sys is not None else None
+        return json(
+            {
+                "name": agent.name,
+                "operating_system": os_name
+            }
+        )
     except KeyError:
         raise BadRequest("Expected `id` query param.")
 
 
-@agent.patch("/name")
-async def update_agent_name(request):
+@agent.patch("/init")
+async def agent_init(request):
     try:
         id = request.json["id"]
-        new_name = request.json["name"]
+        new_name = request.json.get("name")
+        os = request.json.get("operating_system")
         agent = await Agent.get_or_none(id=id)
         if agent is None:
             raise NotFound("Agent not found.")
-        agent.name = new_name
+        operating_system = await OperatingSystem.get_or_none(system_name=os)
+        if operating_system is None:
+            raise NotFound(f"Operating system '{os}' not found. Please specify valid system_name.")
+        if new_name is not None:
+            agent.name = new_name
+        agent.operating_system = operating_system
         await agent.save()
-        return json({"name": new_name})
+        return json({"name": new_name or agent.name, "operating_system": os})
     except (KeyError, AttributeError):
         raise BadRequest("Missing parameter. Expected 'id' and 'name'")
 
@@ -720,7 +776,7 @@ async def get_own_agent_software(request, user):
         data.append(
             {
                 **await software.to_dict(),
-                "latest_version": service.latest_version,
+                "latest_version": await get_latest_version(service, await agent.operating_system),
                 "offering": await offering.to_dict(),
                 "service": await service.to_dict(),
                 "agent": await agent.to_dict()
@@ -800,12 +856,32 @@ class AgentSoftwareAgentCommand(enum.StrEnum):
     UNINSTALL = "uninstall"
 
 
+async def get_latest_version(service: Service, os: OperatingSystem) -> str | None:
+    query = (
+        Service
+        .filter(
+            id=service.id,
+            available_versions__latest=True,
+            available_versions__operating_system=os
+        )
+        .annotate(
+            version=Coalesce("available_versions__version")
+        )
+        .values("version")
+    )
+    results = await query
+    if results:
+        return results[0]["version"]
+    return None
+
+
 async def send_agent_software_notification(command: AgentSoftwareAgentCommand, agent: Agent,
                                            service: Service,
                                            software: AgentSoftware):
+    version = await get_latest_version(service, await agent.operating_system)
     match command:
         case AgentSoftwareAgentCommand.INSTALL:
-            version_info = f" v{service.latest_version}"
+            version_info = f" v{version}"
         case AgentSoftwareAgentCommand.UNINSTALL:
             version_info = ""
         case _:

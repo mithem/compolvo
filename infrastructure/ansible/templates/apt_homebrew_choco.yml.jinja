@@ -5,7 +5,7 @@
     - name: debian
       when: ansible_distribution == "Debian"
       ansible.builtin.apt:
-        name: {{ apt_module or name }}={{ version }}
+        name: {{ apt_module or name }}{{ "=" + version if version else "" }}
         state: {{ state }}
     - name: macos
       when: ansible_distribution == "MacOSX"

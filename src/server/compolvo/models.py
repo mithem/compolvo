@@ -7,6 +7,7 @@ import tortoise.queryset
 from sanic import json
 from tortoise.fields import UUIDField, TextField, CharField, IntEnumField, FloatField, IntField, \
     DatetimeField, BooleanField, ForeignKeyField, ManyToManyField
+from tortoise.fields.relational import _NoneAwaitable
 from tortoise.models import Model
 
 
@@ -31,6 +32,8 @@ class Serializable:
                     value = str(value)
             elif isinstance(value, Serializable):
                 value = await value.to_dict()
+            elif isinstance(value, _NoneAwaitable):
+                value = None
             data[field] = value
         return data
 
@@ -86,21 +89,38 @@ class Service(Model, Serializable):
     system_name = TextField()
     description = TextField(null=True)
     license = ForeignKeyField("models.License", "services")
-    operating_systems = ManyToManyField("models.OperatingSystem", related_name="services")
     download_count = IntField(null=True)
-    latest_version = TextField(null=True)
     image = TextField(null=True)
     tags = ManyToManyField("models.Tag", related_name="services")
 
     fields = ["id", "system_name", "name", "description", "license", "download_count",
-              "latest_version", "image"]
+              "image"]
 
 
 class OperatingSystem(Model, Serializable):
     id = UUIDField(pk=True)
     name = TextField()
+    system_name = CharField(255, unique=True)
+
+    fields = ["id", "name", "system_name"]
+
+
+class PackageManager(Model, Serializable):
+    id = UUIDField(pk=True)
+    name = TextField(null=True)
 
     fields = ["id", "name"]
+
+
+class PackageManagerAvailableVersion(Model, Serializable):
+    id = UUIDField(pk=True)
+    service = ForeignKeyField("models.Service", "available_versions")
+    operating_system = ForeignKeyField("models.OperatingSystem", "available_versions")
+    package_manager = ForeignKeyField("models.PackageManager", "available_versions")
+    version = TextField()
+    latest = BooleanField(default=False)
+
+    # TODO: Add constraint that (service, package_manager, operating_system, latest) is unique
 
 
 class License(Model, Serializable):
@@ -108,6 +128,7 @@ class License(Model, Serializable):
     name = TextField()
 
     fields = ["id", "name"]
+
 
 class Tag(Model, Serializable):
     id = UUIDField(pk=True)
@@ -156,9 +177,10 @@ class Agent(Model, Serializable):
     connected = BooleanField(default=False)
     connection_interrupted = BooleanField(default=False)
     initialized = BooleanField(default=False)
+    operating_system = ForeignKeyField("models.OperatingSystem", "agents", null=True)
 
     fields = ["id", "name", "user", "last_connection_start", "last_connection_end", "connected",
-              "connection_interrupted", "initialized"]
+              "connection_interrupted", "initialized", "operating_system"]
 
 
 class AgentSoftware(Model, Serializable):
