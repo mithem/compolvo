@@ -10,7 +10,7 @@
     - name: macos
       when: ansible_distribution == "MacOSX"
       ansible.builtin.homebrew:
-        name: {{ brew_module or name }}{{ "@" + version if version else "" }}
+        name: {{ brew_module or name }} # No version-specific support at this point as it isn't really generally available for homebrew
         state: {{ state }}
     - name: Windows
       when: ansible_distribution == "Windows"

@@ -943,7 +943,7 @@ async def handle_websocket_msg(agent_id: str, message: str) -> str | None:
                     value = None
                 setattr(software, key, value)
             await software.save()
-        if software.installed_version is None and software.uninstalling == False and was_uninstalling:
+        if software.installed_version is None and software.uninstalling == False and was_uninstalling and not software.installing and not software.corrupt:
             await software.delete()
     return None
 

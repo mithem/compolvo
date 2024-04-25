@@ -3,5 +3,5 @@ services:
     container_name: ansible-environment
     image: ansible-environment:latest
     build:
-      context: .
-      dockerfile: TestEnvironment.Dockerfile
+      context: ../..
+      dockerfile: infrastructure/ansible/TestEnvironment.Dockerfile

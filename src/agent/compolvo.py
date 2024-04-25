@@ -10,12 +10,6 @@ import click
 import requests
 import websockets
 import yaml
-from ansible import context
-from ansible.executor.playbook_executor import PlaybookExecutor
-from ansible.inventory.manager import InventoryManager
-from ansible.module_utils.common.collections import ImmutableDict
-from ansible.parsing.dataloader import DataLoader
-from ansible.vars.manager import VariableManager
 
 config: "Config"
 logger: Logger
@@ -105,36 +99,13 @@ def run_playbook(system_name: str, software_id: str, playbook_name: str):
     if not response.ok:
         logger.error("Error fetching playbook from %s: %s", playbook_url, response.text)
         return None
-    with open(system_name + ".yml", "w") as f:
+    path = system_name + ".yml"
+    with open(path, "w") as f:
         f.write(response.text)
-    context.CLIARGS = ImmutableDict(
-        connection='smart',
-        become=None,
-        become_method=None,
-        become_user=None,
-        check=False,
-        diff=False,
-        verbosity=0,
-        syntax=None,
-        start_at_task=None
-    )
-    loader = DataLoader()
-    inventory = InventoryManager(loader=loader)
-    inventory.add_host("localhost")
-    var_manager = VariableManager(loader=loader, inventory=inventory)
-    var_manager.set_host_variable("localhost", "ansible_python_interpreter",
-                                  "./venv/bin/python3")
-    playbook_executor = PlaybookExecutor(
-        inventory=inventory,
-        variable_manager=var_manager,
-        playbooks=[f"{system_name}.yml"],
-        loader=loader,
-        passwords={}
-    )
-    data = playbook_executor.run()
-    os.remove(system_name + ".yml")
+    return_code = os.system(f"ansible-playbook '{path}'")
+    os.remove(path)
     installed_version = playbook_name if playbook_name != 'uninstall' else None
-    if data == 0:
+    if return_code == 0:
         return f"software status {software_id} installed_version={installed_version};corrupt=false;installing=false;uninstalling=false"
     return f"software status {software_id} installed_version={installed_version};corrupt=true;installing=false;uninstalling=false"
 

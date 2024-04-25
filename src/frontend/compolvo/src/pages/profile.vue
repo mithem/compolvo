@@ -86,7 +86,10 @@ export default defineComponent({
         </v-card-text>
       </v-card>
       <v-card class="stat-card" title="Agent count">
-        <v-card-text class="stat-card-text">{{ agentCount }}</v-card-text>
+        <v-card-text class="stat-card-text">{{
+            agentCount != null ? agentCount : "N/A"
+          }}
+        </v-card-text>
       </v-card>
     </v-container>
     <v-container>
