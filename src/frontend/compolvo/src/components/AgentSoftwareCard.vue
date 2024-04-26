@@ -87,7 +87,7 @@ export default defineComponent({
         <span v-if="software.installing">
           Installing...
         </span>
-        <span v-else>Uninstalling...</span>
+        <span v-if="software.uninstalling">Uninstalling...</span>
         <v-progress-linear indeterminate>
         </v-progress-linear>
       </div>
@@ -107,6 +107,7 @@ export default defineComponent({
         :loading="uninstalling"
         color="red"
         variant="outlined"
+        :disabled="software.installing || software.uninstalling"
       >
         Uninstall
       </v-btn>
@@ -115,6 +116,7 @@ export default defineComponent({
         v-if="updateAvailable"
         @click="startUpdate"
         :loading="upgrading"
+        :disabled="software.installing || software.uninstalling"
         color="blue">
         Update
       </v-btn>

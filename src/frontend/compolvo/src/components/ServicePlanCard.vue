@@ -24,11 +24,8 @@ export default defineComponent({
     const cancel = async function () {
       cancelling.value = true;
       try {
-        const res = await fetch("/api/service/plan?id=" + plan.value.id, {
-          method: "PATCH",
-          body: JSON.stringify({
-            canceled_by_user: true
-          })
+        const res = await fetch("/api/service/plan/cancel?id=" + plan.value.id, {
+          method: "DELETE"
         })
         if (!res.ok) {
           alert(await res.text());

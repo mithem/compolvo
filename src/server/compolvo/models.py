@@ -155,8 +155,10 @@ class ServicePlan(Model, Serializable):
     start_date = DatetimeField()
     end_date = DatetimeField(null=True)
     canceled_by_user = BooleanField(default=False)
+    canceled_at = DatetimeField(null=True, default=None)
 
-    fields = ["id", "service_offering", "user", "start_date", "end_date", "canceled_by_user"]
+    fields = ["id", "service_offering", "user", "start_date", "end_date", "canceled_by_user",
+              "canceled_at"]
 
 
 class Payment(Model, Serializable):

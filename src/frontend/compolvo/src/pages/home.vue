@@ -10,9 +10,11 @@
         </div>
         <div v-else-if="softwares.length > 0">All agents up to date!</div>
         <div v-else>
-          Add an agent in the
+          <span v-if="agentCount == 0">Add an agent in the
           <RouterLink class="link" to="/agents">agent panel</RouterLink>
-          .<br/>
+          .<br/></span>
+          <span v-else>You can install software on your agents from the
+            <RouterLink class="link" to="/profile">profile tab</RouterLink>.</span>
           Or check out new Software in the
           <RouterLink class="link" to="/compare">compare tab</RouterLink>
           .
@@ -20,7 +22,7 @@
         <br/>
         <v-progress-linear v-if="loading" indeterminate></v-progress-linear>
       </v-container>
-      <v-btn prepend-icon="mdi-refresh" @click="fetchSoftware">Refresh</v-btn>
+      <v-btn prepend-icon="mdi-refresh" @click="refresh">Refresh</v-btn>
     </v-container>
     <v-container>
       <v-row>
@@ -46,6 +48,7 @@ export default defineComponent({
     const updates = ref(0);
     const firstName = ref<string>(null);
     const loading = ref(false);
+    const agentCount = ref<number>(null)
     const fetchSoftware = async function () {
       try {
         loading.value = true;
@@ -80,12 +83,30 @@ export default defineComponent({
       }
     }
 
+    const getAgentCount = async function () {
+      try {
+        const res = await fetch("/api/agent/count")
+        if (!res.ok) {
+          alert(await res.text())
+        } else {
+          agentCount.value = JSON.parse(await res.text()).count
+        }
+      } catch (err) {
+        alert(err)
+      }
+    }
+
+    const refresh = async function () {
+      await fetchSoftware()
+      await getUserName()
+      await getAgentCount()
+    }
+
     onMounted(() => {
-      fetchSoftware();
-      getUserName()
+      refresh();
     });
 
-    return {softwares, updates, firstName, loading, fetchSoftware}
+    return {softwares, updates, firstName, loading, agentCount, fetchSoftware, refresh}
   }
 });
 </script>

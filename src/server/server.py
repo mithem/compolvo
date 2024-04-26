@@ -16,6 +16,7 @@ from sanic.log import logger
 from sanic_openapi import openapi
 from tortoise.contrib.sanic import register_tortoise
 from tortoise.exceptions import IntegrityError
+from tortoise.expressions import Q
 from tortoise.functions import Coalesce
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 
@@ -491,11 +492,15 @@ async def get_service_plans(request, plans, user):
 @service_plan.get("/")
 @protected()
 async def get_own_service_plans(request, user):
-    filter_data = {"user": user}
+    filter_data = {
+        "user": user,
+    }
     id = request.args.get("id")
     if id is not None:
         filter_data["id"] = id
-    plans = await ServicePlan.filter(**filter_data).all()
+    plans = await ServicePlan.filter(Q(canceled_by_user=False) | Q(
+        canceled_at__gt=datetime.datetime.now() - datetime.timedelta(days=1.0)),
+                                     **filter_data).all()
     data = []
     for plan in plans:
         offering: ServiceOffering = await plan.service_offering
@@ -541,7 +546,29 @@ async def create_service_plan(request, user):
 @protected({UserRole.Role.ADMIN})
 @patch_endpoint(ServicePlan)
 async def update_service_plan(request, plan, user):
-    pass  # TODO: Make so users can cancel their own service plans
+    pass
+
+
+@service_plan.delete("/cancel")
+@protected()
+async def cancel_service_plan(request, user):
+    id = request.args.get("id")
+    plan = await ServicePlan.get_or_none(id=id)
+    if plan is None:
+        raise NotFound("Service plan not found.")
+    plan_user_id = (await plan.user).id
+    if plan_user_id != user.id:
+        raise BadRequest("You can only cancel your own service plans.")
+    plan.canceled_by_user = True
+    plan.canceled_at = datetime.datetime.now()
+    await plan.save()
+    offering: ServiceOffering = await plan.service_offering
+    service: Service = await offering.service
+    await plan.fetch_related("agent_softwares")
+    for software in plan.agent_softwares:
+        agent: Agent = await software.agent
+        await perform_software_uninstallation(agent, service, software)
+    return await plan.json()
 
 
 @service_plan.delete("/")
@@ -750,7 +777,6 @@ async def delete_agent(request, agent, user):
 async def bulk_delete_agents(request, user):
     try:
         ids = request.json["ids"]
-        print("Ids: ", ids)
         await Agent.filter(id__in=ids).all().delete()  # TODO: Check RBAC
         return HTTPResponse(status=204)
     except KeyError:
@@ -932,11 +958,15 @@ async def uninstall_agent_software(request, user):
     if str(agent_id) != str(user.id):
         raise BadRequest("You can only uninstall software on your own agents.")
     service: Service = await (await (await software.service_plan).service_offering).service
+    await perform_software_uninstallation(agent, service, software)
+    return HTTPResponse(status=204)
+
+
+async def perform_software_uninstallation(agent: Agent, service: Service, software: AgentSoftware):
     await send_agent_software_notification(AgentSoftwareAgentCommand.UNINSTALL, agent, service,
                                            software)
     software.uninstalling = True
     await software.save()
-    return HTTPResponse(status=204)
 
 
 @app.post("/api/agent/ws/queue")
