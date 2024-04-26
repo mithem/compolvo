@@ -2,19 +2,13 @@ compact_card.vue
 <template>
   <v-card class="compact-card">
     <v-card-title>
-      <v-row no-gutters>
-        <v-col cols="12">
           <v-img
             height="200"
             aspect-ratio="16/9"
             cover
             :src="filteredService.service.image"
           ></v-img>
-        </v-col>
-        <v-col cols="12" class="py-2 text-h6">
           {{ filteredService.service.name }}
-        </v-col>
-      </v-row>
     </v-card-title>
 
     <!-- Service Version -->
@@ -105,11 +99,8 @@ export default defineComponent({
 
 <style scoped>
 .compact-card {
-  min-width: auto;
-  max-width: 100%;
+  min-height: 70%;
   max-height: 100%;
-  min-height: 100%;
-  display: flex;
   flex-direction: column;
 }
 

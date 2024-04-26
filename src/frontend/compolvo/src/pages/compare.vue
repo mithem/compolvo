@@ -2,14 +2,14 @@
   <filter_panel @applyFilter="filterServices($event)" style="flex: 1; box-sizing: border-box" :licenses=licenses
                 :oses="oses"/>
   <v-container class="cardsContainer">
-    <v-col v-for="service in filteredServices" :key="service.service.id">
-            <compact-card
-              :filteredService=service
-              :targetDurationDays=targetDurationDays
-              :licenses=licenses
-              :oses=oses
-            />
-          </v-col>
+      <v-col cols="4" v-for="service in filteredServices" :key="service.service.id">
+        <compact-card
+          :filteredService=service
+          :targetDurationDays=targetDurationDays
+          :licenses=licenses
+          :oses=oses
+        />
+      </v-col>
   </v-container>
 </template>
 
@@ -107,7 +107,7 @@ export default defineComponent({
       }
       filteredServices.value = services.value.map((service: DetailedService) => {
         const priceForService = getPriceForService(service.offerings);
-        console.log("priceForService",priceForService)
+        console.log("priceForService", priceForService)
         return {
           service: service,
           calculatedPrice: priceForService[0] as number,
@@ -133,16 +133,16 @@ export default defineComponent({
       }
       // ensures that the cards are getting reloaded if the period is changed in the filter
       filteredServices.value = []
-      setTimeout(()=>{
+      setTimeout(() => {
         filteredServices.value = result
-      },0)
+      }, 0)
     }
 
     const getPriceForService = (offerings: ServiceOffering[]) => {
       const filtered = offerings.filter((offering: ServiceOffering) => {
         console.log(offering.service)
-        console.log("offering.duration_days",offering.duration_days )
-        console.log("targetDurationDays.value",targetDurationDays.value)
+        console.log("offering.duration_days", offering.duration_days)
+        console.log("targetDurationDays.value", targetDurationDays.value)
         console.log("---------------------------------------------------")
         return offering.duration_days === targetDurationDays.value
       }).sort((a, b) => {
@@ -154,7 +154,7 @@ export default defineComponent({
         }
         return 0;
       })
-      console.log("filtered",filtered)
+      console.log("filtered", filtered)
       if (filtered.length > 0) {
         return [filtered[0].price, filtered[0]]
       }
