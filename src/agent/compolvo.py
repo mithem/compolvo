@@ -2,6 +2,7 @@ import asyncio
 import enum
 import logging
 import os
+import platform
 import re
 import sys
 from logging import Logger
@@ -165,6 +166,10 @@ def detect_operating_system(id: str = None) -> OperatingSystem:
             return OperatingSystem.macos
         case "windows":
             return OperatingSystem.windows
+        case "":  # distro seemingly can't detect windows in my VM
+            if platform.system() == "Windows":
+                return OperatingSystem.windows
+
     raise UnsupportedOperatingSystem(
         f"Unsupported operating system detected ({dist}). Please add a agent with a supported one.")
 
