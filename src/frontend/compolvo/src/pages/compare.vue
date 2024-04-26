@@ -1,10 +1,8 @@
 <template>
-  <v-container fluid>
-    <v-row style="margin: 0">
-      <filter_panel @applyFilter="filterServices($event)" style="flex-grow: 1" :licenses=licenses :oses="oses"/>
-      <v-container style="flex-grow: 3; margin:0; padding-top: 0; max-width: 80%"  class="container">
-        <v-row>
-          <v-col cols="12" md="6" lg="4" v-for="service in filteredServices" :key="service.service.id">
+  <filter_panel @applyFilter="filterServices($event)" style="flex: 1; box-sizing: border-box" :licenses=licenses
+                :oses="oses"/>
+  <v-container class="cardsContainer">
+    <v-col v-for="service in filteredServices" :key="service.service.id">
             <compact-card
               :filteredService=service
               :targetDurationDays=targetDurationDays
@@ -12,9 +10,6 @@
               :oses=oses
             />
           </v-col>
-        </v-row>
-      </v-container>
-    </v-row>
   </v-container>
 </template>
 
@@ -190,10 +185,13 @@ export default defineComponent({
 </script>
 
 <style scoped>
-
-.container{
+.cardsContainer {
+  flex: 3;
+  flex-wrap: wrap;
+  display: flex;
+  overflow: hidden;
   overflow-y: scroll;
-  flex: 1;
+  margin: 0;
+  padding-top: 0;
 }
-
 </style>

@@ -2,7 +2,7 @@
   <v-card class="filter-card" title="Filter:">
     <v-list dense class="filter-list">
       <!-- Tags Filter with Custom Chips Display -->
-      <v-list-item>
+      <v-list-item class="filter-list-item">
         <v-select
           v-model="filters.tags"
           :items="tags"
@@ -27,7 +27,7 @@
       </v-list-item>
 
       <!-- Price Range Filter with Label -->
-      <v-list-item class="slider-list-item">
+      <v-list-item class="slider-list-item, filter-list-item">
         <div class="label">Price:</div>
         <v-container>
           <v-range-slider
@@ -43,7 +43,7 @@
       </v-list-item>
 
       <!-- Period Filter -->
-      <v-container class="slider-list-item">
+      <v-container class="slider-list-item, filter-list-item">
         <div class="label">Period:</div>
         <v-slider
           v-model="filters.period"
@@ -56,7 +56,7 @@
       </v-container>
 
       <!-- License Filter -->
-      <v-list-item>
+      <v-list-item class="filter-list-item">
         <v-select
           v-model="filters.license"
           :items="licenses"
@@ -67,7 +67,7 @@
       </v-list-item>
 
       <!-- Operating System Filter -->
-      <v-list-item>
+      <v-list-item class="filter-list-item">
         <v-select
           v-model="filters.os"
           :items="oses"
@@ -78,7 +78,7 @@
       </v-list-item>
 
       <!-- Apply Filters Button -->
-      <v-list-item>
+      <v-list-item class="filter-list-item">
         <v-btn block @click="applyFilters">Select</v-btn>
       </v-list-item>
     </v-list>
@@ -158,22 +158,20 @@ export default defineComponent({
 
 <style scoped>
 .filter-card {
-  max-height: 100%;
-  max-width: 20%;
+  overflow: auto;
 }
 
 .filter-list {
-  margin-top: 20px;
+  margin-top: 10px;
 }
 
-.slider-list-item {
-  margin-top: 24px;
+.filter-list-item {
+  flex: 1;
 }
 
 .slider-list-item .label {
   font-size: 14px;
   color: rgba(0, 0, 0, .87);
-  margin-bottom: 8px;
 }
 
 .price-slider .v-slider__thumb-label {
