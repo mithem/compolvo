@@ -19,7 +19,7 @@ export default defineComponent({
     const snackbarText = ref("");
     const buyNowMsg = ref("");
 
-    const createServicePlan = async function () {
+    const createServicePlan = async function (callback: () => void) {
       creating.value = true;
       try {
         const res = await fetch("/api/service/plan", {
@@ -31,6 +31,7 @@ export default defineComponent({
         if (!res.ok) {
           alert(await res.text())
         } else {
+          callback();
           snackbarText.value = "Order successful."
           showingSnackbar.value = true;
         }
@@ -136,7 +137,7 @@ export default defineComponent({
             <v-spacer/>
             <v-btn
               text="Buy now"
-              @click='createServicePlan(); isActive.value=false'
+              @click='createServicePlan(() => isActive.value=false)'
             ></v-btn>
           </v-card-actions>
         </v-col>

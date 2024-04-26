@@ -9,6 +9,7 @@ from typing import Set, Dict
 
 import jwt
 import jwt.exceptions
+import stripe
 import websockets
 from sanic import Sanic, redirect, Request, text, Blueprint, json, HTTPResponse
 from sanic.exceptions import BadRequest, NotFound, Unauthorized
@@ -22,7 +23,8 @@ from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 
 from compolvo import cors
 from compolvo import options
-from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, protected
+from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, protected, \
+    requires_payment_details, requires_stripe_customer
 from compolvo.models import User, Service, ServiceOffering, ServicePlan, Tag, Payment, \
     Agent, AgentSoftware, UserRole, Serializable, License, OperatingSystem, PackageManager, \
     PackageManagerAvailableVersion
@@ -36,6 +38,10 @@ app.config.SERVER_NAME = os.environ["SERVER_NAME"]
 
 app.config.SECRET_KEY = os.environ["COMPOLVO_SECRET_KEY"]
 app.config.SESSION_TIMEOUT = 60 * 60
+
+STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY")
+if STRIPE_API_KEY is not None:
+    stripe.api_key = STRIPE_API_KEY
 
 db_hostname = os.environ[
     "DB_HOSTNAME"]  # TODO: Make other parameters configurable via environment variables
@@ -58,8 +64,11 @@ agent = Blueprint("agent", url_prefix="/api/agent")
 agent_software = Blueprint("agent_software", url_prefix="/api/agent/software")
 license = Blueprint("license", url_prefix="/api/license")
 operating_system = Blueprint("operating_system", url_prefix="/api/operating-system")
+payment_intent = Blueprint("payment_intent", url_prefix="/api/billing/payment/intent")
+payment_method = Blueprint("payment_method", url_prefix="/api/billing/payment/method")
+billing = Blueprint.group(payment_intent, payment_method)
 api = Blueprint.group(user, service_group, tag, payment, agent, agent_software, license,
-                      operating_system)
+                      operating_system, billing)
 
 app.blueprint(api)
 
@@ -256,29 +265,52 @@ async def db_setup(request, user):
     return HTTPResponse("Created.", status=201)
 
 
+def test_email(email: str) -> bool:
+    #  https://stackoverflow.com/questions/201323/how-can-i-validate-an-email-address-using-a-regular-expression
+    pattern = r"(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])"
+    match = re.match(pattern, email)
+    return match is not None
+
+
+async def create_user(email: str, first: str | None, last: str | None, password: str,
+                      role: UserRole.Role = None) -> User:
+    if not test_email(email):
+        raise BadRequest("Invalid email.")
+    user = await User.get_or_none(email=email)
+    if user is None:
+        salt = generate_secret()
+        user = await User.create(
+            email=email,
+            first_name=first,
+            last_name=last,
+            password=hash_password(password, salt),
+            salt=salt,
+        )
+    if role is None:
+        role = UserRole.Role.USER
+    existing_role = await UserRole.get_or_none(user=user, role=role)
+    if existing_role is None:
+        await UserRole.create(
+            user=user,
+            role=role
+        )
+    if STRIPE_API_KEY is not None:
+        results = await stripe.Customer.search_async(query=f"email:'{email}'")
+        if len(results.data) > 0:
+            id = results.data[0].stripe_id
+        else:
+            customer = await stripe.Customer.create_async(
+                email=email,
+                name=first + " " + last
+            )
+            id = customer.id
+        user.stripe_id = id
+        await user.save()
+    return user
+
+
 @app.listener("before_server_start")
 async def test_user(request):
-    async def create_user(email: str, first: str, last: str, password: str,
-                          role: UserRole.Role = None):
-        user = await User.get_or_none(email=email)
-        if user is None:
-            salt = generate_secret()
-            user = await User.create(
-                email=email,
-                first_name=first,
-                last_name=last,
-                password=hash_password(password, salt),
-                salt=salt,
-            )
-        if role is None:
-            role = UserRole.Role.USER
-        existing_role = await UserRole.get_or_none(user=user, role=role)
-        if existing_role is None:
-            await UserRole.create(
-                user=user,
-                role=role
-            )
-
     options.setup_options(app, request)
     await create_user("test@example.com", "Test", "user", "test")
     await create_user("admin@example.com", "Admin", "Istrator", "admin", UserRole.Role.ADMIN)
@@ -330,22 +362,14 @@ async def get_user(request, user):
 
 
 @user.post("/")
-async def create_user(request):
+async def create_new_user(request):
     try:
-        salt = generate_secret()
-        password = hash_password(request.json["password"], salt)
-        user = await User.create(
-            first_name=request.json.get("first_name"),
-            last_name=request.json.get("last_name"),
-            email=request.json["email"],
-            password=password,
-            salt=salt
+        return await create_user(
+            request.json["email"],
+            request.json.get("first_name"),
+            request.json.get("last_name"),
+            request.json["password"]
         )
-        await UserRole.create(
-            user=user,
-            role=UserRole.Role.USER
-        )
-        return await user.json()
     except KeyError:
         raise BadRequest("Missing name, email, or password.")
     except IntegrityError:
@@ -522,8 +546,8 @@ async def get_own_service_plans(request, user):
 
 
 @service_plan.post("/")
-@protected()
-async def create_service_plan(request, user):
+@requires_payment_details(stripe)
+async def create_service_plan(request, user, methods):
     try:
         service_offering_id = request.json["service_offering"]
         offering = await ServiceOffering.get_or_none(id=service_offering_id)
@@ -1002,6 +1026,26 @@ async def get_operating_systems(request, user, operating_systems):
 async def get_own_agent_count(request, user: User):
     count = await Agent.filter(user=user).count()
     return json({"count": count})
+
+
+@payment_intent.post("/")
+@requires_stripe_customer(stripe)
+async def create_payment_intent(request, user, customer):
+    intent = await stripe.PaymentIntent.create_async(
+        amount=1200,
+        currency="eur"
+    )
+    return json({"client_secret": intent.client_secret})
+
+
+@payment_method.post("/attach")
+@requires_stripe_customer(stripe)
+async def attach_payment_method_to_customer(request, user, customer: stripe.Customer):
+    try:
+        await stripe.PaymentMethod.attach_async(request.json["method_id"], customer=customer.id)
+        return HTTPResponse(status=204)
+    except (TypeError, KeyError) as e:
+        raise BadRequest("Expected method_id for the payment method to attach")
 
 
 # TODO: Add endpoints for creating, updating and deleting licenses + OSes

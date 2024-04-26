@@ -1,9 +1,10 @@
 from functools import wraps
 from typing import Type, Set
 
+import stripe as stripe_module
 from compolvo.models import Serializable, UserRole, User
 from compolvo.utils import check_token, user_has_roles
-from sanic import HTTPResponse
+from sanic import HTTPResponse, text
 from sanic.exceptions import BadRequest, NotFound, Unauthorized
 
 
@@ -92,4 +93,32 @@ def protected(requires_roles: Set[UserRole.Role] = None):
 
         return decorated_function
 
+    return decorator
+
+
+def requires_stripe_customer(stripe):
+    def decorator(func):
+        @wraps(func)
+        @protected()
+        async def decorated_function(request, user: User, *args, **kwargs):
+            customer = await stripe.Customer.retrieve_async(user.stripe_id)
+            return await func(request, user, customer, *args, **kwargs)
+
+        return decorated_function
+
+    return decorator
+
+
+def requires_payment_details(stripe):
+    def decorator(func):
+        @wraps(func)
+        @requires_stripe_customer(stripe)
+        async def decorated_function(request, user: User, customer: stripe_module.Customer, *args,
+                                     **kwargs):
+            methods = customer.list_payment_methods()
+            if len(methods) == 0:
+                return text("Requires payment details.", status=402)
+            return await func(request, user, methods, *args, **kwargs)
+
+        return decorated_function
     return decorator

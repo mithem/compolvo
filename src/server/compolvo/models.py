@@ -62,6 +62,7 @@ class User(Model, Serializable):
     email = CharField(255, unique=True)
     password = TextField(null=True)
     salt = TextField(null=True)
+    stripe_id = TextField(null=True)
 
     fields = ["id", "first_name", "last_name", "email"]
 
