@@ -19,7 +19,8 @@ def patch_endpoint(cls: Type[Serializable]):
             if instance is None:
                 raise NotFound(f"Specified {cls.__name__} not found.")
             for key, value in request.json.items():
-                if key not in cls.fields:
+                fields = set(getattr(cls, "patch_fields", cls.fields)) - {"id"}
+                if key not in fields:
                     raise BadRequest(f"Key '{key}' does not exist on {cls.__name__}.")
                 setattr(instance, key, value)
             await instance.save()

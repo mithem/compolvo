@@ -1,6 +1,6 @@
 <script lang="ts">
 import {defineComponent, onMounted, ref} from "vue";
-import {ServicePlan} from "../components/models";
+import {ServicePlan, UserMeObject} from "../components/models";
 
 
 export default defineComponent({
@@ -11,9 +11,10 @@ export default defineComponent({
     const svcPlans = ref<ServicePlan[]>([]);
     const monthlyPrice = ref<number>(null);
     const agentCount = ref<number>(null);
+    const me = ref<UserMeObject>(null);
+    const loadingUserInfo = ref(false);
 
     const fetchServicePlans = async function () {
-      console.log("Fetching service plans")
       loading.value = true
       try {
         const res = await fetch("/api/service/plan")
@@ -32,6 +33,17 @@ export default defineComponent({
         alert(err)
       }
       loading.value = false
+    }
+
+    const fetchUserInfo = async function () {
+      loadingUserInfo.value = true
+      const res = await fetch("/api/user/me")
+      if (!res.ok) {
+        alert(await res.text())
+      } else {
+        me.value = await res.json()
+      }
+      loadingUserInfo.value = false
     }
 
     const deleteAccount = async function () {
@@ -63,12 +75,24 @@ export default defineComponent({
       }
     }
 
-    onMounted(async () => {
-      await getAgentCount()
-      await fetchServicePlans()
+    onMounted(() => {
+      fetchUserInfo()
+      getAgentCount()
+      fetchServicePlans()
     })
 
-    return {loading, svcPlans, deleting, monthlyPrice, agentCount, fetchServicePlans, deleteAccount}
+    return {
+      loading,
+      svcPlans,
+      deleting,
+      monthlyPrice,
+      agentCount,
+      me,
+      loadingUserInfo,
+      fetchServicePlans,
+      deleteAccount,
+      fetchUserInfo
+    }
   }
 })
 </script>
@@ -99,6 +123,13 @@ export default defineComponent({
         </v-col>
       </v-row>
     </v-container>
+    <div v-if="me != null">
+      <UserInfoForm :user=me></UserInfoForm>
+    </div>
+    <div v-else-if="loadingUserInfo">
+      Loading user info...
+      <v-progress-linear indeterminate></v-progress-linear>
+    </div>
     <v-btn
       @click="deleteAccount"
       :loading=deleting

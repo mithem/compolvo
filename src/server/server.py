@@ -1,34 +1,30 @@
-import asyncio
 import datetime
 import enum
 import os
-import queue
-import re
-from queue import Queue
-from typing import Set, Dict
+from typing import Set
 
 import jwt
 import jwt.exceptions
 import stripe
-import websockets
 from sanic import Sanic, redirect, Request, text, Blueprint, json, HTTPResponse
 from sanic.exceptions import BadRequest, NotFound, Unauthorized
-from sanic.log import logger
 from sanic_openapi import openapi
 from tortoise.contrib.sanic import register_tortoise
 from tortoise.exceptions import IntegrityError
 from tortoise.expressions import Q
 from tortoise.functions import Coalesce
-from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 
 from compolvo import cors
 from compolvo import options
 from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, protected, \
     requires_payment_details, requires_stripe_customer
-from compolvo.models import User, Service, ServiceOffering, ServicePlan, Tag, Payment, \
-    Agent, AgentSoftware, UserRole, Serializable, License, OperatingSystem, PackageManager, \
-    PackageManagerAvailableVersion
-from compolvo.utils import hash_password, verify_password, generate_secret
+from compolvo.models import Payment, \
+    Agent, AgentSoftware, Serializable, PackageManager, PackageManagerAvailableVersion
+from compolvo.models import Service, OperatingSystem, Tag, UserRole, User, License, \
+    ServiceOffering, ServicePlan
+from compolvo.utils import verify_password, hash_password, generate_secret, test_email
+from compolvo.websockets import run_websocket_server, run_websocket_handler_queue_worker, \
+    queue_websocket_msg
 
 HTTP_HEADER_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
 
@@ -49,6 +45,7 @@ db_username = os.environ["DB_USERNAME"]
 db_password = os.environ["DB_PASSWORD"]
 db_database = os.environ["DB_DATABASE"]
 db_port = os.environ["DB_PORT"]
+
 register_tortoise(app,
                   db_url=f'mysql://{db_username}:{db_password}@{db_hostname}:{db_port}/{db_database}',
                   modules={'models': ['compolvo.models']}, generate_schemas=True)
@@ -82,8 +79,69 @@ async def index(request):
 
 @app.post("/api/setup")
 @protected({UserRole.Role.ADMIN})
-async def db_setup(request, user):
-    if request.json is not None and request.json.get("services", False):
+async def db_setup(request, user: User):
+    if request.json is not None:
+        services = request.json.get("services", False)
+        service_offerings = request.json.get("service_offerings", False)
+        service_plans = request.json.get("service_plans", False)
+        await set_up_demo_db(user, services, service_offerings, service_plans)
+        return text("Created.", status=201)
+    return HTTPResponse(status=204)
+
+
+async def _get_svc_and_tag_from_request(request):
+    try:
+        service = await Service.get_or_none(id=request.json["service"])
+        if service is None:
+            raise NotFound("Service not found.")
+        tag = await Tag.get_or_none(id=request.json["tag"])
+        if tag is None:
+            raise NotFound("Tag not found.")
+        return service, tag
+    except KeyError:
+        raise BadRequest("Missing paramete)r(s). Required: service, tag (both as ids).")
+
+
+async def create_user(email: str, first: str | None, last: str | None, password: str,
+                      role: UserRole.Role = None) -> User:
+    if not test_email(email):
+        raise BadRequest("Invalid email.")
+    user = await User.get_or_none(email=email)
+    if user is None:
+        salt = generate_secret()
+        user = await User.create(
+            email=email,
+            first_name=first,
+            last_name=last,
+            password=hash_password(password, salt),
+            salt=salt,
+        )
+    if role is None:
+        role = UserRole.Role.USER
+    existing_role = await UserRole.get_or_none(user=user, role=role)
+    if existing_role is None:
+        await UserRole.create(
+            user=user,
+            role=role
+        )
+    if STRIPE_API_KEY is not None:
+        results = await stripe.Customer.search_async(query=f"email:'{email}'")
+        if len(results.data) > 0:
+            id = results.data[0].stripe_id
+        else:
+            customer = await stripe.Customer.create_async(
+                email=email,
+                name=first + " " + last
+            )
+            id = customer.id
+        user.stripe_id = id
+        await user.save()
+    return user
+
+
+async def set_up_demo_db(user: User, services: bool = False, service_offerings: bool = False,
+                         service_plans: bool = False):
+    if services:
         tag_developer = await Tag.create(
             label="Developer"
         )
@@ -204,7 +262,7 @@ async def db_setup(request, user):
             tag_enthusiast
         )
         await svc_nextcloud.save()
-        if request.json is not None and request.json.get("service_offerings", False):
+        if service_offerings:
             off_docker_month = await ServiceOffering.create(
                 service=svc_docker,
                 name="month",
@@ -241,7 +299,7 @@ async def db_setup(request, user):
                 price=29.99,
                 duration_days=90
             )
-            if request.json is not None and request.json.get("service_plans", False):
+            if service_plans:
                 plan_docker = await ServicePlan.create(
                     user=user,
                     service_offering=off_docker_month,
@@ -262,58 +320,32 @@ async def db_setup(request, user):
                     service_offering=off_nginx_quarter,
                     start_date=datetime.datetime.now() - datetime.timedelta(days=45)
                 )
-    return HTTPResponse("Created.", status=201)
-
-
-def test_email(email: str) -> bool:
-    #  https://stackoverflow.com/questions/201323/how-can-i-validate-an-email-address-using-a-regular-expression
-    pattern = r"(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])"
-    match = re.match(pattern, email)
-    return match is not None
-
-
-async def create_user(email: str, first: str | None, last: str | None, password: str,
-                      role: UserRole.Role = None) -> User:
-    if not test_email(email):
-        raise BadRequest("Invalid email.")
-    user = await User.get_or_none(email=email)
-    if user is None:
-        salt = generate_secret()
-        user = await User.create(
-            email=email,
-            first_name=first,
-            last_name=last,
-            password=hash_password(password, salt),
-            salt=salt,
-        )
-    if role is None:
-        role = UserRole.Role.USER
-    existing_role = await UserRole.get_or_none(user=user, role=role)
-    if existing_role is None:
-        await UserRole.create(
-            user=user,
-            role=role
-        )
-    if STRIPE_API_KEY is not None:
-        results = await stripe.Customer.search_async(query=f"email:'{email}'")
-        if len(results.data) > 0:
-            id = results.data[0].stripe_id
-        else:
-            customer = await stripe.Customer.create_async(
-                email=email,
-                name=first + " " + last
-            )
-            id = customer.id
-        user.stripe_id = id
-        await user.save()
-    return user
 
 
 @app.listener("before_server_start")
 async def test_user(request):
     options.setup_options(app, request)
-    await create_user("test@example.com", "Test", "user", "test")
+    await create_user("test@example.com", "Test", "user", "test", None)
     await create_user("admin@example.com", "Admin", "Istrator", "admin", UserRole.Role.ADMIN)
+
+
+async def get_latest_version(service: Service, os: OperatingSystem) -> str | None:
+    query = (
+        Service
+        .filter(
+            id=service.id,
+            available_versions__latest=True,
+            available_versions__operating_system=os
+        )
+        .annotate(
+            version=Coalesce("available_versions__version")
+        )
+        .values("version")
+    )
+    results = await query
+    if results:
+        return results[0]["version"]
+    return None
 
 
 @app.get("/api/login")
@@ -333,6 +365,20 @@ async def login(request: Request):
     headers = {"Set-Cookie": f"token={token}; Expires={expires.strftime(HTTP_HEADER_DATE_FORMAT)}"}
     redirect_url = request.args.get("redirect_url", request.url_for("index"))
     return redirect(redirect_url, headers=headers)
+
+
+@app.post("/api/auth")
+async def auth(request: Request):
+    email = request.json.get("email", None)
+    password = request.json.get("password", None)
+    if email is None or password is None:
+        raise BadRequest("Missing email or password parameters.")
+    user = await User.get_or_none(email=email)
+    if user is None:
+        raise NotFound("User not found.")
+    if not verify_password(password, user.password, user.salt):
+        raise Unauthorized()
+    return HTTPResponse(status=204)
 
 
 @app.get("/api/logout")
@@ -357,8 +403,20 @@ async def get_users(request, users, user):
 @user.get("/me")
 @protected()
 async def get_user(request, user):
+    if user.stripe_id != None:
+        customer = await stripe.Customer.retrieve_async(user.stripe_id)
+        methods = customer.list_payment_methods()
+        has_payment_method = len(methods) > 0
+    else:
+        has_payment_method = False
     return json(
-        {**await user.to_dict(), "roles": [await role.to_dict() for role in await user.roles]})
+        {
+            **await user.to_dict(),
+            "roles": [await role.to_dict() for role in await user.roles],
+            "connected_to_billing_provider": user.stripe_id != None,
+            "has_payment_method": has_payment_method
+        }
+    )
 
 
 @user.post("/")
@@ -377,14 +435,26 @@ async def create_new_user(request):
 
 
 @user.patch("/")
-@protected({UserRole.Role.ADMIN})
-@patch_endpoint(User)
-async def update_user(request, patched_user, user):
-    pass  # TODO: Make, so that authenticated user can update themselves, but not others
-
+@protected()
+async def update_user(request, user: User):
+    first_name = request.json.get("first_name", None)
+    last_name = request.json.get("last_name", None)
+    email = request.json.get("email", None)
+    password = request.json.get("password")
+    if password is not None:
+        user.password = hash_password(password, user.salt)
+    if first_name is not None:
+        user.first_name = first_name
+    if last_name is not None:
+        user.last_name = last_name
+    if email is not None:
+        user.email = email
+        # TODO: Email verification
+    await user.save()
+    return HTTPResponse(status=204)
 
 @user.delete("/")
-@protected({UserRole.Role.ADMIN})
+@protected()
 @delete_endpoint(User)
 async def delete_user(request, deleted_user, user):
     pass  # TODO: Make, so that admins can delete anyone, but everyone themselves
@@ -634,23 +704,10 @@ async def delete_tag(request, tag, user):
     pass
 
 
-async def _get_svc_and_tag(request):
-    try:
-        service = await Service.get_or_none(id=request.json["service"])
-        if service is None:
-            raise NotFound("Service not found.")
-        tag = await Tag.get_or_none(id=request.json["tag"])
-        if tag is None:
-            raise NotFound("Tag not found.")
-        return service, tag
-    except KeyError:
-        raise BadRequest("Missing paramete)r(s). Required: service, tag (both as ids).")
-
-
 @service.post("/tag")
 @protected({UserRole.Role.ADMIN})
 async def associate_tag_with_service(request, user):
-    svc, tag = await _get_svc_and_tag(request)
+    svc, tag = await _get_svc_and_tag_from_request(request)
     await svc.tags.add(tag)
     return HTTPResponse(status=204)
 
@@ -658,7 +715,7 @@ async def associate_tag_with_service(request, user):
 @service.delete("/tag")
 @protected({UserRole.Role.ADMIN})
 async def deassociate_tag_with_service(request, user):
-    svc, tag = await _get_svc_and_tag(request)
+    svc, tag = await _get_svc_and_tag_from_request(request)
     await svc.tags.remove(tag)
     return HTTPResponse(status=204)
 
@@ -901,45 +958,6 @@ async def bulk_create_agent_software(request, user):
         raise BadRequest("Service plan is already installed on at least one agent.")
 
 
-class AgentSoftwareAgentCommand(enum.StrEnum):
-    INSTALL = "install"
-    UNINSTALL = "uninstall"
-
-
-async def get_latest_version(service: Service, os: OperatingSystem) -> str | None:
-    query = (
-        Service
-        .filter(
-            id=service.id,
-            available_versions__latest=True,
-            available_versions__operating_system=os
-        )
-        .annotate(
-            version=Coalesce("available_versions__version")
-        )
-        .values("version")
-    )
-    results = await query
-    if results:
-        return results[0]["version"]
-    return None
-
-
-async def send_agent_software_notification(command: AgentSoftwareAgentCommand, agent: Agent,
-                                           service: Service,
-                                           software: AgentSoftware):
-    version = await get_latest_version(service, await agent.operating_system)
-    match command:
-        case AgentSoftwareAgentCommand.INSTALL:
-            version_info = f" v{version}"
-        case AgentSoftwareAgentCommand.UNINSTALL:
-            version_info = ""
-        case _:
-            raise ValueError("Unexpected AgentSoftwareAgentCommand.")
-    message = f"{command.value} {service.system_name} {software.id}{version_info}"
-    queue_websocket_msg(str(agent.id), message)
-
-
 @agent_software.patch("/")
 @protected({UserRole.Role.ADMIN})
 @patch_endpoint(AgentSoftware)
@@ -991,6 +1009,26 @@ async def perform_software_uninstallation(agent: Agent, service: Service, softwa
                                            software)
     software.uninstalling = True
     await software.save()
+
+
+class AgentSoftwareAgentCommand(enum.StrEnum):
+    INSTALL = "install"
+    UNINSTALL = "uninstall"
+
+
+async def send_agent_software_notification(command: AgentSoftwareAgentCommand, agent: Agent,
+                                           service: Service,
+                                           software: AgentSoftware):
+    version = await get_latest_version(service, await agent.operating_system)
+    match command:
+        case AgentSoftwareAgentCommand.INSTALL:
+            version_info = f" v{version}"
+        case AgentSoftwareAgentCommand.UNINSTALL:
+            version_info = ""
+        case _:
+            raise ValueError("Unexpected AgentSoftwareAgentCommand.")
+    message = f"{command.value} {service.system_name} {software.id}{version_info}"
+    queue_websocket_msg(str(agent.id), message)
 
 
 @app.post("/api/agent/ws/queue")
@@ -1050,125 +1088,6 @@ async def attach_payment_method_to_customer(request, user, customer: stripe.Cust
 
 # TODO: Add endpoints for creating, updating and deleting licenses + OSes
 # Queue for messages pending to be sent to respective agents
-websocket_message_queue: Dict[str, Queue[str]] = dict()
-# Queue for handling messages sent by agents (as that might require expensive database calls)
-# Format: (agent_id: str, message: str)
-websocket_handler_queue: Queue[(str, str)] = Queue()
-
-
-def queue_websocket_msg(agent_id: str, message: str):
-    assert type(
-        agent_id) == str, "agent id isn't of type str. Don't search further why messages don't get delivered"
-    global websocket_message_queue
-    queue = websocket_message_queue.get(agent_id)
-    if queue is None:
-        queue = Queue()
-    queue.put(message)
-    websocket_message_queue[agent_id] = queue
-    logger.debug(f"Queued message for {agent_id}: {message}")
-
-
-async def handle_websocket_msg(agent_id: str, message: str) -> str | None:
-    logger.debug("Handling websocket message for %s: %s", agent_id, message)
-    status_pattern = r"(?P<status_key>[\w\d_-]+)=(?P<status_value>[\w\d\    ._-]+)"
-    software_status_pattern = r"software status (?P<software_id>[\w\d-]{36}) (?P<status>[\w\d_\.=;-]+)"
-    software_status_match = re.match(software_status_pattern, message)
-    if software_status_match is not None:
-        software_id = software_status_match.group("software_id")
-        status = software_status_match.group("status")
-        stati = status.split(";")
-        status_data = {}
-        for status_entry in stati:
-            match = re.match(status_pattern, status_entry)
-            if match is not None:
-                status_data[match.group("status_key")] = match.group("status_value")
-        software = await AgentSoftware.get_or_none(id=software_id)
-        was_uninstalling = software.uninstalling
-        if set(status_data.keys()).issubset(
-                {"corrupt", "installed_version", "installing", "uninstalling"}):
-            for key, value in status_data.items():
-                if value in ["true", "false"]:
-                    value = value == "true"
-                elif value in ["null", "None"]:
-                    value = None
-                setattr(software, key, value)
-            await software.save()
-        if software.installed_version is None and software.uninstalling == False and was_uninstalling and not software.installing and not software.corrupt:
-            await software.delete()
-    return None
-
-
-async def websocket_handler(ws: websockets.WebSocketServerProtocol):
-    login_msg = await ws.recv()
-    match = re.match(r"^login agent (?P<id>[\w-]{36})$", login_msg)
-    if match is None:
-        return await ws.close(4000, "Invalid login message.")
-    agent_id = match.group("id")
-    agent = await Agent.get_or_none(id=agent_id)
-    if agent is None:
-        return await ws.close(4004, "Agent not found.")
-    if agent.connected:
-        return await ws.close(4003, "Agent is already connected.")
-    agent.last_connection_start = datetime.datetime.now()
-    agent.connected = True
-    agent.connection_interrupted = False
-    await agent.save()
-    await ws.send("login successful")
-    logger.debug("Agent logged in successfully: %s", agent_id)
-
-    async def message_emitter(queue: Queue):
-        if queue is not None:
-            while not queue.empty():
-                msg = queue.get()
-                await ws.send(msg)
-
-    async def message_consumer():
-        try:
-            async with asyncio.timeout(1):
-                msg = await ws.recv()
-                websocket_handler_queue.put((agent_id, msg))
-        except TimeoutError:
-            pass
-
-    try:
-        while True:
-            queue = websocket_message_queue.get(agent_id)
-            if ws.closed:
-                if ws.close_code != 1000:
-                    raise ConnectionClosedError(ws.close_rcvd, ws.close_sent)
-                raise ConnectionClosedOK(ws.close_rcvd, ws.close_sent)
-            await asyncio.gather(message_emitter(queue), message_consumer())
-    except ConnectionClosedOK:
-        logger.debug("Connection to agent %s closed ok", agent_id)
-    except ConnectionClosedError:
-        logger.warning("Connection to agent %s closed unexpectedly", agent_id)
-        agent.connection_interrupted = True
-    finally:
-        agent.last_connection_end = datetime.datetime.now()
-        agent.connected = False
-        await agent.save()
-
-
-async def run_websocket_server(app):
-    logger.info("Preparing agents' connected attributes...")
-    agents = await Agent.filter(connected=True).all()
-    for agent in agents:
-        agent.connected = False
-        await agent.save()
-    async with websockets.serve(websocket_handler, "0.0.0.0", 8001):
-        logger.info("Started websocket server")
-        await asyncio.Future()
-
-
-async def run_websocket_handler_queue_worker():
-    logger.info("Running worker handling websocket message queue...")
-    while True:
-        try:
-            agent_id, msg = websocket_handler_queue.get(block=False)
-            await handle_websocket_msg(agent_id, msg)
-        except queue.Empty:
-            await asyncio.sleep(1)
-
 
 app.add_task(run_websocket_server(app))
 app.add_task(run_websocket_handler_queue_worker())
