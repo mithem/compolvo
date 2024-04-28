@@ -1,5 +1,5 @@
 <script lang="ts">
-import {defineComponent, onMounted} from "vue"
+import {defineComponent, onMounted, ref} from "vue"
 import type {
   Stripe as StripeType,
   StripeCardElement,
@@ -14,6 +14,8 @@ export default defineComponent({
     let stripe: typeof Stripe
     let elements: StripeElements
     let cardElement: StripeCardElement
+    const loading = ref(false);
+
     const initStripe = async function () {
       let stripeScript = document.createElement("script")
       stripeScript.src = "https://js.stripe.com/v3/"
@@ -33,6 +35,7 @@ export default defineComponent({
 
     const createPaymentMethod = async function () {
       event.preventDefault()
+      loading.value = true
       const {paymentMethod, error} = await stripe.createPaymentMethod({
         type: 'card',
         card: cardElement
@@ -47,40 +50,17 @@ export default defineComponent({
           method_id: paymentMethod.id
         })
       })
+      loading.value = false
       if (!res.ok) {
         alert(await res.text())
       } else {
-        alert("Success")
+        document.location.href = "/profile"
       }
-      /*const {error: err} = await elements.submit();
-      if (err) {
-        alert(err);
-        return;
-      }
-
-      const res = await fetch("/api/billing/payment/intent", {
-        method: "POST"
-      })
-      if (!res.ok) {
-        alert(await res.text())
-        return;
-      }
-      const {client_secret: clientSecret} = await res.json()
-      const {error} = await stripe.confirmPayment({
-        elements,
-        clientSecret,
-        confirmParams: {
-          return_url: "http://localhost:8080"
-        }
-      })
-      if (error) {
-        alert(error)
-      }*/
     }
 
     onMounted(initStripe)
 
-    return {createPaymentMethod}
+    return {loading, createPaymentMethod}
   }
 })
 </script>
@@ -90,6 +70,7 @@ export default defineComponent({
     <h1>Payment info</h1>
     <div class="container container-horiz">
       <v-card class="payment-detail-card">
+        <v-progress-linear v-if="loading" indeterminate></v-progress-linear>
         <div id="card-element"></div>
         <v-card-actions>
           <v-spacer></v-spacer>

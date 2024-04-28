@@ -81,6 +81,10 @@ export interface UserRole {
   role: number
 }
 
+export enum BillingCylce {
+  INDIVIDUAL
+}
+
 export interface UserMeObject {
   id: string
   first_name: string
@@ -89,4 +93,5 @@ export interface UserMeObject {
   roles: UserRole[]
   connected_to_billing_provider: boolean
   has_payment_method: boolean
+  billing_cycle: BillingCylce
 }

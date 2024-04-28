@@ -1,13 +1,14 @@
 import datetime
 import enum
 import os
-from typing import Set
+from typing import Set, Tuple, Dict
 
 import jwt
 import jwt.exceptions
 import stripe
 from sanic import Sanic, redirect, Request, text, Blueprint, json, HTTPResponse
 from sanic.exceptions import BadRequest, NotFound, Unauthorized
+from sanic.log import logger
 from sanic_openapi import openapi
 from tortoise.contrib.sanic import register_tortoise
 from tortoise.exceptions import IntegrityError
@@ -18,8 +19,9 @@ from compolvo import cors
 from compolvo import options
 from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, protected, \
     requires_payment_details, requires_stripe_customer
-from compolvo.models import Payment, \
-    Agent, AgentSoftware, Serializable, PackageManager, PackageManagerAvailableVersion
+from compolvo.models import Agent, AgentSoftware, Serializable, PackageManager, \
+    PackageManagerAvailableVersion, \
+    BillingCycle, BillingCycleType
 from compolvo.models import Service, OperatingSystem, Tag, UserRole, User, License, \
     ServiceOffering, ServicePlan
 from compolvo.utils import verify_password, hash_password, generate_secret, test_email
@@ -84,7 +86,9 @@ async def db_setup(request, user: User):
         services = request.json.get("services", False)
         service_offerings = request.json.get("service_offerings", False)
         service_plans = request.json.get("service_plans", False)
-        await set_up_demo_db(user, services, service_offerings, service_plans)
+        await set_up_demo_db(user, services=services,
+                             service_offerings=service_offerings,
+                             service_plans=service_plans)
         return text("Created.", status=201)
     return HTTPResponse(status=204)
 
@@ -109,12 +113,17 @@ async def create_user(email: str, first: str | None, last: str | None, password:
     user = await User.get_or_none(email=email)
     if user is None:
         salt = generate_secret()
+        billing_cycle = await BillingCycle.get_or_none(type=BillingCycleType.INDIVIDUAL)
+        if billing_cycle is None:
+            billing_cycle = await BillingCycle.create(type=BillingCycleType.INDIVIDUAL,
+                                                      description="Individual services")
         user = await User.create(
             email=email,
             first_name=first,
             last_name=last,
             password=hash_password(password, salt),
             salt=salt,
+            billing_cycle=billing_cycle
         )
     if role is None:
         role = UserRole.Role.USER
@@ -136,11 +145,12 @@ async def create_user(email: str, first: str | None, last: str | None, password:
             id = customer.id
         user.stripe_id = id
         await user.save()
-    return user
+    app.add_task(set_up_stripe_customer(user))
+    return await user.json()
 
 
-async def set_up_demo_db(user: User, services: bool = False, service_offerings: bool = False,
-                         service_plans: bool = False):
+async def set_up_demo_db(user: User, services: bool = False,
+                         service_offerings: bool = False, service_plans: bool = False):
     if services:
         tag_developer = await Tag.create(
             label="Developer"
@@ -404,9 +414,12 @@ async def get_users(request, users, user):
 @protected()
 async def get_user(request, user):
     if user.stripe_id != None:
-        customer = await stripe.Customer.retrieve_async(user.stripe_id)
-        methods = customer.list_payment_methods()
-        has_payment_method = len(methods) > 0
+        try:
+            customer = await stripe.Customer.retrieve_async(user.stripe_id)
+            methods = customer.list_payment_methods()
+            has_payment_method = len(methods) > 0
+        except stripe.InvalidRequestError:  # Customer not found in Stripe
+            has_payment_method = False
     else:
         has_payment_method = False
     return json(
@@ -453,11 +466,13 @@ async def update_user(request, user: User):
     await user.save()
     return HTTPResponse(status=204)
 
+
 @user.delete("/")
 @protected()
 @delete_endpoint(User)
-async def delete_user(request, deleted_user, user):
-    pass  # TODO: Make, so that admins can delete anyone, but everyone themselves
+async def delete_user(request, deleted_user: User, user):
+    await stripe.Customer.delete_async(deleted_user.stripe_id)
+    # TODO: Make, so that admins can delete anyone, but everyone themselves
 
 
 @service.get("/")
@@ -631,6 +646,8 @@ async def create_service_plan(request, user, methods):
         if end is not None:
             data["end_date"] = datetime.datetime.fromisoformat(end)
         plan = await ServicePlan.create(**data)
+        # don't set up new stripe subscription directly to be compatible with future billing modes
+        await app.add_task(evaluate_billing_for_user(user))
         return await plan.json()
     except (KeyError, AttributeError):
         raise BadRequest("Missing parameters. Required: service_offering, and user.")
@@ -653,8 +670,14 @@ async def cancel_service_plan(request, user):
     plan_user_id = (await plan.user).id
     if plan_user_id != user.id:
         raise BadRequest("You can only cancel your own service plans.")
+    await cancel_service_plan_for_user(plan)
+    return await plan.json()
+
+
+async def cancel_service_plan_for_user(plan: ServicePlan):
     plan.canceled_by_user = True
-    plan.canceled_at = datetime.datetime.now()
+    if plan.canceled_at is None:
+        plan.canceled_at = datetime.datetime.now()
     await plan.save()
     offering: ServiceOffering = await plan.service_offering
     service: Service = await offering.service
@@ -662,7 +685,7 @@ async def cancel_service_plan(request, user):
     for software in plan.agent_softwares:
         agent: Agent = await software.agent
         await perform_software_uninstallation(agent, service, software)
-    return await plan.json()
+    app.add_task(evaluate_billing_for_user(plan.user))
 
 
 @service_plan.delete("/")
@@ -718,47 +741,6 @@ async def deassociate_tag_with_service(request, user):
     svc, tag = await _get_svc_and_tag_from_request(request)
     await svc.tags.remove(tag)
     return HTTPResponse(status=204)
-
-
-@payment.get("/")
-@protected()
-@get_endpoint(Payment, {UserRole.Role.ADMIN})
-async def get_payments(request, payments, user):
-    pass
-
-
-@payment.post("/")
-@protected({UserRole.Role.ADMIN})
-async def create_payment(request, user):
-    try:
-        plan = await ServicePlan.get(id=request.json["service_plan"])
-        date_str = request.json.get("date")
-        if date_str is not None:
-            date = datetime.datetime.fromisoformat(date_str)
-        else:
-            date = datetime.datetime.now()
-        payment = await Payment.create(
-            service_plan=plan,
-            date=date,
-            amount=request.json["amount"]
-        )
-        return await payment.json()
-    except (KeyError, AttributeError):
-        raise BadRequest("Missing parameters. Required: servcice_plan")
-
-
-@payment.patch("/")
-@protected({UserRole.Role.ADMIN})
-@patch_endpoint(Payment)
-async def update_payment(request, payment, user):
-    pass
-
-
-@payment.delete("/")
-@protected({UserRole.Role.ADMIN})
-@delete_endpoint(Payment)
-async def delete_payment(request, payment, user):
-    pass
 
 
 @agent.get("/")
@@ -1080,10 +1062,206 @@ async def create_payment_intent(request, user, customer):
 @requires_stripe_customer(stripe)
 async def attach_payment_method_to_customer(request, user, customer: stripe.Customer):
     try:
-        await stripe.PaymentMethod.attach_async(request.json["method_id"], customer=customer.id)
+        method_id = request.json["method_id"]
+        await stripe.PaymentMethod.attach_async(method_id, customer=customer.id)
+        await stripe.Customer.modify_async(customer.id,
+                                           invoice_settings={"default_payment_method": method_id})
         return HTTPResponse(status=204)
     except (TypeError, KeyError) as e:
         raise BadRequest("Expected method_id for the payment method to attach")
+
+
+@app.get("/api/billing/cycle")
+@protected()
+@get_endpoint(BillingCycle)
+async def get_billing_cycles(request, user, cycles):
+    pass
+
+
+@app.post("/api/billing/setup")
+@protected({UserRole.Role.ADMIN})
+async def set_up_billing(request, user):
+    app.add_task(set_up_stripe_products())
+    return text("Accepted.", status=202)
+
+
+@app.post("/api/billing/maintenance")
+@protected({UserRole.Role.ADMIN})
+async def billing_maintenance(request, user):
+    app.add_task(perform_billing_maintenance())
+    return text("Accepted.", status=202)
+
+
+async def perform_billing_maintenance():
+    logger.info("Performing billing maintenance...")
+    await set_up_stripe_products()
+    users = await User.all()
+    for user in users:
+        await evaluate_billing_for_user(user)
+    logger.info("Billing maintenance complete")
+
+
+async def set_up_stripe_products():
+    services = await Service.all()
+    for service in services:
+        product, service = await assert_stripe_product_for_service(service)
+        await assert_stripe_prices_for_service(product, service)
+
+
+async def assert_stripe_product_for_service(service: Service) -> Tuple[stripe.Product, Service]:
+    async def create():
+        product = await stripe.Product.create_async(
+            name=service.name,
+            description=service.description,
+        )
+        service.stripe_product_id = product.id
+        await service.save()
+        return product, service
+
+    if service.stripe_product_id is not None:
+        try:
+            product = await stripe.Product.retrieve_async(service.stripe_product_id)
+        except stripe.InvalidRequestError as e:
+            if "No such product" in str(e):
+                return await create()
+            raise e
+        update_data = {}
+        if product.name != service.name:
+            update_data["name"] = service.name
+        if product.description != service.description:
+            update_data["description"] = service.description
+        if len(update_data) > 0:
+            await stripe.Product.modify_async(product.id, **update_data)
+        return product, service
+    else:
+        return await create()
+
+
+async def assert_stripe_prices_for_service(product: stripe.Product, service: Service):
+    offerings = await ServiceOffering.filter(service=service).all()
+    prices = await stripe.Price.search_async(query=f"product:'{product.id}'")
+    for offering in offerings:
+        potential_prices = list(
+            filter(lambda price: str(price.id) == str(offering.stripe_price_id), prices.data))
+        prices_length = len(potential_prices)
+        if offering.stripe_price_id is not None and prices_length > 0:
+            assert prices_length == 1, "Multiple prices associated with the same ServiceOffering."
+            price: stripe.Price = potential_prices[0]
+            update_data = {}
+            target_price = int(offering.price * 100)
+            if price.unit_amount != target_price:
+                update_data["unit_amount"] = target_price
+            if len(update_data) > 0:
+                await stripe.Price.modify_async(price.id, **update_data)
+        else:
+            recurring_data = get_stripe_recurring_object_for_service_offering(offering)
+            price = await stripe.Price.create_async(
+                product=product.id,
+                currency="eur",
+                unit_amount=int(offering.price * 100),
+                recurring=recurring_data
+            )
+            offering.stripe_price_id = price.id
+            await offering.save()
+
+
+def get_stripe_recurring_object_for_service_offering(offering: ServiceOffering) -> Dict[
+    str, str | int]:
+    match offering.name:
+        case "month":
+            interval = "month"
+            interval_count = 1
+        case "quarter":
+            interval = "month"
+            interval_count = 3
+        case "year":
+            interval = "year"
+            interval_count = 1
+        case _:
+            raise ValueError(
+                f"Offering {offering.id} has invalid name for stripe sync: {offering.name}")
+    return {"interval": interval,
+            "interval_count": interval_count}
+
+
+async def evaluate_billing_for_user(user: User):
+    cycle: BillingCycle = await user.billing_cycle
+    match cycle.type:
+        case BillingCycleType.INDIVIDUAL:
+            await set_up_billing_individual_services_for_user(user)
+        case _:
+            raise ValueError("Unexpected BillingCycleType")
+
+
+async def set_up_billing_individual_services_for_user(user: User):
+    await set_up_stripe_customer(user)
+    service_plans = await ServicePlan.filter(user=user).all()
+    for plan in service_plans:
+        if plan.stripe_subscription_id is None:
+            await create_stripe_subscription_for_plan(user, plan)
+        else:
+            await handle_stripe_subscription_status(plan)
+
+
+async def set_up_stripe_customer(user: User) -> User:
+    async def create() -> User:
+        customer = await stripe.Customer.create_async(
+            email=user.email,
+            name=user.first_name + " " + user.last_name
+        )
+        user.stripe_id = customer.id
+        await user.save()
+        return user
+
+    if user.stripe_id is None:
+        return await create()
+    try:
+        customer = await stripe.Customer.retrieve_async(user.stripe_id)
+        return user
+    except stripe.InvalidRequestError:
+        return await create()
+
+
+async def handle_stripe_subscription_status(plan: ServicePlan):
+    assert plan.stripe_subscription_id is not None
+    try:
+        subscription = await stripe.Subscription.retrieve_async(plan.stripe_subscription_id)
+        if plan.canceled_by_user and subscription.cancel_at is None:
+            subscription = await stripe.Subscription.cancel_async(subscription.id)
+        if subscription.status in ["canceled", "unpaid", "incomplete_expired"]:
+            if not plan.canceled_by_user:
+                await cancel_service_plan_for_user(plan)
+    except stripe.InvalidRequestError as e:
+        if "No such subscription" in str(e):
+            return
+        raise e
+
+
+async def get_stripe_price_by_id(product_id: str, price_id: str) -> stripe.Price:
+    prices = await stripe.Price.search_async(query=f"product:'{product_id}'")
+    potential_prices = list(filter(lambda price: price.id == str(price_id), prices.data))
+    assert len(
+        potential_prices) == 1, f"Expected exactly one stripe price with id {price_id} for product {product_id}. Got {potential_prices}."
+    return potential_prices[0]
+
+
+async def create_stripe_subscription_for_plan(user: User, service_plan: ServicePlan):
+    assert user.stripe_id is not None, f"User {user.id} does not have a stripe ID associated."
+    offering: ServiceOffering = await service_plan.service_offering
+    service: Service = await offering.service
+    if offering.stripe_price_id is None or service.stripe_product_id is None:
+        await set_up_stripe_products()
+        await offering.refresh_from_db()
+        await service.refresh_from_db()
+    price = await get_stripe_price_by_id(service.stripe_product_id, offering.stripe_price_id)
+    customer = user.stripe_id
+    price_id = price.id
+    subscription = await stripe.Subscription.create_async(
+        customer=customer,
+        items=[{"price": price_id}]
+    )
+    service_plan.stripe_subscription_id = subscription.id
+    await service_plan.save()
 
 
 # TODO: Add endpoints for creating, updating and deleting licenses + OSes

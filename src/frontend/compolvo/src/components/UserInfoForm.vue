@@ -113,15 +113,17 @@ export default defineComponent({
 <template>
   <v-card class="form-card account-info-card">
     <v-card-title>Account info</v-card-title>
-    <div v-if="!user.has_payment_method" class="payment-method-config-container">
-      No payment method configured.
+    <div class="payment-method-config-container">
+      <div v-if="!user.has_payment_method">
+        No payment method configured.
+      </div>
+      <div v-else class="payment-method-config-container no-space-between">
+        <v-icon color="green">mdi-check</v-icon>
+        Payment method configured.
+      </div>
       <v-btn @click="$router.push('/payment-info')">
         Configure
       </v-btn>
-    </div>
-    <div v-else class="payment-method-config-container no-space-between">
-      <v-icon color="green">mdi-check</v-icon>
-      Payment method configured.
     </div>
     <v-form
       fast-fail

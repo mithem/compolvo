@@ -81,16 +81,15 @@ def protected(requires_roles: Set[UserRole.Role] = None):
     def decorator(func):
         @wraps(func)
         async def decorated_function(request, *args, **kwargs):
-            try:
-                user = await check_token(request)
-                assert user
-                if requires_roles is not None:
-                    assert await user_has_roles(user, requires_roles)
+            unauthorized = Unauthorized("Unauthorized.")
+            user = await check_token(request)
+            if user is None:
+                raise unauthorized
+            if requires_roles is not None:
+                if not await user_has_roles(user, requires_roles):
+                    raise unauthorized
 
-                response = await func(request, user, *args, **kwargs)
-                return response
-            except AssertionError:
-                raise Unauthorized("Unauthorized.")
+            return await func(request, user, *args, **kwargs)
 
         return decorated_function
 
@@ -102,11 +101,17 @@ def requires_stripe_customer(stripe):
         @wraps(func)
         @protected()
         async def decorated_function(request, user: User, *args, **kwargs):
-            customer = await stripe.Customer.retrieve_async(user.stripe_id)
+            customer_not_found = text("Stripe customer not found. Try again later.", status=500)
+            if user.stripe_id is None:
+                return text("Requires stripe synchronization", status=500)
+            try:
+                customer = await stripe.Customer.retrieve_async(user.stripe_id)
+                if getattr(customer, "deleted", False):
+                    return customer_not_found
+            except stripe.InvalidRequestError:
+                return customer_not_found
             return await func(request, user, customer, *args, **kwargs)
-
         return decorated_function
-
     return decorator
 
 
@@ -116,8 +121,8 @@ def requires_payment_details(stripe):
         @requires_stripe_customer(stripe)
         async def decorated_function(request, user: User, customer: stripe_module.Customer, *args,
                                      **kwargs):
-            methods = customer.list_payment_methods()
-            if len(methods) == 0:
+            methods = await customer.list_payment_methods_async()
+            if len(methods.data) == 0:
                 return text("Requires payment details.", status=402)
             return await func(request, user, methods, *args, **kwargs)
 
