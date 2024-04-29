@@ -187,11 +187,13 @@ export default defineComponent({
 <style scoped>
 .cardsContainer {
   flex: 3;
+  box-sizing: border-box;
   flex-wrap: wrap;
   display: flex;
   overflow: hidden;
   overflow-y: scroll;
   margin: 0;
   padding-top: 0;
+  height: 90vh;
 }
 </style>

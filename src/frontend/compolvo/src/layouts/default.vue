@@ -1,7 +1,7 @@
 <template>
-  <v-app id="app" style="height: 100vh; display: flex">
+  <v-app id="app" style="height: 100vh; display: flex;">
     <Navbar/>
-    <v-main style="display: flex; flex: 1; ">
+    <v-main style="display: flex; flex: 1">
       <router-view/>
     </v-main>
   </v-app>
