@@ -13,6 +13,7 @@ from websockets import ConnectionClosedError, ConnectionClosedOK
 
 con: BaseDBAsyncClient
 
+# Queue for messages pending to be sent to respective agents
 websocket_message_queue: Dict[str, Queue[str]] = dict()
 # Queue for handling messages sent by agents (as that might require expensive database calls)
 # Format: (agent_id: str, message: str)
