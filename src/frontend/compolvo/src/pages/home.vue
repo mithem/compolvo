@@ -37,7 +37,7 @@
 <script lang="ts">
 import {defineComponent, onMounted, ref} from 'vue';
 import AgentSoftwareCard from "../components/AgentSoftwareCard.vue";
-import {AgentSoftware, User} from "../components/models";
+import {AgentSoftware, UserMeObject} from "../components/models";
 import {isHigherVersion} from "../components/utils";
 
 
@@ -76,7 +76,7 @@ export default defineComponent({
       try {
         const res = await fetch("/api/user/me")
         if (res.ok) {
-          const user: User = JSON.parse(await res.text());
+          const user: UserMeObject = await res.json()
           firstName.value = user.first_name;
         }
       } catch (err) {

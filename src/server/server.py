@@ -2,14 +2,14 @@ import asyncio
 import datetime
 import enum
 import os
-import queue
-import re
-from queue import Queue
-from typing import Set, Dict
+import signal
+from typing import Set, Tuple, Dict
 
 import jwt
 import jwt.exceptions
-import websockets
+import stripe
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from sanic import Sanic, redirect, Request, text, Blueprint, json, HTTPResponse
 from sanic.exceptions import BadRequest, NotFound, Unauthorized
 from sanic.log import logger
@@ -18,15 +18,19 @@ from tortoise.contrib.sanic import register_tortoise
 from tortoise.exceptions import IntegrityError
 from tortoise.expressions import Q
 from tortoise.functions import Coalesce
-from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 
 from compolvo import cors
 from compolvo import options
-from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, protected
-from compolvo.models import User, Service, ServiceOffering, ServicePlan, Tag, Payment, \
-    Agent, AgentSoftware, UserRole, Serializable, License, OperatingSystem, PackageManager, \
-    PackageManagerAvailableVersion
-from compolvo.utils import hash_password, verify_password, generate_secret
+from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, protected, \
+    requires_payment_details, requires_stripe_customer
+from compolvo.models import Agent, AgentSoftware, Serializable, PackageManager, \
+    PackageManagerAvailableVersion, \
+    BillingCycle, BillingCycleType, ServerStatus
+from compolvo.models import Service, OperatingSystem, Tag, UserRole, User, License, \
+    ServiceOffering, ServicePlan
+from compolvo.utils import verify_password, hash_password, generate_secret, test_email
+from compolvo.websockets import run_websocket_server, run_websocket_handler_queue_worker, \
+    queue_websocket_msg
 
 HTTP_HEADER_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
 
@@ -37,12 +41,18 @@ app.config.SERVER_NAME = os.environ["SERVER_NAME"]
 app.config.SECRET_KEY = os.environ["COMPOLVO_SECRET_KEY"]
 app.config.SESSION_TIMEOUT = 60 * 60
 
+SERVER_ID = os.environ["SERVER_ID"]
+STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY")
+if STRIPE_API_KEY is not None:
+    stripe.api_key = STRIPE_API_KEY
+
 db_hostname = os.environ[
     "DB_HOSTNAME"]  # TODO: Make other parameters configurable via environment variables
 db_username = os.environ["DB_USERNAME"]
 db_password = os.environ["DB_PASSWORD"]
 db_database = os.environ["DB_DATABASE"]
 db_port = os.environ["DB_PORT"]
+
 register_tortoise(app,
                   db_url=f'mysql://{db_username}:{db_password}@{db_hostname}:{db_port}/{db_database}',
                   modules={'models': ['compolvo.models']}, generate_schemas=True)
@@ -58,8 +68,11 @@ agent = Blueprint("agent", url_prefix="/api/agent")
 agent_software = Blueprint("agent_software", url_prefix="/api/agent/software")
 license = Blueprint("license", url_prefix="/api/license")
 operating_system = Blueprint("operating_system", url_prefix="/api/operating-system")
+payment_intent = Blueprint("payment_intent", url_prefix="/api/billing/payment/intent")
+payment_method = Blueprint("payment_method", url_prefix="/api/billing/payment/method")
+billing = Blueprint.group(payment_intent, payment_method)
 api = Blueprint.group(user, service_group, tag, payment, agent, agent_software, license,
-                      operating_system)
+                      operating_system, billing)
 
 app.blueprint(api)
 
@@ -73,8 +86,77 @@ async def index(request):
 
 @app.post("/api/setup")
 @protected({UserRole.Role.ADMIN})
-async def db_setup(request, user):
-    if request.json is not None and request.json.get("services", False):
+async def db_setup(request, user: User):
+    if request.json is not None:
+        services = request.json.get("services", False)
+        service_offerings = request.json.get("service_offerings", False)
+        service_plans = request.json.get("service_plans", False)
+        await set_up_demo_db(user, services=services,
+                             service_offerings=service_offerings,
+                             service_plans=service_plans)
+        return text("Created.", status=201)
+    return HTTPResponse(status=204)
+
+
+async def _get_svc_and_tag_from_request(request):
+    try:
+        service = await Service.get_or_none(id=request.json["service"])
+        if service is None:
+            raise NotFound("Service not found.")
+        tag = await Tag.get_or_none(id=request.json["tag"])
+        if tag is None:
+            raise NotFound("Tag not found.")
+        return service, tag
+    except KeyError:
+        raise BadRequest("Missing paramete)r(s). Required: service, tag (both as ids).")
+
+
+async def create_user(email: str, first: str | None, last: str | None, password: str,
+                      role: UserRole.Role = None) -> User:
+    if not test_email(email):
+        raise BadRequest("Invalid email.")
+    user = await User.get_or_none(email=email)
+    if user is None:
+        salt = generate_secret()
+        billing_cycle = await BillingCycle.get_or_none(type=BillingCycleType.INDIVIDUAL)
+        if billing_cycle is None:
+            billing_cycle = await BillingCycle.create(type=BillingCycleType.INDIVIDUAL,
+                                                      description="Individual services")
+        user = await User.create(
+            email=email,
+            first_name=first,
+            last_name=last,
+            password=hash_password(password, salt),
+            salt=salt,
+            billing_cycle=billing_cycle
+        )
+    if role is None:
+        role = UserRole.Role.USER
+    existing_role = await UserRole.get_or_none(user=user, role=role)
+    if existing_role is None:
+        await UserRole.create(
+            user=user,
+            role=role
+        )
+    if STRIPE_API_KEY is not None:
+        results = await stripe.Customer.search_async(query=f"email:'{email}'")
+        if len(results.data) > 0:
+            id = results.data[0].stripe_id
+        else:
+            customer = await stripe.Customer.create_async(
+                email=email,
+                name=first + " " + last
+            )
+            id = customer.id
+        user.stripe_id = id
+        await user.save()
+        app.add_task(set_up_stripe_customer(user))
+    return await user.json()
+
+
+async def set_up_demo_db(user: User, services: bool = False,
+                         service_offerings: bool = False, service_plans: bool = False):
+    if services:
         tag_developer = await Tag.create(
             label="Developer"
         )
@@ -195,7 +277,7 @@ async def db_setup(request, user):
             tag_enthusiast
         )
         await svc_nextcloud.save()
-        if request.json is not None and request.json.get("service_offerings", False):
+        if service_offerings:
             off_docker_month = await ServiceOffering.create(
                 service=svc_docker,
                 name="month",
@@ -232,7 +314,7 @@ async def db_setup(request, user):
                 price=29.99,
                 duration_days=90
             )
-            if request.json is not None and request.json.get("service_plans", False):
+            if service_plans:
                 plan_docker = await ServicePlan.create(
                     user=user,
                     service_offering=off_docker_month,
@@ -253,35 +335,37 @@ async def db_setup(request, user):
                     service_offering=off_nginx_quarter,
                     start_date=datetime.datetime.now() - datetime.timedelta(days=45)
                 )
-    return HTTPResponse("Created.", status=201)
 
 
 @app.listener("before_server_start")
-async def test_user(request):
-    async def create_user(email: str, first: str, last: str, password: str,
-                          role: UserRole.Role = None):
-        user = await User.get_or_none(email=email)
-        if user is None:
-            salt = generate_secret()
-            user = await User.create(
-                email=email,
-                first_name=first,
-                last_name=last,
-                password=hash_password(password, salt),
-                salt=salt,
-            )
-        if role is None:
-            role = UserRole.Role.USER
-        existing_role = await UserRole.get_or_none(user=user, role=role)
-        if existing_role is None:
-            await UserRole.create(
-                user=user,
-                role=role
-            )
-
-    options.setup_options(app, request)
-    await create_user("test@example.com", "Test", "user", "test")
+async def test_user(app):
+    options.setup_options(app)
+    await create_user("test@example.com", "Test", "user", "test", None)
     await create_user("admin@example.com", "Admin", "Istrator", "admin", UserRole.Role.ADMIN)
+
+
+@app.listener("after_server_start")
+async def after_server_start(app):
+    await update_server_status(running=True)
+
+
+async def get_latest_version(service: Service, os: OperatingSystem) -> str | None:
+    query = (
+        Service
+        .filter(
+            id=service.id,
+            available_versions__latest=True,
+            available_versions__operating_system=os
+        )
+        .annotate(
+            version=Coalesce("available_versions__version")
+        )
+        .values("version")
+    )
+    results = await query
+    if results:
+        return results[0]["version"]
+    return None
 
 
 @app.get("/api/login")
@@ -301,6 +385,20 @@ async def login(request: Request):
     headers = {"Set-Cookie": f"token={token}; Expires={expires.strftime(HTTP_HEADER_DATE_FORMAT)}"}
     redirect_url = request.args.get("redirect_url", request.url_for("index"))
     return redirect(redirect_url, headers=headers)
+
+
+@app.post("/api/auth")
+async def auth(request: Request):
+    email = request.json.get("email", None)
+    password = request.json.get("password", None)
+    if email is None or password is None:
+        raise BadRequest("Missing email or password parameters.")
+    user = await User.get_or_none(email=email)
+    if user is None:
+        raise NotFound("User not found.")
+    if not verify_password(password, user.password, user.salt):
+        raise Unauthorized()
+    return HTTPResponse(status=204)
 
 
 @app.get("/api/logout")
@@ -325,27 +423,34 @@ async def get_users(request, users, user):
 @user.get("/me")
 @protected()
 async def get_user(request, user):
+    if STRIPE_API_KEY is not None and user.stripe_id is not None:
+        try:
+            customer = await stripe.Customer.retrieve_async(user.stripe_id)
+            methods = customer.list_payment_methods()
+            has_payment_method = len(methods) > 0
+        except stripe.InvalidRequestError:  # Customer not found in Stripe
+            has_payment_method = False
+    else:
+        has_payment_method = False
     return json(
-        {**await user.to_dict(), "roles": [await role.to_dict() for role in await user.roles]})
+        {
+            **await user.to_dict(),
+            "roles": [await role.to_dict() for role in await user.roles],
+            "connected_to_billing_provider": user.stripe_id != None,
+            "has_payment_method": has_payment_method
+        }
+    )
 
 
 @user.post("/")
-async def create_user(request):
+async def create_new_user(request):
     try:
-        salt = generate_secret()
-        password = hash_password(request.json["password"], salt)
-        user = await User.create(
-            first_name=request.json.get("first_name"),
-            last_name=request.json.get("last_name"),
-            email=request.json["email"],
-            password=password,
-            salt=salt
+        return await create_user(
+            request.json["email"],
+            request.json.get("first_name"),
+            request.json.get("last_name"),
+            request.json["password"]
         )
-        await UserRole.create(
-            user=user,
-            role=UserRole.Role.USER
-        )
-        return await user.json()
     except KeyError:
         raise BadRequest("Missing name, email, or password.")
     except IntegrityError:
@@ -353,17 +458,31 @@ async def create_user(request):
 
 
 @user.patch("/")
-@protected({UserRole.Role.ADMIN})
-@patch_endpoint(User)
-async def update_user(request, patched_user, user):
-    pass  # TODO: Make, so that authenticated user can update themselves, but not others
+@protected()
+async def update_user(request, user: User):
+    first_name = request.json.get("first_name", None)
+    last_name = request.json.get("last_name", None)
+    email = request.json.get("email", None)
+    password = request.json.get("password")
+    if password is not None:
+        user.password = hash_password(password, user.salt)
+    if first_name is not None:
+        user.first_name = first_name
+    if last_name is not None:
+        user.last_name = last_name
+    if email is not None:
+        user.email = email
+        # TODO: Email verification
+    await user.save()
+    return HTTPResponse(status=204)
 
 
 @user.delete("/")
-@protected({UserRole.Role.ADMIN})
+@protected()
 @delete_endpoint(User)
-async def delete_user(request, deleted_user, user):
-    pass  # TODO: Make, so that admins can delete anyone, but everyone themselves
+async def delete_user(request, deleted_user: User, user):
+    await stripe.Customer.delete_async(deleted_user.stripe_id)
+    # TODO: Make, so that admins can delete anyone, but everyone themselves
 
 
 @service.get("/")
@@ -522,8 +641,8 @@ async def get_own_service_plans(request, user):
 
 
 @service_plan.post("/")
-@protected()
-async def create_service_plan(request, user):
+@requires_payment_details(stripe)
+async def create_service_plan(request, user, methods):
     try:
         service_offering_id = request.json["service_offering"]
         offering = await ServiceOffering.get_or_none(id=service_offering_id)
@@ -537,6 +656,8 @@ async def create_service_plan(request, user):
         if end is not None:
             data["end_date"] = datetime.datetime.fromisoformat(end)
         plan = await ServicePlan.create(**data)
+        # don't set up new stripe subscription directly to be compatible with future billing modes
+        await app.add_task(evaluate_billing_for_user(user))
         return await plan.json()
     except (KeyError, AttributeError):
         raise BadRequest("Missing parameters. Required: service_offering, and user.")
@@ -559,8 +680,14 @@ async def cancel_service_plan(request, user):
     plan_user_id = (await plan.user).id
     if plan_user_id != user.id:
         raise BadRequest("You can only cancel your own service plans.")
+    await cancel_service_plan_for_user(plan)
+    return await plan.json()
+
+
+async def cancel_service_plan_for_user(plan: ServicePlan):
     plan.canceled_by_user = True
-    plan.canceled_at = datetime.datetime.now()
+    if plan.canceled_at is None:
+        plan.canceled_at = datetime.datetime.now()
     await plan.save()
     offering: ServiceOffering = await plan.service_offering
     service: Service = await offering.service
@@ -568,7 +695,8 @@ async def cancel_service_plan(request, user):
     for software in plan.agent_softwares:
         agent: Agent = await software.agent
         await perform_software_uninstallation(agent, service, software)
-    return await plan.json()
+    if STRIPE_API_KEY is not None:
+        app.add_task(evaluate_billing_for_user(await plan.user))
 
 
 @service_plan.delete("/")
@@ -610,23 +738,10 @@ async def delete_tag(request, tag, user):
     pass
 
 
-async def _get_svc_and_tag(request):
-    try:
-        service = await Service.get_or_none(id=request.json["service"])
-        if service is None:
-            raise NotFound("Service not found.")
-        tag = await Tag.get_or_none(id=request.json["tag"])
-        if tag is None:
-            raise NotFound("Tag not found.")
-        return service, tag
-    except KeyError:
-        raise BadRequest("Missing paramete)r(s). Required: service, tag (both as ids).")
-
-
 @service.post("/tag")
 @protected({UserRole.Role.ADMIN})
 async def associate_tag_with_service(request, user):
-    svc, tag = await _get_svc_and_tag(request)
+    svc, tag = await _get_svc_and_tag_from_request(request)
     await svc.tags.add(tag)
     return HTTPResponse(status=204)
 
@@ -634,50 +749,9 @@ async def associate_tag_with_service(request, user):
 @service.delete("/tag")
 @protected({UserRole.Role.ADMIN})
 async def deassociate_tag_with_service(request, user):
-    svc, tag = await _get_svc_and_tag(request)
+    svc, tag = await _get_svc_and_tag_from_request(request)
     await svc.tags.remove(tag)
     return HTTPResponse(status=204)
-
-
-@payment.get("/")
-@protected()
-@get_endpoint(Payment, {UserRole.Role.ADMIN})
-async def get_payments(request, payments, user):
-    pass
-
-
-@payment.post("/")
-@protected({UserRole.Role.ADMIN})
-async def create_payment(request, user):
-    try:
-        plan = await ServicePlan.get(id=request.json["service_plan"])
-        date_str = request.json.get("date")
-        if date_str is not None:
-            date = datetime.datetime.fromisoformat(date_str)
-        else:
-            date = datetime.datetime.now()
-        payment = await Payment.create(
-            service_plan=plan,
-            date=date,
-            amount=request.json["amount"]
-        )
-        return await payment.json()
-    except (KeyError, AttributeError):
-        raise BadRequest("Missing parameters. Required: servcice_plan")
-
-
-@payment.patch("/")
-@protected({UserRole.Role.ADMIN})
-@patch_endpoint(Payment)
-async def update_payment(request, payment, user):
-    pass
-
-
-@payment.delete("/")
-@protected({UserRole.Role.ADMIN})
-@delete_endpoint(Payment)
-async def delete_payment(request, payment, user):
-    pass
 
 
 @agent.get("/")
@@ -877,45 +951,6 @@ async def bulk_create_agent_software(request, user):
         raise BadRequest("Service plan is already installed on at least one agent.")
 
 
-class AgentSoftwareAgentCommand(enum.StrEnum):
-    INSTALL = "install"
-    UNINSTALL = "uninstall"
-
-
-async def get_latest_version(service: Service, os: OperatingSystem) -> str | None:
-    query = (
-        Service
-        .filter(
-            id=service.id,
-            available_versions__latest=True,
-            available_versions__operating_system=os
-        )
-        .annotate(
-            version=Coalesce("available_versions__version")
-        )
-        .values("version")
-    )
-    results = await query
-    if results:
-        return results[0]["version"]
-    return None
-
-
-async def send_agent_software_notification(command: AgentSoftwareAgentCommand, agent: Agent,
-                                           service: Service,
-                                           software: AgentSoftware):
-    version = await get_latest_version(service, await agent.operating_system)
-    match command:
-        case AgentSoftwareAgentCommand.INSTALL:
-            version_info = f" v{version}"
-        case AgentSoftwareAgentCommand.UNINSTALL:
-            version_info = ""
-        case _:
-            raise ValueError("Unexpected AgentSoftwareAgentCommand.")
-    message = f"{command.value} {service.system_name} {software.id}{version_info}"
-    queue_websocket_msg(str(agent.id), message)
-
-
 @agent_software.patch("/")
 @protected({UserRole.Role.ADMIN})
 @patch_endpoint(AgentSoftware)
@@ -969,6 +1004,26 @@ async def perform_software_uninstallation(agent: Agent, service: Service, softwa
     await software.save()
 
 
+class AgentSoftwareAgentCommand(enum.StrEnum):
+    INSTALL = "install"
+    UNINSTALL = "uninstall"
+
+
+async def send_agent_software_notification(command: AgentSoftwareAgentCommand, agent: Agent,
+                                           service: Service,
+                                           software: AgentSoftware):
+    version = await get_latest_version(service, await agent.operating_system)
+    match command:
+        case AgentSoftwareAgentCommand.INSTALL:
+            version_info = f" v{version}"
+        case AgentSoftwareAgentCommand.UNINSTALL:
+            version_info = ""
+        case _:
+            raise ValueError("Unexpected AgentSoftwareAgentCommand.")
+    message = f"{command.value} {service.system_name} {software.id}{version_info}"
+    queue_websocket_msg(str(agent.id), message)
+
+
 @app.post("/api/agent/ws/queue")
 @protected({UserRole.Role.ADMIN})
 async def send_agent_queue_message(request, user):
@@ -1004,130 +1059,280 @@ async def get_own_agent_count(request, user: User):
     return json({"count": count})
 
 
+@payment_method.post("/attach")
+@requires_stripe_customer(stripe)
+async def attach_payment_method_to_customer(request, user, customer: stripe.Customer):
+    try:
+        method_id = request.json["method_id"]
+        await stripe.PaymentMethod.attach_async(method_id, customer=customer.id)
+        await stripe.Customer.modify_async(customer.id,
+                                           invoice_settings={"default_payment_method": method_id})
+        return HTTPResponse(status=204)
+    except (TypeError, KeyError) as e:
+        raise BadRequest("Expected method_id for the payment method to attach")
+
+
+@app.get("/api/billing/cycle")
+@protected()
+@get_endpoint(BillingCycle)
+async def get_billing_cycles(request, user, cycles):
+    pass
+
+
+@app.post("/api/billing/setup")
+@protected({UserRole.Role.ADMIN})
+async def set_up_billing(request, user):
+    app.add_task(set_up_stripe_products())
+    return text("Accepted.", status=202)
+
+
+@app.post("/api/billing/maintenance")
+@protected({UserRole.Role.ADMIN})
+async def billing_maintenance(request, user):
+    app.add_task(perform_billing_maintenance())
+    return text("Accepted.", status=202)
+
+
+@app.get("/api/server/status")
+@protected({UserRole.Role.ADMIN})
+@get_endpoint(ServerStatus)
+async def get_server_stati(request, user, stati):
+    pass
+
+
+@app.post("/api/server/stop")
+@protected({UserRole.Role.ADMIN})
+async def stop_server(request, user):
+    app.stop(False)
+    return text("Accepted.", status=202)
+
+
+async def perform_billing_maintenance():
+    performing_maintenance = await ServerStatus.filter(
+        performing_billing_maintenance=True).count() > 0
+    if performing_maintenance:
+        logger.warning("Already performing billing maintenance, therefore skipping this one.")
+        return
+    logger.info("Performing billing maintenance...")
+    await update_server_status(billing_maintenance=True)
+    await set_up_stripe_products()
+    users = await User.all()
+    for user in users:
+        await evaluate_billing_for_user(user)
+    await update_server_status(billing_maintenance=False)
+    logger.info("Billing maintenance complete")
+
+
+async def set_up_stripe_products():
+    services = await Service.all()
+    for service in services:
+        product, service = await assert_stripe_product_for_service(service)
+        await assert_stripe_prices_for_service(product, service)
+
+
+async def assert_stripe_product_for_service(service: Service) -> Tuple[stripe.Product, Service]:
+    async def create():
+        product = await stripe.Product.create_async(
+            name=service.name,
+            description=service.description,
+        )
+        service.stripe_product_id = product.id
+        await service.save()
+        return product, service
+
+    if service.stripe_product_id is not None:
+        try:
+            product = await stripe.Product.retrieve_async(service.stripe_product_id)
+        except stripe.InvalidRequestError as e:
+            if "No such product" in str(e):
+                return await create()
+            raise e
+        update_data = {}
+        if product.name != service.name:
+            update_data["name"] = service.name
+        if product.description != service.description:
+            update_data["description"] = service.description
+        if len(update_data) > 0:
+            await stripe.Product.modify_async(product.id, **update_data)
+        return product, service
+    else:
+        return await create()
+
+
+async def assert_stripe_prices_for_service(product: stripe.Product, service: Service):
+    offerings = await ServiceOffering.filter(service=service).all()
+    prices = await stripe.Price.search_async(query=f"product:'{product.id}'")
+    for offering in offerings:
+        potential_prices = list(
+            filter(lambda price: str(price.id) == str(offering.stripe_price_id), prices.data))
+        prices_length = len(potential_prices)
+        if offering.stripe_price_id is not None and prices_length > 0:
+            assert prices_length == 1, "Multiple prices associated with the same ServiceOffering."
+            price: stripe.Price = potential_prices[0]
+            update_data = {}
+            target_price = int(offering.price * 100)
+            if price.unit_amount != target_price:
+                update_data["unit_amount"] = target_price
+            if len(update_data) > 0:
+                await stripe.Price.modify_async(price.id, **update_data)
+        else:
+            recurring_data = get_stripe_recurring_object_for_service_offering(offering)
+            price = await stripe.Price.create_async(
+                product=product.id,
+                currency="eur",
+                unit_amount=int(offering.price * 100),
+                recurring=recurring_data
+            )
+            offering.stripe_price_id = price.id
+            await offering.save()
+
+
+def get_stripe_recurring_object_for_service_offering(offering: ServiceOffering) -> Dict[
+    str, str | int]:
+    match offering.name:
+        case "month":
+            interval = "month"
+            interval_count = 1
+        case "quarter":
+            interval = "month"
+            interval_count = 3
+        case "year":
+            interval = "year"
+            interval_count = 1
+        case _:
+            raise ValueError(
+                f"Offering {offering.id} has invalid name for stripe sync: {offering.name}")
+    return {"interval": interval,
+            "interval_count": interval_count}
+
+
+async def evaluate_billing_for_user(user: User):
+    cycle: BillingCycle = await user.billing_cycle
+    match cycle.type:
+        case BillingCycleType.INDIVIDUAL:
+            await set_up_billing_individual_services_for_user(user)
+        case _:
+            raise ValueError("Unexpected BillingCycleType")
+
+
+async def set_up_billing_individual_services_for_user(user: User):
+    await set_up_stripe_customer(user)
+    service_plans = await ServicePlan.filter(user=user).all()
+    for plan in service_plans:
+        if plan.stripe_subscription_id is None:
+            await create_stripe_subscription_for_plan(user, plan)
+        else:
+            await handle_stripe_subscription_status(plan)
+
+
+async def set_up_stripe_customer(user: User) -> User:
+    async def create() -> User:
+        customer = await stripe.Customer.create_async(
+            email=user.email,
+            name=user.first_name + " " + user.last_name
+        )
+        user.stripe_id = customer.id
+        await user.save()
+        return user
+
+    if user.stripe_id is None:
+        return await create()
+    try:
+        customer = await stripe.Customer.retrieve_async(user.stripe_id)
+        return user
+    except stripe.InvalidRequestError:
+        return await create()
+
+
+async def handle_stripe_subscription_status(plan: ServicePlan):
+    assert plan.stripe_subscription_id is not None
+    try:
+        subscription = await stripe.Subscription.retrieve_async(plan.stripe_subscription_id)
+        if plan.canceled_by_user and subscription.cancel_at is None:
+            subscription = await stripe.Subscription.cancel_async(subscription.id)
+        if subscription.status in ["canceled", "unpaid", "incomplete_expired"]:
+            if not plan.canceled_by_user:
+                await cancel_service_plan_for_user(plan)
+    except stripe.InvalidRequestError as e:
+        if "No such subscription" in str(e):
+            return
+        raise e
+
+
+async def get_stripe_price_by_id(product_id: str, price_id: str) -> stripe.Price:
+    prices = await stripe.Price.search_async(query=f"product:'{product_id}'")
+    potential_prices = list(filter(lambda price: price.id == str(price_id), prices.data))
+    assert len(
+        potential_prices) == 1, f"Expected exactly one stripe price with id {price_id} for product {product_id}. Got {potential_prices}."
+    return potential_prices[0]
+
+
+async def create_stripe_subscription_for_plan(user: User, service_plan: ServicePlan):
+    assert user.stripe_id is not None, f"User {user.id} does not have a stripe ID associated."
+    offering: ServiceOffering = await service_plan.service_offering
+    service: Service = await offering.service
+    if offering.stripe_price_id is None or service.stripe_product_id is None:
+        await set_up_stripe_products()
+        await offering.refresh_from_db()
+        await service.refresh_from_db()
+    price = await get_stripe_price_by_id(service.stripe_product_id, offering.stripe_price_id)
+    customer = user.stripe_id
+    price_id = price.id
+    subscription = await stripe.Subscription.create_async(
+        customer=customer,
+        items=[{"price": price_id}]
+    )
+    service_plan.stripe_subscription_id = subscription.id
+    await service_plan.save()
+
+
+async def run_schedules():
+    logger.info("Starting schedule runner...")
+    scheduler = AsyncIOScheduler()
+
+    billing_maintenance_trigger = CronTrigger(minute="*/5")
+    scheduler.add_job(perform_billing_maintenance, billing_maintenance_trigger)
+
+    scheduler.start()
+
+
+async def update_server_status(running: bool = None, billing_maintenance: bool = None):
+    status = await get_server_status()
+    if status is None:
+        status = await ServerStatus.create(server_id=SERVER_ID, server_running=True)
+    if running is not None:
+        status.server_running = running
+    if billing_maintenance is not None:
+        status.performing_billing_maintenance = billing_maintenance
+    await status.save()
+
+
+async def get_server_status() -> ServerStatus | None:
+    return await ServerStatus.get_or_none(server_id=SERVER_ID)
+
+
+async def signal_handler(sig: str):
+    logger.info(f"Received {sig}, stopping server...")
+    await update_server_status(running=False)
+    app.stop()
+
+
+async def set_up_sigint_handler():
+    loop = asyncio.get_event_loop()
+    signals = ["SIGINT", "SIGTERM"]
+    for sig in signals:
+        loop.add_signal_handler(getattr(signal, sig),
+                                lambda: asyncio.create_task(signal_handler(sig)))
+
+
 # TODO: Add endpoints for creating, updating and deleting licenses + OSes
 # Queue for messages pending to be sent to respective agents
-websocket_message_queue: Dict[str, Queue[str]] = dict()
-# Queue for handling messages sent by agents (as that might require expensive database calls)
-# Format: (agent_id: str, message: str)
-websocket_handler_queue: Queue[(str, str)] = Queue()
-
-
-def queue_websocket_msg(agent_id: str, message: str):
-    assert type(
-        agent_id) == str, "agent id isn't of type str. Don't search further why messages don't get delivered"
-    global websocket_message_queue
-    queue = websocket_message_queue.get(agent_id)
-    if queue is None:
-        queue = Queue()
-    queue.put(message)
-    websocket_message_queue[agent_id] = queue
-    logger.debug(f"Queued message for {agent_id}: {message}")
-
-
-async def handle_websocket_msg(agent_id: str, message: str) -> str | None:
-    logger.debug("Handling websocket message for %s: %s", agent_id, message)
-    status_pattern = r"(?P<status_key>[\w\d_-]+)=(?P<status_value>[\w\d\    ._-]+)"
-    software_status_pattern = r"software status (?P<software_id>[\w\d-]{36}) (?P<status>[\w\d_\.=;-]+)"
-    software_status_match = re.match(software_status_pattern, message)
-    if software_status_match is not None:
-        software_id = software_status_match.group("software_id")
-        status = software_status_match.group("status")
-        stati = status.split(";")
-        status_data = {}
-        for status_entry in stati:
-            match = re.match(status_pattern, status_entry)
-            if match is not None:
-                status_data[match.group("status_key")] = match.group("status_value")
-        software = await AgentSoftware.get_or_none(id=software_id)
-        was_uninstalling = software.uninstalling
-        if set(status_data.keys()).issubset(
-                {"corrupt", "installed_version", "installing", "uninstalling"}):
-            for key, value in status_data.items():
-                if value in ["true", "false"]:
-                    value = value == "true"
-                elif value in ["null", "None"]:
-                    value = None
-                setattr(software, key, value)
-            await software.save()
-        if software.installed_version is None and software.uninstalling == False and was_uninstalling and not software.installing and not software.corrupt:
-            await software.delete()
-    return None
-
-
-async def websocket_handler(ws: websockets.WebSocketServerProtocol):
-    login_msg = await ws.recv()
-    match = re.match(r"^login agent (?P<id>[\w-]{36})$", login_msg)
-    if match is None:
-        return await ws.close(4000, "Invalid login message.")
-    agent_id = match.group("id")
-    agent = await Agent.get_or_none(id=agent_id)
-    if agent is None:
-        return await ws.close(4004, "Agent not found.")
-    if agent.connected:
-        return await ws.close(4003, "Agent is already connected.")
-    agent.last_connection_start = datetime.datetime.now()
-    agent.connected = True
-    agent.connection_interrupted = False
-    await agent.save()
-    await ws.send("login successful")
-    logger.debug("Agent logged in successfully: %s", agent_id)
-
-    async def message_emitter(queue: Queue):
-        if queue is not None:
-            while not queue.empty():
-                msg = queue.get()
-                await ws.send(msg)
-
-    async def message_consumer():
-        try:
-            async with asyncio.timeout(1):
-                msg = await ws.recv()
-                websocket_handler_queue.put((agent_id, msg))
-        except TimeoutError:
-            pass
-
-    try:
-        while True:
-            queue = websocket_message_queue.get(agent_id)
-            if ws.closed:
-                if ws.close_code != 1000:
-                    raise ConnectionClosedError(ws.close_rcvd, ws.close_sent)
-                raise ConnectionClosedOK(ws.close_rcvd, ws.close_sent)
-            await asyncio.gather(message_emitter(queue), message_consumer())
-    except ConnectionClosedOK:
-        logger.debug("Connection to agent %s closed ok", agent_id)
-    except ConnectionClosedError:
-        logger.warning("Connection to agent %s closed unexpectedly", agent_id)
-        agent.connection_interrupted = True
-    finally:
-        agent.last_connection_end = datetime.datetime.now()
-        agent.connected = False
-        await agent.save()
-
-
-async def run_websocket_server(app):
-    logger.info("Preparing agents' connected attributes...")
-    agents = await Agent.filter(connected=True).all()
-    for agent in agents:
-        agent.connected = False
-        await agent.save()
-    async with websockets.serve(websocket_handler, "0.0.0.0", 8001):
-        logger.info("Started websocket server")
-        await asyncio.Future()
-
-
-async def run_websocket_handler_queue_worker():
-    logger.info("Running worker handling websocket message queue...")
-    while True:
-        try:
-            agent_id, msg = websocket_handler_queue.get(block=False)
-            await handle_websocket_msg(agent_id, msg)
-        except queue.Empty:
-            await asyncio.sleep(1)
-
 
 app.add_task(run_websocket_server(app))
 app.add_task(run_websocket_handler_queue_worker())
+app.add_task(run_schedules())
+app.add_task(perform_billing_maintenance())
+app.add_task(set_up_sigint_handler())
 
 if __name__ == "__main__":
     app.run("0.0.0.0")

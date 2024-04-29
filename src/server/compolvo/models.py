@@ -1,4 +1,5 @@
 import datetime
+import enum
 from enum import IntEnum
 from typing import List, Type, Iterable
 from uuid import UUID
@@ -55,6 +56,18 @@ class Serializable:
         return await cls.list_json(await cls.all())  # typing: ignore
 
 
+class BillingCycleType(enum.IntEnum):
+    INDIVIDUAL = 0
+
+
+class BillingCycle(Model, Serializable):
+    id = UUIDField(pk=True)
+    type = IntEnumField(BillingCycleType, unique=True)
+    description = TextField()
+
+    fields = ["id", "type", "description"]
+
+
 class User(Model, Serializable):
     id = UUIDField(pk=True)
     first_name = TextField(null=True)
@@ -62,8 +75,10 @@ class User(Model, Serializable):
     email = CharField(255, unique=True)
     password = TextField(null=True)
     salt = TextField(null=True)
+    stripe_id = TextField(null=True)
+    billing_cycle = ForeignKeyField("models.BillingCycle", "users")
 
-    fields = ["id", "first_name", "last_name", "email"]
+    fields = ["id", "first_name", "last_name", "email", "billing_cycle"]
 
 
 class UserRole(Model, Serializable):
@@ -92,6 +107,7 @@ class Service(Model, Serializable):
     download_count = IntField(null=True)
     image = TextField(null=True)
     tags = ManyToManyField("models.Tag", related_name="services")
+    stripe_product_id = TextField(null=True)
 
     fields = ["id", "system_name", "name", "description", "license", "download_count",
               "image"]
@@ -120,7 +136,8 @@ class PackageManagerAvailableVersion(Model, Serializable):
     version = TextField()
     latest = BooleanField(default=False)
 
-    # TODO: Add constraint that (service, package_manager, operating_system, latest) is unique
+    class Meta:
+        unique_together = (("service", "package_manager", "operating_system", "latest"),)
 
 
 class License(Model, Serializable):
@@ -144,6 +161,7 @@ class ServiceOffering(Model, Serializable):
     description = TextField(null=True)
     price = FloatField()
     duration_days = IntField()
+    stripe_price_id = TextField(null=True)
 
     fields = ["id", "name", "service", "description", "price", "duration_days"]
 
@@ -156,18 +174,10 @@ class ServicePlan(Model, Serializable):
     end_date = DatetimeField(null=True)
     canceled_by_user = BooleanField(default=False)
     canceled_at = DatetimeField(null=True, default=None)
+    stripe_subscription_id = TextField(null=True)
 
     fields = ["id", "service_offering", "user", "start_date", "end_date", "canceled_by_user",
               "canceled_at"]
-
-
-class Payment(Model, Serializable):
-    id = UUIDField(pk=True)
-    service_plan = ForeignKeyField("models.ServicePlan", "payments")
-    amount = FloatField()
-    date = DatetimeField()
-
-    fields = ["id", "service_plan", "amount", "date"]
 
 
 class Agent(Model, Serializable):
@@ -199,3 +209,12 @@ class AgentSoftware(Model, Serializable):
 
     class Meta:
         unique_together = (("agent", "service_plan"),)
+
+
+class ServerStatus(Model, Serializable):
+    id = UUIDField(pk=True)
+    server_id = CharField(255, unique=True)
+    server_running = BooleanField(default=False)
+    performing_billing_maintenance = BooleanField(default=False)
+
+    fields = ["id", "server_id", "server_running", "performing_billing_maintenance"]

@@ -88,9 +88,22 @@ export interface ServicePlan {
   installable: boolean
 }
 
-export interface User {
-  id: string;
-  email: string
+export interface UserRole {
+  id: string
+  role: number
+}
+
+export enum BillingCylce {
+  INDIVIDUAL
+}
+
+export interface UserMeObject {
+  id: string
   first_name: string
   last_name: string
+  email: string
+  roles: UserRole[]
+  connected_to_billing_provider: boolean
+  has_payment_method: boolean
+  billing_cycle: BillingCylce
 }

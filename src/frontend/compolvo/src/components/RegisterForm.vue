@@ -1,7 +1,7 @@
 <template>
   <div class="card-container">
     <v-card class="form-card">
-      <v-form @submit.prevent="register">
+      <v-form @submit.prevent="validate" fast-fail validate-on="input" ref="form">
         <v-col>
           <v-row
             class="vert-input-field"
@@ -11,14 +11,12 @@
               v-model="firstName"
               :counter="100"
               label="First name"
-              hide-details
             ></v-text-field>
             <v-text-field
               class="horiz-input-field"
               v-model="lastName"
               :counter="100"
               label="Last name"
-              hide-details
             ></v-text-field>
           </v-row>
           <v-text-field
@@ -27,7 +25,6 @@
             v-model="email"
             :counter="50"
             label="E-Mail"
-            hide-details
             required
           ></v-text-field>
           <v-text-field
@@ -36,7 +33,8 @@
             v-model="password"
             :counter="50"
             label="Password"
-            hide-details
+            :rules="passwordValidation"
+            validate-on="input"
             required
           >
           </v-text-field>
@@ -46,7 +44,8 @@
             v-model="repeatPassword"
             :counter="50"
             label="Repeat password"
-            hide-details
+            :rules="repeatPasswordValidation"
+            validate-on="input"
             required
           >
           </v-text-field>
@@ -63,40 +62,78 @@
 
 <style scoped>
 </style>
-<script setup lang="ts">
-import {defineComponent, ref} from "vue";
+<script lang="ts">
+import {defineComponent, getCurrentInstance, ref} from "vue";
 import Constants from "./Constants";
+import {evaluatePasswordRules} from "./utils";
 
-const loading = ref(false)
-const firstName = ref("")
-const lastName = ref("")
-const email = ref("")
-const password = ref("")
-const repeatPassword = ref("")
 
-defineComponent({
+export default defineComponent({
   name: 'RegisterForm',
+  data: () => ({
+    passwordValidation: [
+      value => {
+        return evaluatePasswordRules(value)
+      }
+    ]
+  }),
   setup() {
-    return {firstName, lastName, email, password, repeatPassword}
+    const loading = ref(false)
+    const firstName = ref("")
+    const lastName = ref("")
+    const email = ref("")
+    const password = ref("")
+    const repeatPassword = ref("")
+    const repeatPasswordValidation = [
+      value => {
+        if (value !== password.value) {
+          return "Passwords don't match."
+        }
+        return true
+      }
+    ]
+
+    const instance = getCurrentInstance().proxy
+
+    async function validate() {
+      const {valid: valid, errors: errors} = await instance.$refs.form.validate()
+      if (valid) {
+        await register()
+      } else {
+        alert("Error(s) valdiating form: " + errors.flatMap(err => err.errorMessages).join(", "))
+      }
+    }
+
+    async function register() {
+      loading.value = true
+      const res = await fetch(Constants.HOST_URL + "/api/user", {
+        method: "POST",
+        body: JSON.stringify({
+          first_name: firstName.value != "" ? firstName.value : null,
+          last_name: lastName.value != "" ? lastName.value : null,
+          email: email.value,
+          password: password.value
+        })
+      })
+      loading.value = false
+      if (res.ok) {
+        document.location.pathname = "/";
+      } else {
+        alert(await res.text())
+      }
+    }
+
+    return {
+      firstName,
+      lastName,
+      email,
+      password,
+      repeatPassword,
+      loading,
+      repeatPasswordValidation,
+      validate,
+      register
+    }
   },
 });
-
-async function register() {
-  loading.value = true
-  const res = await fetch(Constants.HOST_URL + "/api/user", {
-    method: "POST",
-    body: JSON.stringify({
-      first_name: firstName.value != "" ? firstName.value : null,
-      last_name: lastName.value != "" ? lastName.value : null,
-      email: email.value,
-      password: password.value
-    })
-  })
-  loading.value = false
-  if (res.ok) {
-    document.location.pathname = "/";
-  } else {
-    alert(await res.text())
-  }
-}
 </script>

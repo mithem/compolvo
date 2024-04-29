@@ -1,9 +1,10 @@
 from functools import wraps
 from typing import Type, Set
 
+import stripe as stripe_module
 from compolvo.models import Serializable, UserRole, User
 from compolvo.utils import check_token, user_has_roles
-from sanic import HTTPResponse
+from sanic import HTTPResponse, text
 from sanic.exceptions import BadRequest, NotFound, Unauthorized
 
 
@@ -18,7 +19,8 @@ def patch_endpoint(cls: Type[Serializable]):
             if instance is None:
                 raise NotFound(f"Specified {cls.__name__} not found.")
             for key, value in request.json.items():
-                if key not in cls.fields:
+                fields = set(getattr(cls, "patch_fields", cls.fields)) - {"id"}
+                if key not in fields:
                     raise BadRequest(f"Key '{key}' does not exist on {cls.__name__}.")
                 setattr(instance, key, value)
             await instance.save()
@@ -79,17 +81,53 @@ def protected(requires_roles: Set[UserRole.Role] = None):
     def decorator(func):
         @wraps(func)
         async def decorated_function(request, *args, **kwargs):
-            try:
-                user = await check_token(request)
-                assert user
-                if requires_roles is not None:
-                    assert await user_has_roles(user, requires_roles)
+            unauthorized = Unauthorized("Unauthorized.")
+            user = await check_token(request)
+            if user is None:
+                raise unauthorized
+            if requires_roles is not None:
+                if not await user_has_roles(user, requires_roles):
+                    raise unauthorized
 
-                response = await func(request, user, *args, **kwargs)
-                return response
-            except AssertionError:
-                raise Unauthorized("Unauthorized.")
+            return await func(request, user, *args, **kwargs)
 
         return decorated_function
 
+    return decorator
+
+
+def requires_stripe_customer(stripe):
+    def decorator(func):
+        @wraps(func)
+        @protected()
+        async def decorated_function(request, user: User, *args, **kwargs):
+            if stripe.api_key is None:
+                return HTTPResponse("Stripe API key not set, which is required for this endpoint.",
+                                    status=500)
+            customer_not_found = text("Stripe customer not found. Try again later.", status=500)
+            if user.stripe_id is None:
+                return text("Requires stripe synchronization", status=500)
+            try:
+                customer = await stripe.Customer.retrieve_async(user.stripe_id)
+                if getattr(customer, "deleted", False):
+                    return customer_not_found
+            except stripe.InvalidRequestError:
+                return customer_not_found
+            return await func(request, user, customer, *args, **kwargs)
+        return decorated_function
+    return decorator
+
+
+def requires_payment_details(stripe):
+    def decorator(func):
+        @wraps(func)
+        @requires_stripe_customer(stripe)
+        async def decorated_function(request, user: User, customer: stripe_module.Customer, *args,
+                                     **kwargs):
+            methods = await customer.list_payment_methods_async()
+            if len(methods.data) == 0:
+                return text("Requires payment details.", status=402)
+            return await func(request, user, methods, *args, **kwargs)
+
+        return decorated_function
     return decorator

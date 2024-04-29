@@ -471,6 +471,156 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "agent/ws/queue",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"agent\": \"277311bd-bff2-41e0-9a87-0902a00e07d2\",\n    \"message\": \"Hello, world!\",\n    \"count\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{HOST}}/api/agent/ws/queue",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "agent",
+            "ws",
+            "queue"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "service/plan/cancel?id=",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/service/plan/cancel?id=a0528145-c619-4d7d-aa5e-0bf0ccd3a26a",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "service",
+            "plan",
+            "cancel"
+          ],
+          "query": [
+            {
+              "key": "id",
+              "value": "a0528145-c619-4d7d-aa5e-0bf0ccd3a26a"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "billing/setup",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/billing/setup",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "billing",
+            "setup"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "billing/maintenance",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/billing/maintenance",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "billing",
+            "maintenance"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "billing/cycle",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/billing/cycle",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "billing",
+            "cycle"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "server/status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/server/status",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "server",
+            "status"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "server/stop",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/server/stop",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "server",
+            "stop"
+          ]
+        }
+      },
+      "response": []
     }
   ],
   "event": [
