@@ -136,7 +136,8 @@ class PackageManagerAvailableVersion(Model, Serializable):
     version = TextField()
     latest = BooleanField(default=False)
 
-    # TODO: Add constraint that (service, package_manager, operating_system, latest) is unique
+    class Meta:
+        unique_together = (("service", "package_manager", "operating_system", "latest"),)
 
 
 class License(Model, Serializable):
@@ -208,3 +209,12 @@ class AgentSoftware(Model, Serializable):
 
     class Meta:
         unique_together = (("agent", "service_plan"),)
+
+
+class ServerStatus(Model, Serializable):
+    id = UUIDField(pk=True)
+    server_id = CharField(255, unique=True)
+    server_running = BooleanField(default=False)
+    performing_billing_maintenance = BooleanField(default=False)
+
+    fields = ["id", "server_id", "server_running", "performing_billing_maintenance"]

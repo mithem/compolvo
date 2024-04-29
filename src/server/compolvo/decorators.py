@@ -101,6 +101,9 @@ def requires_stripe_customer(stripe):
         @wraps(func)
         @protected()
         async def decorated_function(request, user: User, *args, **kwargs):
+            if stripe.api_key is None:
+                return HTTPResponse("Stripe API key not set, which is required for this endpoint.",
+                                    status=500)
             customer_not_found = text("Stripe customer not found. Try again later.", status=500)
             if user.stripe_id is None:
                 return text("Requires stripe synchronization", status=500)

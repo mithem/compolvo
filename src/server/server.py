@@ -1,11 +1,15 @@
+import asyncio
 import datetime
 import enum
 import os
+import signal
 from typing import Set, Tuple, Dict
 
 import jwt
 import jwt.exceptions
 import stripe
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from sanic import Sanic, redirect, Request, text, Blueprint, json, HTTPResponse
 from sanic.exceptions import BadRequest, NotFound, Unauthorized
 from sanic.log import logger
@@ -21,7 +25,7 @@ from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, p
     requires_payment_details, requires_stripe_customer
 from compolvo.models import Agent, AgentSoftware, Serializable, PackageManager, \
     PackageManagerAvailableVersion, \
-    BillingCycle, BillingCycleType
+    BillingCycle, BillingCycleType, ServerStatus
 from compolvo.models import Service, OperatingSystem, Tag, UserRole, User, License, \
     ServiceOffering, ServicePlan
 from compolvo.utils import verify_password, hash_password, generate_secret, test_email
@@ -37,6 +41,7 @@ app.config.SERVER_NAME = os.environ["SERVER_NAME"]
 app.config.SECRET_KEY = os.environ["COMPOLVO_SECRET_KEY"]
 app.config.SESSION_TIMEOUT = 60 * 60
 
+SERVER_ID = os.environ["SERVER_ID"]
 STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY")
 if STRIPE_API_KEY is not None:
     stripe.api_key = STRIPE_API_KEY
@@ -145,7 +150,7 @@ async def create_user(email: str, first: str | None, last: str | None, password:
             id = customer.id
         user.stripe_id = id
         await user.save()
-    app.add_task(set_up_stripe_customer(user))
+        app.add_task(set_up_stripe_customer(user))
     return await user.json()
 
 
@@ -333,10 +338,15 @@ async def set_up_demo_db(user: User, services: bool = False,
 
 
 @app.listener("before_server_start")
-async def test_user(request):
-    options.setup_options(app, request)
+async def test_user(app):
+    options.setup_options(app)
     await create_user("test@example.com", "Test", "user", "test", None)
     await create_user("admin@example.com", "Admin", "Istrator", "admin", UserRole.Role.ADMIN)
+
+
+@app.listener("after_server_start")
+async def after_server_start(app):
+    await update_server_status(running=True)
 
 
 async def get_latest_version(service: Service, os: OperatingSystem) -> str | None:
@@ -413,7 +423,7 @@ async def get_users(request, users, user):
 @user.get("/me")
 @protected()
 async def get_user(request, user):
-    if user.stripe_id != None:
+    if STRIPE_API_KEY is not None and user.stripe_id is not None:
         try:
             customer = await stripe.Customer.retrieve_async(user.stripe_id)
             methods = customer.list_payment_methods()
@@ -685,7 +695,8 @@ async def cancel_service_plan_for_user(plan: ServicePlan):
     for software in plan.agent_softwares:
         agent: Agent = await software.agent
         await perform_software_uninstallation(agent, service, software)
-    app.add_task(evaluate_billing_for_user(plan.user))
+    if STRIPE_API_KEY is not None:
+        app.add_task(evaluate_billing_for_user(await plan.user))
 
 
 @service_plan.delete("/")
@@ -1048,16 +1059,6 @@ async def get_own_agent_count(request, user: User):
     return json({"count": count})
 
 
-@payment_intent.post("/")
-@requires_stripe_customer(stripe)
-async def create_payment_intent(request, user, customer):
-    intent = await stripe.PaymentIntent.create_async(
-        amount=1200,
-        currency="eur"
-    )
-    return json({"client_secret": intent.client_secret})
-
-
 @payment_method.post("/attach")
 @requires_stripe_customer(stripe)
 async def attach_payment_method_to_customer(request, user, customer: stripe.Customer):
@@ -1092,12 +1093,33 @@ async def billing_maintenance(request, user):
     return text("Accepted.", status=202)
 
 
+@app.get("/api/server/status")
+@protected({UserRole.Role.ADMIN})
+@get_endpoint(ServerStatus)
+async def get_server_stati(request, user, stati):
+    pass
+
+
+@app.post("/api/server/stop")
+@protected({UserRole.Role.ADMIN})
+async def stop_server(request, user):
+    app.stop(False)
+    return text("Accepted.", status=202)
+
+
 async def perform_billing_maintenance():
+    performing_maintenance = await ServerStatus.filter(
+        performing_billing_maintenance=True).count() > 0
+    if performing_maintenance:
+        logger.warning("Already performing billing maintenance, therefore skipping this one.")
+        return
     logger.info("Performing billing maintenance...")
+    await update_server_status(billing_maintenance=True)
     await set_up_stripe_products()
     users = await User.all()
     for user in users:
         await evaluate_billing_for_user(user)
+    await update_server_status(billing_maintenance=False)
     logger.info("Billing maintenance complete")
 
 
@@ -1264,11 +1286,53 @@ async def create_stripe_subscription_for_plan(user: User, service_plan: ServiceP
     await service_plan.save()
 
 
+async def run_schedules():
+    logger.info("Starting schedule runner...")
+    scheduler = AsyncIOScheduler()
+
+    billing_maintenance_trigger = CronTrigger(minute="*/5")
+    scheduler.add_job(perform_billing_maintenance, billing_maintenance_trigger)
+
+    scheduler.start()
+
+
+async def update_server_status(running: bool = None, billing_maintenance: bool = None):
+    status = await get_server_status()
+    if status is None:
+        status = await ServerStatus.create(server_id=SERVER_ID, server_running=True)
+    if running is not None:
+        status.server_running = running
+    if billing_maintenance is not None:
+        status.performing_billing_maintenance = billing_maintenance
+    await status.save()
+
+
+async def get_server_status() -> ServerStatus | None:
+    return await ServerStatus.get_or_none(server_id=SERVER_ID)
+
+
+async def signal_handler(sig: str):
+    logger.info(f"Received {sig}, stopping server...")
+    await update_server_status(running=False)
+    app.stop()
+
+
+async def set_up_sigint_handler():
+    loop = asyncio.get_event_loop()
+    signals = ["SIGINT", "SIGTERM"]
+    for sig in signals:
+        loop.add_signal_handler(getattr(signal, sig),
+                                lambda: asyncio.create_task(signal_handler(sig)))
+
+
 # TODO: Add endpoints for creating, updating and deleting licenses + OSes
 # Queue for messages pending to be sent to respective agents
 
 app.add_task(run_websocket_server(app))
 app.add_task(run_websocket_handler_queue_worker())
+app.add_task(run_schedules())
+app.add_task(perform_billing_maintenance())
+app.add_task(set_up_sigint_handler())
 
 if __name__ == "__main__":
     app.run("0.0.0.0")
