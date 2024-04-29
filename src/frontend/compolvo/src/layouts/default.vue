@@ -1,10 +1,9 @@
 <template>
-  <v-app>
+  <v-app id="app" style="height: 100vh; display: flex;">
     <Navbar/>
-    <v-main>
+    <v-main style="display: flex; flex: 1">
       <router-view/>
     </v-main>
-    <AppFooter/>
   </v-app>
 </template>
 
@@ -14,8 +13,9 @@
 
 <style>
 /* Global styles */
-body, #app, .v-application {
-  background-color: #E0E0E0; /* Light grey background; change hex as needed */
+html, body, .v-application {
+  background-color: #E0E0E0; /* Light grey background */
 }
 </style>
 <style src="@/styles/global.scss"></style>
+

@@ -2,19 +2,13 @@ compact_card.vue
 <template>
   <v-card class="compact-card">
     <v-card-title>
-      <v-row no-gutters>
-        <v-col cols="12">
           <v-img
             height="200"
             aspect-ratio="16/9"
             cover
             :src="filteredService.service.image"
           ></v-img>
-        </v-col>
-        <v-col cols="12" class="py-2 text-h6">
           {{ filteredService.service.name }}
-        </v-col>
-      </v-row>
     </v-card-title>
 
     <!-- Service Version -->
@@ -24,7 +18,17 @@ compact_card.vue
     <v-card-text class="desc">{{ filteredService.service.description }}</v-card-text>
 
     <!-- License -->
-    <v-card-text>License: {{ filteredService.service.license }}</v-card-text>
+    <v-card-text>License: {{ formatedLicense }}</v-card-text>
+
+    <!-- Os
+    <v-card-text>Os: {{ formatedOs }}</v-card-text>
+    -->
+
+    <v-card-text>
+      <div class="tags">
+        <span v-for="os in formatedOs" key="formatedOs" class="tag">{{os}}</span>
+      </div>
+    </v-card-text>
 
     <!-- Tags -->
     <v-card-text>
@@ -44,17 +48,34 @@ compact_card.vue
 <script lang="ts">
 import {defineComponent, ref} from 'vue';
 import { FilteredService } from '../pages/compare.vue';
+import {License, OperatingSystem} from "./models";
 
 export default defineComponent({
   name: 'CompactCard',
-  props:["filteredService","targetDurationDays"],
+  props: ["filteredService", "targetDurationDays", "licenses", "oses"],
   setup(
     props: {
       filteredService: FilteredService,
       targetDurationDays: number
+      licenses: License[]
+      oses: OperatingSystem[]
     }) {
     const filteredService = ref<FilteredService>(props.filteredService);
     const targetDurationDays = ref(props.targetDurationDays)
+    const formatedLicense = ref<string>(null)
+    const formatedOs = ref<string[]>(null)
+
+    console.log("cards",filteredService)
+
+
+    formatedOs.value = filteredService.value.service.operating_systems.map(osId => {
+      const foundOs = props.oses.find(os => os.id === osId)
+      return foundOs ? foundOs.props.title : 'N/A'
+    })
+
+    const optLicense = props.licenses.filter(license => license.id == filteredService.value.service.license)
+    formatedLicense.value = optLicense.length > 0 ? optLicense[0].props.title : "N/A"
+
 
     const formatPriceMean = (calcPrice,offering) => {
       let periodName = "";
@@ -65,13 +86,12 @@ export default defineComponent({
       }
       return `$${calcPrice.toFixed(2)} / ${periodName} (paid each ${offering.name})`;
     }
-    console.log("Oberknecht")
-    console.log(filteredService)
-    console.log(targetDurationDays)
 
     return {
       filteredService,
-      formatPriceMean
+      formatPriceMean,
+      formatedLicense,
+      formatedOs
     };
   }
 });
@@ -79,11 +99,8 @@ export default defineComponent({
 
 <style scoped>
 .compact-card {
-  min-width: auto;
-  max-width: 100%;
+  min-height: 70%;
   max-height: 100%;
-  min-height: 100%;
-  display: flex;
   flex-direction: column;
 }
 
