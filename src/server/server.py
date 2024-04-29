@@ -28,7 +28,8 @@ from compolvo.models import Agent, AgentSoftware, Serializable, PackageManager, 
     BillingCycle, BillingCycleType, ServerStatus
 from compolvo.models import Service, OperatingSystem, Tag, UserRole, User, License, \
     ServiceOffering, ServicePlan
-from compolvo.utils import verify_password, hash_password, generate_secret, test_email
+from compolvo.utils import verify_password, hash_password, generate_secret, test_email, \
+    user_has_roles
 from compolvo.websockets import run_websocket_server, run_websocket_handler_queue_worker, \
     queue_websocket_msg
 
@@ -47,7 +48,7 @@ if STRIPE_API_KEY is not None:
     stripe.api_key = STRIPE_API_KEY
 
 db_hostname = os.environ[
-    "DB_HOSTNAME"]  # TODO: Make other parameters configurable via environment variables
+    "DB_HOSTNAME"]
 db_username = os.environ["DB_USERNAME"]
 db_password = os.environ["DB_PASSWORD"]
 db_database = os.environ["DB_DATABASE"]
@@ -477,12 +478,20 @@ async def update_user(request, user: User):
     return HTTPResponse(status=204)
 
 
-@user.delete("/")
-@protected()
+@user.delete("/admin")
+@protected({UserRole.Role.ADMIN})
 @delete_endpoint(User)
 async def delete_user(request, deleted_user: User, user):
     await stripe.Customer.delete_async(deleted_user.stripe_id)
-    # TODO: Make, so that admins can delete anyone, but everyone themselves
+
+
+@user.delete("/")
+@protected()
+async def delete_own_user(request, user: User):
+    if user.stripe_id is not None:
+        await stripe.Customer.delete_async(user.stripe_id)
+    await user.delete()
+    return HTTPResponse(status=204)
 
 
 @service.get("/")
@@ -848,10 +857,14 @@ async def delete_agent(request, agent, user):
 
 @agent.delete("/bulk")
 @protected()
-async def bulk_delete_agents(request, user):
+async def bulk_delete_agents(request, user: User):
     try:
         ids = request.json["ids"]
-        await Agent.filter(id__in=ids).all().delete()  # TODO: Check RBAC
+        if user_has_roles(user, {UserRole.Role.ADMIN}):
+            user_filter = {}
+        else:
+            user_filter = {"user": user}
+        await Agent.filter(id__in=ids, **user_filter).all().delete()
         return HTTPResponse(status=204)
     except KeyError:
         raise BadRequest("Missing parameters. Required: ids")
@@ -1041,14 +1054,65 @@ async def send_agent_queue_message(request, user):
 @license.get("/")
 @protected()
 @get_endpoint(License)
-async def get_licenses(request, user, licenses):
+async def get_licenses(request, licenses, user):
     pass
 
 
-@operating_system.get("")
+@license.post("/")
+@protected({UserRole.Role.ADMIN})
+async def create_license(request, user):
+    try:
+        name = request.json["name"]
+        license = await License.create(name=name)
+        return await license.json()
+    except (AttributeError, KeyError):
+        raise BadRequest("Expected parameter name.")
+
+
+@license.patch("/")
+@protected({UserRole.Role.ADMIN})
+@patch_endpoint(License)
+async def update_license(request, license, user):
+    pass
+
+
+@license.delete("/")
+@protected({UserRole.Role.ADMIN})
+@delete_endpoint(License)
+async def delete_license(request, license, user):
+    pass
+
+
+@operating_system.get("/")
 @protected()
 @get_endpoint(OperatingSystem)
 async def get_operating_systems(request, user, operating_systems):
+    pass
+
+
+@operating_system.post("/")
+@protected({UserRole.Role.ADMIN})
+async def create_operating_system(request, user):
+    try:
+        name = request.json["name"]
+        system_name = request.json["system_name"]
+        os = await OperatingSystem.create(name=name, system_name=system_name)
+        return os.json()
+    except (AttributeError, KeyError):
+        raise BadRequest("Expected parameters name and system_name.")
+
+
+@operating_system.patch("/")
+@protected({UserRole.Role.ADMIN})
+@patch_endpoint(OperatingSystem)
+async def update_operating_system(request, user, operating_system):
+    pass
+
+
+@operating_system.delete("/")
+@protected({UserRole.Role.ADMIN})
+@delete_endpoint(OperatingSystem)
+async def delete_operating_system(request, user, operating_system):
     pass
 
 
@@ -1326,7 +1390,6 @@ async def set_up_sigint_handler():
 
 
 # TODO: Add endpoints for creating, updating and deleting licenses + OSes
-# Queue for messages pending to be sent to respective agents
 
 app.add_task(run_websocket_server(app))
 app.add_task(run_websocket_handler_queue_worker())
