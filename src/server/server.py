@@ -1194,7 +1194,7 @@ async def stop_server(request, user):
 
 async def perform_billing_maintenance():
     if STRIPE_API_KEY is None:
-        logger.warning("Skipping billint maintenance as no stripe API key is found.")
+        logger.warning("Skipping billing maintenance as no stripe API key is found.")
         return
     performing_maintenance = await ServerStatus.filter(
         performing_billing_maintenance=True).count() > 0
