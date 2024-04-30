@@ -3,9 +3,9 @@ compact_card.vue
   <v-card :to="{path: 'detail', query:{id: filteredService.service.id} }" class="compact-card">
     <v-card-title>
           <v-img
+            contain
             height="200"
             aspect-ratio="16/9"
-            cover
             :src="filteredService.service.image"
           ></v-img>
           {{ filteredService.service.name }}
@@ -100,6 +100,7 @@ export default defineComponent({
 <style scoped>
 .compact-card {
   flex-direction: column;
+  border-radius: 5px;
 }
 
 .version {
