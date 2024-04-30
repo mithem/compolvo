@@ -1,12 +1,87 @@
+<template>
+  <v-card class="card">
+    <v-img
+      v-if="service != null"
+      contain
+      height="200"
+      width="100%"
+      aspect-ratio="16/9"
+      :src="'/static/images/'+ service.system_name + '.png'"
+      style="box-shadow: 10px 10px 1rem #555 "
+    ></v-img>
+
+
+    <v-dialog max-width="750">
+      <template v-slot:activator="{ props: activatorProps }">
+        <v-btn
+          v-bind="activatorProps"
+          color="blue"
+          prepend-icon="mdi-cart"
+        >
+          Order
+        </v-btn>
+      </template>
+      <template v-slot:default="{ isActive }">
+        <v-card class="pa-5">
+          <v-col>
+            <h1>New Order</h1>
+            <h3>For {{ service.name }}</h3><br/>
+            <v-progress-linear v-if="creating" indeterminate :height="5"></v-progress-linear>
+            Subscription mode:
+            <v-select
+              v-if="service !== null"
+              v-model="selectedOffering"
+              label="Select offering"
+              :items="selectableOfferings"
+              item-title="price"
+              item-value="id"
+            ></v-select>
+            <br/>
+
+            <div v-if="selectedOffering !== null">
+              {{ buyNowMsg }}
+            </div>
+
+            <v-card-actions>
+              <v-spacer/>
+              <v-btn
+                text="Buy now"
+                @click='createServicePlan(() => isActive.value=false)'
+              ></v-btn>
+            </v-card-actions>
+          </v-col>
+        </v-card>
+      </template>
+    </v-dialog>
+    <v-snackbar
+      v-model="showingSnackbar"
+      color="success"
+    >
+      {{ snackbarText }}
+      <template v-slot:actions>
+        <v-btn
+          variant="text"
+          @click="showingSnackbar=false"
+        >
+          Close
+        </v-btn>
+      </template>
+    </v-snackbar>
+
+  </v-card>
+
+
+</template>
+
 <script lang="ts">
-import {defineComponent, ref} from "vue";
+import {defineComponent, getCurrentInstance, onMounted, ref} from "vue";
+
 import {ServiceOffering} from "../components/models";
 
 interface SelectableOffering {
   props: { title: string, subtitle: string },
   id: string
 }
-
 export default defineComponent({
   setup() {
     const serviceId = ref("");
@@ -18,6 +93,7 @@ export default defineComponent({
     const showingSnackbar = ref(false);
     const snackbarText = ref("");
     const buyNowMsg = ref("");
+    const instance = getCurrentInstance().proxy
 
     const createServicePlan = async function (callback: () => void) {
       creating.value = true;
@@ -44,7 +120,7 @@ export default defineComponent({
     const fetchServiceData = async function () {
       loading.value = true;
       try {
-        const res = await fetch("/api/service?id=" + serviceId.value)
+        const res = await fetch("/api/service?id=" + instance.$route.query.id)
         if (!res.ok) {
           alert(await res.text())
         } else {
@@ -64,6 +140,8 @@ export default defineComponent({
       }
       loading.value = false;
     }
+
+    onMounted(fetchServiceData);
 
     return {
       serviceId,
@@ -92,70 +170,12 @@ export default defineComponent({
 });
 </script>
 
-<template>
-  <h1>Detail</h1>
-  <v-text-field
-    type="text"
-    v-model="serviceId"
-    placeholder="Service ID"
-    persistent-placeholder
-  >
-  </v-text-field>
-  <v-btn @click="fetchServiceData">Load service</v-btn>
-  <v-dialog max-width="750">
-    <template v-slot:activator="{ props: activatorProps }">
-      <v-btn
-        v-bind="activatorProps"
-        color="blue"
-        prepend-icon="mdi-cart"
-      >
-        Order
-      </v-btn>
-    </template>
-    <template v-slot:default="{ isActive }">
-      <v-card class="pa-5">
-        <v-col>
-          <h1>New Order</h1>
-          <h3>For {{ service.name }}</h3><br/>
-          <v-progress-linear v-if="creating" indeterminate :height="5"></v-progress-linear>
-          Subscription mode:
-          <v-select
-            v-if="service !== null"
-            v-model="selectedOffering"
-            label="Select offering"
-            :items="selectableOfferings"
-            item-title="price"
-            item-value="id"
-          ></v-select>
-          <br/>
+<style>
 
-          <div v-if="selectedOffering !== null">
-            {{ buyNowMsg }}
-          </div>
+.card {
+  width: 60%;
+  margin: 0 auto;
+  border-radius: 15px;
+}
 
-          <v-card-actions>
-            <v-spacer/>
-            <v-btn
-              text="Buy now"
-              @click='createServicePlan(() => isActive.value=false)'
-            ></v-btn>
-          </v-card-actions>
-        </v-col>
-      </v-card>
-    </template>
-  </v-dialog>
-  <v-snackbar
-    v-model="showingSnackbar"
-    color="success"
-  >
-    {{ snackbarText }}
-    <template v-slot:actions>
-      <v-btn
-        variant="text"
-        @click="showingSnackbar=false"
-      >
-        Close
-      </v-btn>
-    </template>
-  </v-snackbar>
-</template>
+</style>
