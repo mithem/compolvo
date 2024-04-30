@@ -33,7 +33,7 @@ compact_card.vue
 
     <!-- Download Count and Price -->
     <v-card-actions class="bottom-right">
-      <div>Downloads: {{ filteredService.service.download_count }}</div>
+      <div>Downloads: {{ formatLargeNumber(filteredService.service.download_count) }}</div>
       <div>Price: {{formatPriceMean(filteredService.calculatedPrice,filteredService.selectedOffering)}}</div>
     </v-card-actions>
   </v-card>
@@ -43,9 +43,11 @@ compact_card.vue
 import {defineComponent, ref} from 'vue';
 import {FilteredService} from '../pages/compare.vue';
 import {License, OperatingSystem} from "./models";
+import {formatLargeNumber} from "./utils";
 
 export default defineComponent({
   name: 'CompactCard',
+  methods: {formatLargeNumber},
   props: ["filteredService", "targetDurationDays", "licenses", "oses"],
   setup(
     props: {

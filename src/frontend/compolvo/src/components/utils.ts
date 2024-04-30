@@ -49,3 +49,19 @@ export function evaluatePasswordRules(password: string): boolean | string {
   return true;
 
 }
+
+export function formatLargeNumber(count: number): string {
+  const ordersOfMagnitude = {
+    3: "K",
+    6: "M",
+    9: "T",
+    12: "P"
+  }
+  for (const key of Object.keys(ordersOfMagnitude)) {
+    const treshold = 10 ** Number(key);
+    if (count >= treshold) {
+      return (Math.round(count / treshold * 100) / 100).toString() + ordersOfMagnitude[key]
+    }
+  }
+  return count.toString()
+}

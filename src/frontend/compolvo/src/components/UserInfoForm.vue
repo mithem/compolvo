@@ -12,6 +12,12 @@ export default defineComponent({
         return evaluatePasswordRules(value)
       }
     ],
+    currentPasswordRules: [
+      value => {
+        if (value == "") return "Field is required."
+        return true
+      }
+    ]
   }),
   setup(props: {
     user: UserMeObject
@@ -23,6 +29,7 @@ export default defineComponent({
     const confirmPassword = ref("");
     const showingSnackbar = ref(false);
     const snackbarText = ref<string>(null);
+    const oldUser = {...props.user}
 
     const confirmPasswordRules = [
       (value) => {
@@ -57,9 +64,9 @@ export default defineComponent({
 
     const saveInfo = async function () {
       const changedInfo = {
-        first_name: user.value.first_name != props.user.first_name ? user.value.first_name : undefined,
-        last_name: user.value.last_name != props.user.last_name ? user.value.last_name : undefined,
-        email: user.value.email != props.user.email ? user.value.email : undefined
+        first_name: user.value.first_name != oldUser.first_name ? user.value.first_name : undefined,
+        last_name: user.value.last_name != oldUser.last_name ? user.value.last_name : undefined,
+        email: user.value.email != oldUser.email ? user.value.email : undefined
       }
 
       if (newPassword.value !== "") {
@@ -152,7 +159,9 @@ export default defineComponent({
       <v-text-field
         v-model="currentPassword"
         type="password"
+        :rules="currentPasswordRules"
         label="Current password"
+        mandatory
       ></v-text-field>
       <v-text-field v-if="currentPassword !== ''"
                     v-model="newPassword"
