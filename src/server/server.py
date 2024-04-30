@@ -898,6 +898,13 @@ async def get_agent_software(request, software, user):
     pass
 
 
+@agent_software.get("/count")
+@protected()
+async def get_agent_software_count(request, user):
+    return json({
+        "count": await AgentSoftware.filter(agent__user=user).count()
+    })
+
 @agent_software.get("/")
 @protected()
 async def get_own_agent_software(request, user):

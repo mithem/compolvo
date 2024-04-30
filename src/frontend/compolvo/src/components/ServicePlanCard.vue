@@ -1,5 +1,6 @@
 <script lang="ts">
 import {defineComponent, ref} from "vue"
+import {ServicePlan} from "./models";
 
 interface SelectableAgent {
   props: {
@@ -31,6 +32,7 @@ export default defineComponent({
           alert(await res.text());
         } else {
           await fetchData();
+          this.$emit("reloadStats")
         }
       } catch (err) {
         alert(err)
@@ -90,6 +92,7 @@ export default defineComponent({
         } else {
           selectedAgents.value = []
           await callback()
+          this.$emit("reloadStats")
         }
       } catch (err) {
         alert(err)

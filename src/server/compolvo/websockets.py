@@ -39,9 +39,9 @@ async def handle_websocket_msg(agent_id: str, message: str) -> str | None:
         if set(status_data.keys()).issubset(
                 {"corrupt", "installed_version", "installing", "uninstalling"}):
             for key, value in status_data.items():
-                if value in ["true", "false"]:
+                if value.lower() in ["true", "false"]:
                     value = value == "true"
-                elif value in ["null", "None"]:
+                elif value.lower() in ["null", "none"]:
                     value = None
                 setattr(software, key, value)
             await software.save()
