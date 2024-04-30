@@ -898,6 +898,13 @@ async def get_agent_software(request, software, user):
     pass
 
 
+@agent_software.get("/count")
+@protected()
+async def get_agent_software_count(request, user):
+    return json({
+        "count": await AgentSoftware.filter(agent__user=user).count()
+    })
+
 @agent_software.get("/")
 @protected()
 async def get_own_agent_software(request, user):
@@ -1194,7 +1201,7 @@ async def stop_server(request, user):
 
 async def perform_billing_maintenance():
     if STRIPE_API_KEY is None:
-        logger.warning("Skipping billint maintenance as no stripe API key is found.")
+        logger.warning("Skipping billing maintenance as no stripe API key is found.")
         return
     performing_maintenance = await ServerStatus.filter(
         performing_billing_maintenance=True).count() > 0

@@ -11,6 +11,7 @@ export default defineComponent({
     const svcPlans = ref<ServicePlan[]>([]);
     const monthlyPrice = ref<number>(null);
     const agentCount = ref<number>(null);
+    const softwareCount = ref<number>(null);
     const me = ref<UserMeObject>(null);
     const loadingUserInfo = ref(false);
 
@@ -75,9 +76,28 @@ export default defineComponent({
       }
     }
 
+    const getSoftwareCount = async function () {
+      try {
+        const res = await fetch("/api/agent/software/count")
+        if (!res.ok) {
+          alert(await res.text())
+        } else {
+          const data = JSON.parse(await res.text())
+          softwareCount.value = data.count
+        }
+      } catch (err) {
+        alert(err)
+      }
+    }
+
+    const loadStats = async function () {
+      getAgentCount()
+      getSoftwareCount()
+    }
+
     onMounted(() => {
       fetchUserInfo()
-      getAgentCount()
+      loadStats()
       fetchServicePlans()
     })
 
@@ -87,11 +107,13 @@ export default defineComponent({
       deleting,
       monthlyPrice,
       agentCount,
+      softwareCount,
       me,
       loadingUserInfo,
       fetchServicePlans,
       deleteAccount,
-      fetchUserInfo
+      fetchUserInfo,
+      loadStats
     }
   }
 })
@@ -115,11 +137,16 @@ export default defineComponent({
           }}
         </v-card-text>
       </v-card>
+      <v-card class="stat-card" title="Software count">
+        <v-card-text class="stat-card-text">
+          {{ softwareCount != null ? softwareCount : "N/A" }}
+        </v-card-text>
+      </v-card>
     </v-container>
     <v-container>
       <v-row>
         <v-col cols="12" md="6" lg="4" v-for="plan in svcPlans" :key="plan.id">
-          <ServicePlanCard :service_plan="plan"></ServicePlanCard>
+          <ServicePlanCard @reloadStats="loadStats" :service_plan="plan"></ServicePlanCard>
         </v-col>
       </v-row>
     </v-container>

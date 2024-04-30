@@ -96,12 +96,16 @@ def handle_websocket_command(command: str) -> str | None:
     return None
 
 
+def generate_software_status(software_id: str, installed_version: str | None, corrupt=False,
+                             installing=False, uninstalling=False):
+    return f"software status {software_id} installed_version={installed_version};corrupt={corrupt};installing={installing};uninstalling={uninstalling}".lower()
+
 def run_playbook(system_name: str, software_id: str, playbook_name: str):
     playbook_url = f"http{'s' if config.compolvo.secure else ''}://{config.compolvo.host}/ansible/playbooks/{system_name}/{playbook_name}.yml"
     response = requests.get(playbook_url)
     if not response.ok:
         logger.error("Error fetching playbook from %s: %s", playbook_url, response.text)
-        return None
+        return generate_software_status(software_id, None, True, False, False)
     path = system_name + ".yml"
     with open(path, "w") as f:
         f.write(response.text)
@@ -109,8 +113,8 @@ def run_playbook(system_name: str, software_id: str, playbook_name: str):
     os.remove(path)
     installed_version = playbook_name if playbook_name != 'uninstall' else None
     if return_code == 0:
-        return f"software status {software_id} installed_version={installed_version};corrupt=false;installing=false;uninstalling=false"
-    return f"software status {software_id} installed_version={installed_version};corrupt=true;installing=false;uninstalling=false"
+        return generate_software_status(software_id, installed_version, False, False, False)
+    return generate_software_status(software_id, installed_version, True, False, False)
 
 
 async def run_websocket(retries: Optional[int] = 5):
