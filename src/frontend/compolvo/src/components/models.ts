@@ -57,12 +57,11 @@ export interface OperatingSystem {
 export interface DetailedService {
   id: string
   name: string
+  system_name: string
   description: string | null
   operating_systems: string[] | null
   license: string | null
   download_count: number | null
-  latest_version: string | null
-  image: string | "https://upload.wikimedia.org/wikipedia/commons/6/65/No-Image-Placeholder.svg"
   tags: Tag[]
   offerings: ServiceOffering[]
 }

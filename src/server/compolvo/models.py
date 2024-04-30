@@ -102,14 +102,15 @@ class Service(Model, Serializable):
     id = UUIDField(pk=True)
     name = TextField()
     system_name = TextField()
+    short_description = TextField(null=True)
     description = TextField(null=True)
     license = ForeignKeyField("models.License", "services")
     download_count = IntField(null=True)
-    image = TextField(null=True)
     tags = ManyToManyField("models.Tag", related_name="services")
     stripe_product_id = TextField(null=True)
 
-    fields = ["id", "system_name", "name", "description", "license", "download_count",
+    fields = ["id", "system_name", "name", "short_description", "description", "license",
+              "download_count",
               "image"]
 
 
@@ -184,6 +185,7 @@ class Agent(Model, Serializable):
     id = UUIDField(pk=True)
     name = TextField(null=True)
     user = ForeignKeyField("models.User", "agents")
+    connection_from_ip_address = TextField(null=True)
     last_connection_start = DatetimeField(null=True)
     last_connection_end = DatetimeField(null=True)
     connected = BooleanField(default=False)
@@ -191,7 +193,8 @@ class Agent(Model, Serializable):
     initialized = BooleanField(default=False)
     operating_system = ForeignKeyField("models.OperatingSystem", "agents", null=True)
 
-    fields = ["id", "name", "user", "last_connection_start", "last_connection_end", "connected",
+    fields = ["id", "name", "user", "connection_from_ip_address", "last_connection_start",
+              "last_connection_end", "connected",
               "connection_interrupted", "initialized", "operating_system"]
 
 

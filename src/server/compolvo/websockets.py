@@ -64,6 +64,7 @@ async def websocket_handler(ws: websockets.WebSocketServerProtocol):
     agent.last_connection_start = datetime.datetime.now()
     agent.connected = True
     agent.connection_interrupted = False
+    agent.connection_from_ip_address = str(ws.remote_address)
     await agent.save()
     await ws.send("login successful")
     logger.debug("Agent logged in successfully: %s", agent_id)

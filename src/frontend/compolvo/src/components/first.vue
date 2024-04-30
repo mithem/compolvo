@@ -1,6 +1,6 @@
 <template>
-  <v-app>
-    <v-main>
+  <div class="page-container-row">
+    <div class="page-container-cell">
       <div class="compolvo-container">
         <h1>{{ pageTitle }}</h1>
         <p>Willkommen auf der Compolvo-Seite!</p>
@@ -8,12 +8,12 @@
       <div class="image-container">
         <img src="@/assets/logo_compolvo.png" alt="Bildbeschreibung" class="styled-image">
       </div>
-    </v-main>
-  </v-app>
+    </div>
+  </div>
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue';
+import {ref} from 'vue';
 
 // Definiere den Seitentitel
 const pageTitle = ref('Compolvo');
@@ -22,9 +22,22 @@ const pageTitle = ref('Compolvo');
 </script>
 
 <style scoped>
+.page-container-row {
+  display: flex;
+  justify-content: center;
+  width: 100vw;
+}
+
+.page-container-col {
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+}
+
 .compolvo-container {
   text-align: center;
   margin-top: 50px;
+  position: relative;
 }
 
 h1 {

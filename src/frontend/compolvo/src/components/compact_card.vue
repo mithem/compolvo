@@ -6,13 +6,10 @@ compact_card.vue
             contain
             height="200"
             aspect-ratio="16/9"
-            :src="filteredService.service.image"
+            :src="'/static/images/' + filteredService.service.system_name + '.png'"
           ></v-img>
           {{ filteredService.service.name }}
     </v-card-title>
-
-    <!-- Service Version -->
-    <v-card-subtitle class="version">{{ filteredService.service.latest_version }}</v-card-subtitle>
 
     <!-- Service Description -->
     <v-card-text class="desc">{{ filteredService.service.description }}</v-card-text>
@@ -47,7 +44,7 @@ compact_card.vue
 
 <script lang="ts">
 import {defineComponent, ref} from 'vue';
-import { FilteredService } from '../pages/compare.vue';
+import {FilteredService} from '../pages/compare.vue';
 import {License, OperatingSystem} from "./models";
 
 export default defineComponent({

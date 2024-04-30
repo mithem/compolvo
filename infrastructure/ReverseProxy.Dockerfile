@@ -20,5 +20,6 @@ RUN . venv/bin/activate && python3 generate_playbooks.py generate
 
 RUN mkdir -p /var/www/html/compolvo/ansible
 RUN cp -r ansible/playbooks /var/www/html/compolvo/ansible/playbooks
+COPY images /var/www/html/compolvo/static/images
 
 ENTRYPOINT ["reverse-proxy-entrypoint.sh"]
