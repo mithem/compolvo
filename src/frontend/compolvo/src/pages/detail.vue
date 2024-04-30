@@ -7,7 +7,7 @@
       width="100%"
       aspect-ratio="16/9"
       :src="'/static/images/'+ service.system_name + '.png'"
-      class="elevation-10"
+      class="elevation-8"
     ></v-img>
     <!-- Service Name -->
     <v-card-title class="title">
@@ -18,23 +18,68 @@
       <div class="left-items">
         <span v-for="tag in service.tags" :key="tag.id" class="tag">{{ tag.label }}</span>
       </div>
+      <v-btn @click="scrollToBottom" variant="text" color="secondary">
+        <v-icon>
+          mdi-chevron-double-down
+        </v-icon>
+      </v-btn>
+
+      <!-- Downloads -->
       <div class="right-items">
         <span class="data-label">Downloads:</span> <span class="data-value">{{ service.download_count }}</span>
       </div>
     </div>
 
+
+    <!-- Operating Systems -->
     <div class="row">
       <div class="left-items">
         <span v-for="os in formatedOs" key="formatedOs" class="tag">{{os}}</span>
       </div>
+      <!-- License -->
       <div class="right-items">
         <span class="data-label">License:</span> <span class="data-value">{{ formatedLicense }}</span>
       </div>
     </div>
     <!-- Description -->
-    <v-card-text  class="desc">{{ service.description }}</v-card-text>
+    <div class="desc" v-html=compileMarkdownDescription()></div>
 
-
+    <v-sheet
+      class="mx-auto"
+      elevation="8"
+      max-width="100%"
+    >
+      <v-slide-group
+        class="pa-4"
+        selected-class="bg-primary"
+        show-arrows
+      >
+        <v-slide-group-item
+          v-for="n in 15"
+          :key="n"
+          v-slot="{ isSelected, toggle, selectedClass }"
+        >
+          <v-card
+            :class="['ma-4', selectedClass]"
+            color="grey-lighten-1"
+            height="200"
+            width="100"
+            @click="toggle"
+          >
+            <div class="d-flex fill-height align-center justify-center">
+              <v-scale-transition>
+                <v-icon
+                  v-if="isSelected"
+                  color="white"
+                  icon="mdi-close-circle-outline"
+                  size="48"
+                ></v-icon>
+              </v-scale-transition>
+            </div>
+          </v-card>
+        </v-slide-group-item>
+      </v-slide-group>
+    </v-sheet>
 
 
 
@@ -106,8 +151,8 @@
 
 <script lang="ts">
 import {defineComponent, getCurrentInstance, onMounted, ref} from "vue";
-
 import {DetailedService, License, OperatingSystem, ServiceOffering} from "../components/models";
+import {marked} from "marked";
 
 interface SelectableOffering {
   props: { title: string, subtitle: string },
@@ -129,6 +174,10 @@ export default defineComponent({
     const formatedOs = ref<string[]>(null)
     const licenses = ref<License[]>([])
     const oses = ref<OperatingSystem[]>([])
+
+    const compileMarkdownDescription= () => {
+      return marked(service.value.description)
+    }
 
     const createServicePlan = async function (callback: () => void) {
       creating.value = true;
@@ -216,6 +265,11 @@ export default defineComponent({
         formatedLicense.value = optLicense.length > 0 ? optLicense[0].props.title : "N/A"
       }
 
+    const  scrollToBottom= () => {
+      window.scrollTo({
+        top: document.body.scrollHeight,
+        behavior: 'smooth'
+      });}
 
     onMounted(async () => {
       await fetchLicenseOptions()
@@ -224,6 +278,7 @@ export default defineComponent({
     });
 
     return {
+      compileMarkdownDescription,
       licenses,
       oses,
       serviceId,
@@ -238,7 +293,8 @@ export default defineComponent({
       fetchServiceData,
       createServicePlan,
       formatedOs,
-      formatedLicense
+      formatedLicense,
+      scrollToBottom
     };
   },
   watch: {
@@ -260,7 +316,6 @@ export default defineComponent({
   width: 60%;
   margin: 0 auto;
   border-radius: 15px;
-  padding: 20px;
 }
 .title {
   margin: 20px;
@@ -291,7 +346,6 @@ export default defineComponent({
 }
 
 .tag {
-  margin: 20px;
   padding: 3px 8px;
   background-color: #e1e1e1;
   border-radius: 4px;
@@ -303,11 +357,13 @@ export default defineComponent({
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 20px
+  margin: 10px 20px;
 }
 
 .left-items {
   text-align: left;
+  display: flex;
+  gap: 20px;
 }
 
 .right-items {
