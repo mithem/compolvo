@@ -1,6 +1,6 @@
 compact_card.vue
 <template>
-  <v-card class="compact-card">
+  <v-card :to="{path: 'detail', query:{id: filteredService.service.id} }" class="compact-card">
     <v-card-title>
           <v-img
             height="200"
@@ -99,8 +99,6 @@ export default defineComponent({
 
 <style scoped>
 .compact-card {
-  min-height: 70%;
-  max-height: 100%;
   flex-direction: column;
 }
 
@@ -109,7 +107,7 @@ export default defineComponent({
 }
 
 .desc {
-  max-height: 100px;
+  height: 100px;
   overflow: auto;
 }
 
