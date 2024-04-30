@@ -59,6 +59,7 @@ export interface DetailedService {
   name: string
   system_name: string
   description: string | null
+  short_description: string | null
   operating_systems: string[] | null
   license: string | null
   download_count: number | null

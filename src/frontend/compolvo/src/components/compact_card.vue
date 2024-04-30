@@ -12,15 +12,12 @@ compact_card.vue
     </v-card-title>
 
     <!-- Service Description -->
-    <v-card-text class="desc">{{ filteredService.service.description }}</v-card-text>
+    <v-card-text class="desc">{{ filteredService.service.short_description }}</v-card-text>
 
     <!-- License -->
     <v-card-text>License: {{ formatedLicense }}</v-card-text>
 
-    <!-- Os
-    <v-card-text>Os: {{ formatedOs }}</v-card-text>
-    -->
-
+    <!-- Os -->
     <v-card-text>
       <div class="tags">
         <span v-for="os in formatedOs" key="formatedOs" class="tag">{{os}}</span>

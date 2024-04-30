@@ -1,14 +1,42 @@
 <template>
-  <v-card class="card">
+  <v-card class="card"  v-if="service != null">
+    <!-- Service Image -->
     <v-img
-      v-if="service != null"
       contain
       height="200"
       width="100%"
       aspect-ratio="16/9"
       :src="'/static/images/'+ service.system_name + '.png'"
-      style="box-shadow: 10px 10px 1rem #555 "
+      class="elevation-10"
     ></v-img>
+    <!-- Service Name -->
+    <v-card-title class="title">
+      {{ service.name }}
+    </v-card-title>
+    <!-- Service Tags -->
+    <div class="row">
+      <div class="left-items">
+        <span v-for="tag in service.tags" :key="tag.id" class="tag">{{ tag.label }}</span>
+      </div>
+      <div class="right-items">
+        <span class="data-label">Downloads:</span> <span class="data-value">{{ service.download_count }}</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="left-items">
+        <span v-for="os in formatedOs" key="formatedOs" class="tag">{{os}}</span>
+      </div>
+      <div class="right-items">
+        <span class="data-label">License:</span> <span class="data-value">{{ formatedLicense }}</span>
+      </div>
+    </div>
+    <!-- Description -->
+    <v-card-text  class="desc">{{ service.description }}</v-card-text>
+
+
+
+
 
 
     <v-dialog max-width="750">
@@ -69,6 +97,9 @@
     </v-snackbar>
 
   </v-card>
+  <v-progress-linear v-else color="blue" indeterminate :height="5">
+
+  </v-progress-linear>
 
 
 </template>
@@ -76,7 +107,7 @@
 <script lang="ts">
 import {defineComponent, getCurrentInstance, onMounted, ref} from "vue";
 
-import {ServiceOffering} from "../components/models";
+import {DetailedService, License, OperatingSystem, ServiceOffering} from "../components/models";
 
 interface SelectableOffering {
   props: { title: string, subtitle: string },
@@ -85,7 +116,7 @@ interface SelectableOffering {
 export default defineComponent({
   setup() {
     const serviceId = ref("");
-    const service = ref<Service>(null)
+    const service = ref<DetailedService>(null)
     const loading = ref(false);
     const creating = ref(false);
     const selectedOffering = ref<string>(null);
@@ -94,6 +125,10 @@ export default defineComponent({
     const snackbarText = ref("");
     const buyNowMsg = ref("");
     const instance = getCurrentInstance().proxy
+    const formatedLicense = ref<string>(null)
+    const formatedOs = ref<string[]>(null)
+    const licenses = ref<License[]>([])
+    const oses = ref<OperatingSystem[]>([])
 
     const createServicePlan = async function (callback: () => void) {
       creating.value = true;
@@ -135,15 +170,62 @@ export default defineComponent({
             }
           });
         }
+        formatData()
       } catch (err) {
         alert(err)
       }
       loading.value = false;
     }
 
-    onMounted(fetchServiceData);
+    const fetchOsOptions = async () => {
+      try {
+        const response = await fetch(`/api/operating-system`);
+        if (response.ok) {
+          oses.value = (await response.json()).map((os) => {
+            return {props: {title: os.name}, id: os.id}
+          });
+          console.log("oses", oses.value);  // Debugging line to see what's fetched
+        } else {
+          throw new Error('Failed to fetch');
+        }
+      } catch (error) {
+        console.error('Fetch error:', error);
+      }
+    }
+    const fetchLicenseOptions = async () => {
+      try {
+        const response = await fetch(`/api/license`);
+        if (response.ok) {
+          licenses.value = (await response.json()).map((license) => {
+            return {props: {title: license.name}, id: license.id}
+          });
+          console.log("licenses", licenses.value);  // Debugging line to see what's fetched
+        } else {
+          throw new Error('Failed to fetch');
+        }
+      } catch (error) {
+        console.error('Fetch error:', error);
+      }
+    }
+    const formatData = () => {
+        formatedOs.value = service.value.operating_systems.map(osId => {
+          const foundOs = oses.value.find(os => os.id === osId)
+          return foundOs ? foundOs.props.title : 'N/A'
+        })
+        const optLicense = licenses.value.filter(license => license.id == service.value.license)
+        formatedLicense.value = optLicense.length > 0 ? optLicense[0].props.title : "N/A"
+      }
+
+
+    onMounted(async () => {
+      await fetchLicenseOptions()
+      await fetchOsOptions()
+      await fetchServiceData()
+    });
 
     return {
+      licenses,
+      oses,
       serviceId,
       service,
       loading,
@@ -154,7 +236,9 @@ export default defineComponent({
       snackbarText,
       buyNowMsg,
       fetchServiceData,
-      createServicePlan
+      createServicePlan,
+      formatedOs,
+      formatedLicense
     };
   },
   watch: {
@@ -165,7 +249,7 @@ export default defineComponent({
       } else {
         this.buyNowMsg = "No offering selected."
       }
-    }
+    },
   }
 });
 </script>
@@ -176,6 +260,70 @@ export default defineComponent({
   width: 60%;
   margin: 0 auto;
   border-radius: 15px;
+  padding: 20px;
+}
+.title {
+  margin: 20px;
+  padding: 20px;
+  background-color: #333;
+  color: white;
+  text-align: center;
+  font-size: 24px;
+  font-weight: bold;
+  border-radius: 5px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+.desc {
+  padding: 15px;
+  line-height: 1.6;
+  font-size: 16px;
+  color: #444;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  margin: 20px;
+}
+.card {
+  width: 60%;
+  margin: 0 auto;
+  border-radius: 15px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  padding: 20px;
+}
+
+.tag {
+  margin: 20px;
+  padding: 3px 8px;
+  background-color: #e1e1e1;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  display: inline-block;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px
+}
+
+.left-items {
+  text-align: left;
+}
+
+.right-items {
+  margin-right: 20px;
+  text-align: right;
+}
+
+.data-label {
+  font-weight: bold;
+  color: #555;
+}
+
+.data-value {
+  font-size: 16px;
+  color: #000;
+  font-weight: bold;
 }
 
 </style>
