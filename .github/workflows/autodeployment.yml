@@ -43,3 +43,5 @@ jobs:
         run: cd $GITHUB_WORKSPACE/infrastructure && docker compose down
       - name: Compose up
         run: cd $GITHUB_WORKSPACE/infrastructure && docker compose up -d --build
+      - name: send mail
+        run: echo "Compolvo deployment completed." | mail -s "Deployment status" postmaster@localhost
