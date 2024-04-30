@@ -18,3 +18,34 @@ export function isHigherVersion(v1: string | null, v2: string | null): boolean {
   }
   return false;
 }
+
+export function evaluatePasswordRules(password: string): boolean | string {
+  if (password.length < 10) {
+    return "Password must have length of at least 10 characters."
+  }
+  const testCases = [
+    {
+      pattern: /[A-Z]/,
+      name: "uppercase characters"
+    },
+    {
+      pattern: /[a-z]/,
+      name: "lowercase characters"
+    },
+    {
+      pattern: /\d/,
+      name: "numbers"
+    },
+    {
+      pattern: /[?!@$%^&*-]/,
+      name: "special characters"
+    }
+  ]
+  for (const testCase of testCases) {
+    if (!testCase.pattern.test(password)) {
+      return "Password must contain " + testCase.name + "."
+    }
+  }
+  return true;
+
+}

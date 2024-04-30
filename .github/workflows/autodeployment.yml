@@ -1,0 +1,45 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Autodeployment docker compose dev
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "dev" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  
+env:
+  DB_PORT: ${{vars.DB_PORT}}
+  DB_HOSTNAME: ${{vars.DB_HOSTNAME}}
+  DB_DATABASE: ${{vars.DB_DATABASE}}
+  CORS_ORIGIN: ${{vars.CORS_ORIGIN}}
+  SERVER_NAME: ${{vars.SERVER_NAME}}
+  COMPOLVO_SERVER_HOSTNAME: ${{vars.COMPOLVO_SERVER_HOSTNAME}}
+  COMPOLVO_FRONTEND_HOSTNAME: ${{vars.COMPOLVO_FRONTEND_HOSTNAME}}
+  DB_USERNAME: ${{secrets.DB_USERNAME}}
+  DB_PASSWORD: ${{secrets.DB_PASSWORD}}
+  DB_ROOT_PASSWORD: ${{secrets.DB_ROOT_PASSWORD}}
+  COMPOLVO_SECRET_KEY: ${{secrets.COMPOLVO_SECRET_KEY}}
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: debian-4gb-nbg1-1
+    environment: Dev environment
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+      # Runs a single command using the runners shell
+      - name: Pull latest version
+        run: cd $GITHUB_WORKSPACE/infrastructure && git switch dev && git pull
+      - name: Compose down
+        run: cd $GITHUB_WORKSPACE/infrastructure && docker compose down
+      - name: Compose up
+        run: cd $GITHUB_WORKSPACE/infrastructure && docker compose up -d --build

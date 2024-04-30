@@ -1,73 +1,104 @@
+compact_card.vue
 <template>
-  <v-card class="compact-card">
+  <v-card :to="{path: 'detail', query:{id: filteredService.service.id} }" class="compact-card">
     <v-card-title>
-      <v-row no-gutters>
-        <v-col cols="12">
           <v-img
             height="200"
             aspect-ratio="16/9"
             cover
-            :src="serviceImage"
+            :src="filteredService.service.image"
           ></v-img>
-        </v-col>
-        <v-col cols="12" class="py-2 text-h6">
-          {{ serviceName }}
-        </v-col>
-      </v-row>
+          {{ filteredService.service.name }}
     </v-card-title>
 
     <!-- Service Version -->
-    <v-card-subtitle class="version">{{ serviceVersion }}</v-card-subtitle>
+    <v-card-subtitle class="version">{{ filteredService.service.latest_version }}</v-card-subtitle>
 
     <!-- Service Description -->
-    <v-card-text class="desc">{{ serviceDescription }}</v-card-text>
+    <v-card-text class="desc">{{ filteredService.service.description }}</v-card-text>
 
     <!-- License -->
-    <v-card-text>License: {{ license }}</v-card-text>
+    <v-card-text>License: {{ formatedLicense }}</v-card-text>
+
+    <!-- Os
+    <v-card-text>Os: {{ formatedOs }}</v-card-text>
+    -->
+
+    <v-card-text>
+      <div class="tags">
+        <span v-for="os in formatedOs" key="formatedOs" class="tag">{{os}}</span>
+      </div>
+    </v-card-text>
 
     <!-- Tags -->
     <v-card-text>
       <div class="tags">
-        <span v-for="tag in tags" :key="tag" class="tag">{{ tag }}</span>
+        <span v-for="tag in filteredService.service.tags" key="tag.id" class="tag">{{ tag.label }}</span>
       </div>
     </v-card-text>
 
     <!-- Download Count and Price -->
     <v-card-actions class="bottom-right">
-      <div>Downloads: {{ downloadCount }}</div>
-      <div>Price: {{ price }}</div>
+      <div>Downloads: {{ filteredService.service.download_count }}</div>
+      <div>Price: {{formatPriceMean(filteredService.calculatedPrice,filteredService.selectedOffering)}}</div>
     </v-card-actions>
   </v-card>
 </template>
 
 <script lang="ts">
-import {defineComponent} from 'vue';
+import {defineComponent, ref} from 'vue';
+import { FilteredService } from '../pages/compare.vue';
+import {License, OperatingSystem} from "./models";
 
 export default defineComponent({
   name: 'CompactCard',
-  props: {
-    serviceImage: String,
-    serviceName: String,
-    serviceVersion: String,
-    serviceDescription: String,
-    license: String,
-    tags: {
-      type: Array as () => string[],
-      default: () => []
-    },
-    downloadCount: Number,
-    price: Number,
+  props: ["filteredService", "targetDurationDays", "licenses", "oses"],
+  setup(
+    props: {
+      filteredService: FilteredService,
+      targetDurationDays: number
+      licenses: License[]
+      oses: OperatingSystem[]
+    }) {
+    const filteredService = ref<FilteredService>(props.filteredService);
+    const targetDurationDays = ref(props.targetDurationDays)
+    const formatedLicense = ref<string>(null)
+    const formatedOs = ref<string[]>(null)
+
+    console.log("cards",filteredService)
+
+
+    formatedOs.value = filteredService.value.service.operating_systems.map(osId => {
+      const foundOs = props.oses.find(os => os.id === osId)
+      return foundOs ? foundOs.props.title : 'N/A'
+    })
+
+    const optLicense = props.licenses.filter(license => license.id == filteredService.value.service.license)
+    formatedLicense.value = optLicense.length > 0 ? optLicense[0].props.title : "N/A"
+
+
+    const formatPriceMean = (calcPrice,offering) => {
+      let periodName = "";
+      switch (targetDurationDays.value) {
+        case 1: periodName = "day"; break
+        case 30: periodName = "month"; break
+        case 360: periodName = "year"; break
+      }
+      return `$${calcPrice.toFixed(2)} / ${periodName} (paid each ${offering.name})`;
+    }
+
+    return {
+      filteredService,
+      formatPriceMean,
+      formatedLicense,
+      formatedOs
+    };
   }
-})
+});
 </script>
 
 <style scoped>
 .compact-card {
-  min-width: auto;
-  max-width: 100%;
-  max-height: 100%;
-  min-height: 100%;
-  display: flex;
   flex-direction: column;
 }
 
@@ -76,7 +107,7 @@ export default defineComponent({
 }
 
 .desc {
-  max-height: 100px;
+  height: 100px;
   overflow: auto;
 }
 

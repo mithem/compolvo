@@ -5,7 +5,7 @@ services:
     container_name: compolvo-frontend
     build: ../src/frontend/compolvo
     ports:
-      - 3000:80
+      - 3000:3000
   mariadb:
     container_name: compolvo-mariadb
     image: mariadb:11.3
@@ -38,22 +38,24 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN}
       SERVER_NAME: ${SERVER_NAME}
       COMPOLVO_SECRET_KEY: ${COMPOLVO_SECRET_KEY}
+      SERVER_ID: ${SERVER_ID}
   reverse-proxy:
     container_name: compolvo-reverse-proxy
-    image: nginx:latest
-    volumes:
-      - ./reverse-proxy.conf:/etc/nginx/nginx.conf
+    image: compolvo-reverse-proxy
+    build:
+      context: .
+      dockerfile: ReverseProxy.Dockerfile
     ports:
       - target: 8080
         published: 8080
-    depends_on:
-      - frontend
-      - server
+    environment:
+      COMPOLVO_SERVER_HOSTNAME: ${COMPOLVO_SERVER_HOSTNAME}
+      COMPOLVO_FRONTEND_HOSTNAME: ${COMPOLVO_FRONTEND_HOSTNAME}
   ssl-terminal:
     container_name: compolvo-ssl
     image: nginx:latest
     volumes:
-      - ./ssl-terminal.conf:/etc/nginx/nginx.conf
+      - ./ssl-terminal.conf:/etc/nginx/nginx.conf:r
       - /etc/letsencrypt:/ssl
     ports:
       - target: 80

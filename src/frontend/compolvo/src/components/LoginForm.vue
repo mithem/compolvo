@@ -38,35 +38,34 @@
 
 <style scoped>
 </style>
-<script setup lang="ts">
+<script lang="ts">
 import {defineComponent, ref} from "vue";
 import Constants from "./Constants";
 
-const loading = ref(false)
-const email = ref("")
-const password = ref("")
 
-defineComponent({
+export default defineComponent({
   name: 'LoginForm',
   setup() {
-    return {email, password, loading}
+    const loading = ref(false)
+    const email = ref("")
+    const password = ref("")
+    const login = async function () {
+      loading.value = true
+      const params = new URLSearchParams(window.location.search)
+      const redirectUrl = params.get("redirect_url") || Constants.HOST_URL
+      try {
+        const res = await fetch(Constants.HOST_URL + "/api/login?redirect_url=" + redirectUrl + "&email=" + encodeURIComponent(email.value) + "&password=" + encodeURIComponent(password.value));
+        if (res.ok) {
+          document.location.href = redirectUrl
+        } else {
+          alert(await res.text())
+        }
+      } catch (err) {
+        alert(err);
+      }
+      loading.value = false
+    }
+    return {email, password, loading, login}
   },
 });
-
-async function login() {
-  loading.value = true
-  const params = new URLSearchParams(window.location.search)
-  const redirectUrl = params.get("redirect_url") || Constants.HOST_URL
-  try {
-    const res = await fetch(Constants.HOST_URL + "/api/login?redirect_url=" + redirectUrl + "&email=" + encodeURIComponent(email.value) + "&password=" + encodeURIComponent(password.value));
-    if (res.ok) {
-      document.location.href = redirectUrl
-    } else {
-      alert(await res.text())
-    }
-  } catch (err) {
-    alert(err);
-  }
-  loading.value = false
-}
 </script>

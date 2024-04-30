@@ -6,7 +6,9 @@ export interface AgentSoftware {
   corrupt: boolean
   latest_version: string
   offering: ServiceOffering
-  service: AgentService
+  service: Service
+  installing: boolean
+  uninstalling: boolean
 }
 
 export interface ServiceOffering {
@@ -18,21 +20,13 @@ export interface ServiceOffering {
   service: string
 }
 
-export interface AgentService {
+export interface DetailedServiceOffering {
   id: string
   name: string
-  description: string | null
-  license: string | null
-  download_count: number | null
-  retrieval_method: number | null
-  retrieval_data: string | null
-  latest_version: string | null
-  image: string | null
-}
-
-export interface Tag {
-  id: string
-  label: string
+  description: string
+  price: number
+  duration_days: number
+  service: Service
 }
 
 export interface Service {
@@ -41,10 +35,34 @@ export interface Service {
   description: string | null
   license: string | null
   download_count: number | null
-  retrieval_method: number | null
-  retrieval_data: string | null
-  latest_version: string | null
   image: string | null
+}
+
+export interface Tag {
+  id: string
+  props: { title: string }
+}
+
+export interface License {
+  id: string
+  props: { title: string }
+}
+
+export interface OperatingSystem {
+  id: string
+  props: { title: string }
+}
+
+
+export interface DetailedService {
+  id: string
+  name: string
+  description: string | null
+  operating_systems: string[] | null
+  license: string | null
+  download_count: number | null
+  latest_version: string | null
+  image: string | "https://upload.wikimedia.org/wikipedia/commons/6/65/No-Image-Placeholder.svg"
   tags: Tag[]
   offerings: ServiceOffering[]
 }
@@ -57,11 +75,35 @@ export interface Agent {
   lastConnectionEnd: Date;
   connected: boolean;
   connectionInterrupted: boolean;
+  initialized: boolean;
 }
 
-export interface User {
-  id: string;
-  email: string
+export interface ServicePlan {
+  id: string
+  user: string
+  service_offering: DetailedServiceOffering
+  start_date: string
+  end_date: string
+  canceled_by_user: boolean
+  installable: boolean
+}
+
+export interface UserRole {
+  id: string
+  role: number
+}
+
+export enum BillingCylce {
+  INDIVIDUAL
+}
+
+export interface UserMeObject {
+  id: string
   first_name: string
   last_name: string
+  email: string
+  roles: UserRole[]
+  connected_to_billing_provider: boolean
+  has_payment_method: boolean
+  billing_cycle: BillingCylce
 }
