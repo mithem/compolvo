@@ -116,35 +116,33 @@ def run_playbook(system_name: str, software_id: str, playbook_name: str):
 async def run_websocket(retries: Optional[int] = 5):
     uri = f"ws{'s' if config.compolvo.secure else ''}://{config.compolvo.host}/api/agent/ws"
     logger.debug("logging in to WebSocket at %s", uri)
-    retry = False
-    try:
-        async with websockets.connect(uri) as ws:
-            login_msg = f"login agent {config.agent.id}"
-            await ws.send(login_msg)
-            response = await ws.recv()
-            if response == "login successful":
-                logger.info("Logged in successfully.")
-            else:
-                logger.info("Error logging in: %s", response)
-            try:
-                while True:
-                    data = await ws.recv()
-                    logger.debug("received %s", data)
-                    data = handle_websocket_command(data)
-                    if data is not None:
-                        logger.debug("Sending %s", data)
-                        await ws.send(data)
-            except KeyboardInterrupt:
-                return
-            except Exception as e:
-                logger.error(e)
-                retry = True
-    except Exception as e:
-        logger.error(e)
-        retry = True
-    if retry and (retries is None or retries > 0):
+    while retries is None or retries > 0:
+        try:
+            async with websockets.connect(uri) as ws:
+                login_msg = f"login agent {config.agent.id}"
+                await ws.send(login_msg)
+                response = await ws.recv()
+                if response == "login successful":
+                    logger.info("Logged in successfully.")
+                else:
+                    logger.info("Error logging in: %s", response)
+                try:
+                    while True:
+                        data = await ws.recv()
+                        logger.debug("received %s", data)
+                        data = handle_websocket_command(data)
+                        if data is not None:
+                            logger.debug("Sending %s", data)
+                            await ws.send(data)
+                except KeyboardInterrupt:
+                    return
+                except Exception as e:
+                    logger.error(e)
+        except Exception as e:
+            logger.error(e)
+            if retries is not None:
+                retries = retries - 1
         await asyncio.sleep(1)
-        return await run_websocket(None if retries is None else retries - 1)
 
 
 class OperatingSystem(enum.StrEnum):

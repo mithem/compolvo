@@ -110,8 +110,7 @@ class Service(Model, Serializable):
     stripe_product_id = TextField(null=True)
 
     fields = ["id", "system_name", "name", "short_description", "description", "license",
-              "download_count",
-              "image"]
+              "download_count"]
 
 
 class OperatingSystem(Model, Serializable):
