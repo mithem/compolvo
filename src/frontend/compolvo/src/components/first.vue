@@ -1,5 +1,5 @@
 <template>
-  <div class="page-container-row">
+  <div class="page-container">
     <div class="page-container-cell">
       <div class="compolvo-container">
         <h1>{{ pageTitle }}</h1>
@@ -22,16 +22,17 @@ const pageTitle = ref('Compolvo');
 </script>
 
 <style scoped>
-.page-container-row {
+.page-container {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   width: 100vw;
 }
 
-.page-container-col {
-  display: flex;
-  justify-content: center;
-  flex-direction: column;
+.page-container-cell {
+  height: fit-content;
+  position: relative;
+  top: -10rem;
 }
 
 .compolvo-container {

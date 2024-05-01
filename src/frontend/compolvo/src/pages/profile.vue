@@ -23,7 +23,6 @@ export default defineComponent({
           alert(await res.text())
         } else {
           let text = await res.text();
-          console.log(text)
           svcPlans.value = JSON.parse(text)
           monthlyPrice.value = Math.round(svcPlans.value.map((plan) => {
             return plan.service_offering.price / plan.service_offering.duration_days

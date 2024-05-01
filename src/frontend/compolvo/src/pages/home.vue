@@ -1,7 +1,7 @@
 <template>
   <v-container fluid>
-    <v-container fluid style="display: flex">
-      <v-container>
+    <v-container fluid class="container-row">
+      <div>
         <h2 @loggedIn="firstName = $event">Hello<span
           v-if="firstName !== null">, {{ firstName }}</span>!</h2>
         <div v-if="updates !== 0">There <span v-if="updates === 1">is</span><span v-else>are</span>
@@ -14,14 +14,15 @@
           <RouterLink class="link" to="/agents">agent panel</RouterLink>
           .<br/></span>
           <span v-else>You can install software on your agents from the
-            <RouterLink class="link" to="/profile">profile tab</RouterLink>.</span>
+            <RouterLink class="link" to="/profile"
+                        color="secondary">profile tab</RouterLink>.</span>
           Or check out new Software in the
           <RouterLink class="link" to="/compare">compare tab</RouterLink>
           .
         </div>
         <br/>
         <v-progress-linear v-if="loading" indeterminate></v-progress-linear>
-      </v-container>
+      </div>
       <v-btn prepend-icon="mdi-refresh" @click="refresh">Refresh</v-btn>
     </v-container>
     <v-container>
@@ -33,6 +34,14 @@
     </v-container>
   </v-container>
 </template>
+
+<style scoped>
+.container-row {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+</style>
 
 <script lang="ts">
 import {defineComponent, onMounted, ref} from 'vue';

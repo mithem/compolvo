@@ -1,6 +1,6 @@
 <template>
-  <div class="card-container">
-    <v-card class="form-card">
+  <div class="form-card-container">
+    <v-card class="form-card" title="Login">
       <v-form @submit.prevent="login">
         <v-col>
           <v-text-field
@@ -37,6 +37,14 @@
 </template>
 
 <style scoped>
+.form-card-container {
+  min-width: 200px;
+  width: 40vw;
+  max-width: 800px;
+  margin: 0 auto;
+  position: relative;
+  top: -10rem;
+}
 </style>
 <script lang="ts">
 import {defineComponent, ref} from "vue";

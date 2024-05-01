@@ -11,11 +11,6 @@
 
 </script>
 
-<style>
-/* Global styles */
-html, body, .v-application {
-  background-color: #E0E0E0; /* Light grey background */
-}
-</style>
 <style src="@/styles/global.scss"></style>
+<style src="@/styles/main.css"></style>
 

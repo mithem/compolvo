@@ -1,9 +1,15 @@
-<script setup lang="ts"></script>
-
 <template>
   <v-toolbar>
     <v-toolbar-title style="cursor: pointer" @click="$router.push('/')">Compolvo</v-toolbar-title>
     <v-toolbar-items>
+      <v-switch
+        v-model="themeMode"
+        true-value="dark"
+        false-value="light"
+        indeterminate
+        prepend-icon="mdi-theme-light-dark"
+      >
+      </v-switch>
       <v-btn
         v-for="item in menuItems"
         :key="item.title"
@@ -17,6 +23,9 @@
 
 <script lang="ts">
 
+import {ref} from "vue";
+import {useTheme} from "vuetify";
+
 export default {
   name: "Compolvo",
   data() {
@@ -26,8 +35,37 @@ export default {
       menuItems: []
     }
   },
+  setup() {
+    const theme = useTheme();
+    const themeMode = ref(localStorage.getItem("compolvo-theme") || "auto");
+
+    const autoThemeHandler = (query) => {
+      theme.global.name.value = query.matches ? "dark" : "light"
+    }
+    const darkMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+    return {theme, themeMode, darkMediaQuery, autoThemeHandler}
+  },
   mounted() {
     this.setMenuItems()
+    if (this.themeMode === "auto" || this.themeMode === null) {
+      this.darkMediaQuery.addEventListener("change", this.autoThemeHandler)
+    } else {
+      this.theme.global.name.value = this.themeMode
+    }
+  },
+  watch: {
+    themeMode(scheme) {
+      if (scheme != null) {
+        localStorage.setItem("compolvo-theme", scheme)
+      }
+      this.darkMediaQuery.removeEventListener("change", this.autoThemeHandler)
+      if (scheme === "auto") {
+        this.darkMediaQuery.addEventListener("change", this.autoThemeHandler)
+      } else {
+        this.theme.global.name.value = scheme
+      }
+    }
   },
   methods: {
     async isLoggedIn(): Promise<boolean> {

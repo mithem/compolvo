@@ -1,0 +1,8 @@
+.link {
+    color: rgb(var(--v-theme-link)) !important;
+    text-decoration: none !important;
+}
+
+.link:hover {
+    color: rgb(var(--v-theme-on-link)) !important;
+}
