@@ -44,6 +44,8 @@ app.config.SESSION_TIMEOUT = 60 * 60
 
 SERVER_ID = os.environ["SERVER_ID"]
 STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY")
+if STRIPE_API_KEY == "":  # e.g. when docker compose doesn't find the key in the .env file
+    STRIPE_API_KEY = None
 if STRIPE_API_KEY is not None:
     stripe.api_key = STRIPE_API_KEY
 
@@ -1210,10 +1212,13 @@ async def perform_billing_maintenance():
         return
     logger.info("Performing billing maintenance...")
     await update_server_status(billing_maintenance=True)
-    await set_up_stripe_products()
-    users = await User.all()
-    for user in users:
-        await evaluate_billing_for_user(user)
+    try:
+        await set_up_stripe_products()
+        users = await User.all()
+        for user in users:
+            await evaluate_billing_for_user(user)
+    except Exception as e:
+        logger.exception(e)
     await update_server_status(billing_maintenance=False)
     logger.info("Billing maintenance complete")
 

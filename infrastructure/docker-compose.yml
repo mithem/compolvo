@@ -39,6 +39,7 @@ services:
       SERVER_NAME: ${SERVER_NAME}
       COMPOLVO_SECRET_KEY: ${COMPOLVO_SECRET_KEY}
       SERVER_ID: ${SERVER_ID}
+      STRIPE_API_KEY: ${STRIPE_API_KEY}
   reverse-proxy:
     container_name: compolvo-reverse-proxy
     image: compolvo-reverse-proxy
