@@ -51,16 +51,16 @@ export function evaluatePasswordRules(password: string): boolean | string {
 }
 
 export function formatLargeNumber(count: number): string {
-  const ordersOfMagnitude = {
-    3: "K",
-    6: "M",
-    9: "T",
-    12: "P"
-  }
-  for (const key of Object.keys(ordersOfMagnitude)) {
-    const treshold = 10 ** Number(key);
+  const ordersOfMagnitude = [
+    [12, "T"],
+    [9, "B"],
+    [6, "M"],
+    [3, "K"]
+  ]
+  for (const magnitude of ordersOfMagnitude) {
+    const treshold = 10 ** Number(magnitude[0]);
     if (count >= treshold) {
-      return (Math.round(count / treshold * 100) / 100).toString() + ordersOfMagnitude[key]
+      return (Math.round(count / treshold * 10) / 10).toString() + magnitude[1]
     }
   }
   return count.toString()
