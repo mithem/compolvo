@@ -15,14 +15,14 @@ import "@/styles/global.scss"
 // https://vuetifyjs.com/en/introduction/why-vuetify/#feature-guides
 export default createVuetify({
   theme: {
-    defaultTheme:'light',
+    defaultTheme: 'light',
     themes: {
       light: {
         dark: false,
         colors: {
           link: "#0d5aa7",
           "on-link": "#3288de"
-        },
+        }
       },
       dark: {
         dark: true,

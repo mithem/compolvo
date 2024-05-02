@@ -24,7 +24,8 @@ export default defineComponent({
         } else {
           let text = await res.text();
           svcPlans.value = JSON.parse(text)
-          monthlyPrice.value = Math.round(svcPlans.value.map((plan) => {
+          const activePlans = svcPlans.value.filter(plan => !plan.canceled_by_user)
+          monthlyPrice.value = Math.round(activePlans.map((plan) => {
             return plan.service_offering.price / plan.service_offering.duration_days
           })
             .reduce((cost, newCost) => cost + newCost, 0) * 30 * 100) / 100
@@ -145,7 +146,8 @@ export default defineComponent({
     <v-container>
       <v-row>
         <v-col cols="12" md="6" lg="4" v-for="plan in svcPlans" :key="plan.id">
-          <ServicePlanCard @reloadStats="loadStats" :service_plan="plan"></ServicePlanCard>
+          <ServicePlanCard @reloadStats="loadStats();fetchServicePlans()"
+                           :service_plan="plan"></ServicePlanCard>
         </v-col>
       </v-row>
     </v-container>
