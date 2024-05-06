@@ -15,11 +15,11 @@ export default defineComponent({
           key: "id"
         },
         {title: "Name", key: "name"},
-        {title: "User", key: "user"},
-        {title: "Last connection start", key: "lastConnectionStart"},
-        {title: "Last connection end", key: "lastConnectionEnd"},
         {title: "Connected", key: "connected"},
-        {title: "Connection interrupted", key: "connectionInterrupted"},
+        {title: "IP address", key: "connection_from_ip_address"},
+        {title: "Last connection start", key: "last_connection_start"},
+        {title: "Last connection end", key: "last_connection_end"},
+        {title: "Connection interrupted", key: "connection_interrupted"},
         {title: "Initialized", key: "initialized"}
       ]
     }
@@ -122,7 +122,7 @@ export default defineComponent({
 </script>
 
 <template>
-  <v-card class="ma-10 pa-7">
+  <v-card class="agent-card">
     <div v-if="this.agents.length === 0" class="mb-5">No agents. Add a new one in the toolbar.</div>
     <v-data-table
       v-model="selectedAgents"
@@ -212,5 +212,9 @@ export default defineComponent({
 </template>
 
 <style scoped>
-
+.agent-card {
+  margin: 10px;
+  padding: 7px;
+  width: 100vw;
+}
 </style>

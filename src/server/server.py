@@ -344,6 +344,24 @@ async def set_up_demo_db(user: User, services: bool = False,
                 price=29.99,
                 duration_days=90
             )
+            off_nginx_month = await ServiceOffering.create(
+                service=svc_nginx,
+                name="month",
+                price=11.99,
+                duration_days=30
+            )
+            off_nginx_2y = await ServiceOffering.create(
+                service=svc_nginx,
+                name="2-year",
+                price=149.99,
+                duration_days=360 * 2
+            )
+            off_nginx_3y = await ServiceOffering.create(
+                service=svc_nginx,
+                name="3-year",
+                price=239.99,
+                duration_days=360 * 3
+            )
             if service_plans:
                 plan_docker = await ServicePlan.create(
                     user=user,
@@ -549,7 +567,8 @@ async def get_services(request, services, user):
             **await svc.to_dict(),
             "tags": [await tag.to_dict() for tag in await svc.tags],
             "offerings": [await offering.to_dict() for offering in
-                          await ServiceOffering.filter(service=svc).all()],
+                          await ServiceOffering.filter(service=svc).order_by(
+                              "duration_days").all()],
             "operating_systems": oses,
         }
 
@@ -912,6 +931,7 @@ async def get_agent_software_count(request, user):
     return json({
         "count": await AgentSoftware.filter(agent__user=user).count()
     })
+
 
 @agent_software.get("/")
 @protected()
@@ -1305,6 +1325,12 @@ def get_stripe_recurring_object_for_service_offering(offering: ServiceOffering) 
         case "year":
             interval = "year"
             interval_count = 1
+        case "2-year":
+            interval = "year"
+            interval_count = 2
+        case "3-year":
+            interval = "year"
+            interval_count = 3
         case _:
             raise ValueError(
                 f"Offering {offering.id} has invalid name for stripe sync: {offering.name}")
