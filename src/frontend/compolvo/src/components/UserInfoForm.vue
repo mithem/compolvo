@@ -207,4 +207,8 @@ export default defineComponent({
 .no-space-between {
   justify-content: normal;
 }
+
+.form-card {
+  width: 100%;
+}
 </style>

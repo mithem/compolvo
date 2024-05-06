@@ -120,10 +120,10 @@ export default defineComponent({
 </script>
 
 <template>
-  <v-container fluid>
-    <h1>Profile (+ Status)</h1>
+  <div class="profile-container">
+    <h1>Profile</h1>
     <v-progress-linear v-if="loading" indeterminate></v-progress-linear>
-    <v-container class="stats-container">
+    <div class="stats-container">
       <v-card class="stat-card" title="Total service plans">
         <v-card-text class="stat-card-text">{{ svcPlans.length }}</v-card-text>
       </v-card>
@@ -142,21 +142,23 @@ export default defineComponent({
           {{ softwareCount != null ? softwareCount : "N/A" }}
         </v-card-text>
       </v-card>
-    </v-container>
-    <v-container>
+    </div>
+    <div>
       <v-row>
         <v-col cols="12" md="6" lg="4" v-for="plan in svcPlans" :key="plan.id">
           <ServicePlanCard @reloadStats="loadStats();fetchServicePlans()"
                            :service_plan="plan"></ServicePlanCard>
         </v-col>
       </v-row>
-    </v-container>
-    <div v-if="me != null">
-      <UserInfoForm :user=me></UserInfoForm>
     </div>
-    <div v-else-if="loadingUserInfo">
-      Loading user info...
-      <v-progress-linear indeterminate></v-progress-linear>
+    <div class="form-container">
+      <div v-if="me != null" class="user-form-container">
+        <UserInfoForm :user=me></UserInfoForm>
+      </div>
+      <div v-else-if="loadingUserInfo">
+        Loading user info...
+        <v-progress-linear indeterminate></v-progress-linear>
+      </div>
     </div>
     <v-btn
       @click="deleteAccount"
@@ -164,7 +166,7 @@ export default defineComponent({
       color="red"
     >Delete account
     </v-btn>
-  </v-container>
+  </div>
 </template>
 
 <style scoped>
@@ -177,10 +179,30 @@ export default defineComponent({
 .stat-card {
   flex-basis: 100%;
   border-radius: 10px;
+  min-width: 150px;
 }
 
 .stat-card-text {
   font-size: 20px;
   font-weight: bold;
+}
+
+.profile-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin: 20px;
+  justify-content: center;
+  width: 100%;
+}
+
+.form-container {
+  display: flex;
+  justify-content: center;
+}
+
+.user-form-container {
+  width: 100%;
+  max-width: 1000px;
 }
 </style>
