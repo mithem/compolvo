@@ -190,6 +190,12 @@ async def set_up_demo_db(user: User, services: bool = False,
                 name="macOS",
                 system_name="macOS"
             )
+        os_man = await OperatingSystem.filter(system_name="manjaro").first()
+        if os_man is None:
+            os_man = await OperatingSystem.create(
+                name="Manjaro",
+                system_name="manjaro"
+            )
         pm_apt = await PackageManager.create(
             name="apt (debian stable)"
         )
