@@ -14,13 +14,14 @@ export default defineComponent({
     const softwareCount = ref<number>(null);
     const me = ref<UserMeObject>(null);
     const loadingUserInfo = ref(false);
+    const error = ref<Error | null>(null);
 
     const fetchServicePlans = async function () {
       loading.value = true
       try {
         const res = await fetch("/api/service/plan")
         if (!res.ok) {
-          alert(await res.text())
+          error.value = new Error(await res.text())
         } else {
           let text = await res.text();
           svcPlans.value = JSON.parse(text)
@@ -31,7 +32,7 @@ export default defineComponent({
             .reduce((cost, newCost) => cost + newCost, 0) * 30 * 100) / 100
         }
       } catch (err) {
-        alert(err)
+        error.value = err
       }
       loading.value = false
     }
@@ -40,7 +41,7 @@ export default defineComponent({
       loadingUserInfo.value = true
       const res = await fetch("/api/user/me")
       if (!res.ok) {
-        alert(await res.text())
+        error.value = new Error(await res.text())
       } else {
         me.value = await res.json()
       }
@@ -58,7 +59,7 @@ export default defineComponent({
       if (res.ok) {
         document.location.pathname = "/"
       } else {
-        alert(await res.text())
+        error.value = new Error(await res.text())
       }
     }
 
@@ -66,13 +67,13 @@ export default defineComponent({
       try {
         const res = await fetch("/api/agent/count")
         if (!res.ok) {
-          alert(await res.text())
+          error.value = new Error(await res.text())
         } else {
           const data = JSON.parse(await res.text())
           agentCount.value = data.count
         }
       } catch (err) {
-        alert(err)
+        error.value = err
       }
     }
 
@@ -80,13 +81,13 @@ export default defineComponent({
       try {
         const res = await fetch("/api/agent/software/count")
         if (!res.ok) {
-          alert(await res.text())
+          error.value = new Error(await res.text())
         } else {
           const data = JSON.parse(await res.text())
           softwareCount.value = data.count
         }
       } catch (err) {
-        alert(err)
+        error.value = err
       }
     }
 
@@ -110,6 +111,7 @@ export default defineComponent({
       softwareCount,
       me,
       loadingUserInfo,
+      error,
       fetchServicePlans,
       deleteAccount,
       fetchUserInfo,
@@ -122,6 +124,7 @@ export default defineComponent({
 <template>
   <div class="profile-container">
     <h1>Profile</h1>
+    <ErrorPanel v-if="error != null" :error=error/>
     <v-progress-linear v-if="loading" indeterminate></v-progress-linear>
     <div class="stats-container">
       <v-card class="stat-card" title="Total service plans">
@@ -192,7 +195,6 @@ export default defineComponent({
   flex-direction: column;
   gap: 20px;
   margin: 20px;
-  justify-content: center;
   width: 100%;
 }
 

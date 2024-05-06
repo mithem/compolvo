@@ -33,14 +33,19 @@ export default defineComponent({
     const deleting = ref(false);
     const creating = ref(false);
     const newAgentID = ref<string>(null);
+    const error = ref<Error | null>(null);
     const loadAgents = async function () {
       loading.value = true;
-      const res = await fetch("/api/agent");
-      if (!res.ok) {
-        alert(await res.text());
-      } else {
-        agents.value = JSON.parse(await res.text());
-        await filterAgents();
+      try {
+        const res = await fetch("/api/agent");
+        if (!res.ok) {
+          error.value = new Error(await res.text())
+        } else {
+          agents.value = JSON.parse(await res.text());
+          await filterAgents();
+        }
+      } catch (err) {
+        error.value = err
       }
       loading.value = false
     }
@@ -62,12 +67,12 @@ export default defineComponent({
           })
         });
         if (!res.ok) {
-          alert(await res.text());
+          error.value = new Error(await res.text());
         } else {
           await loadAgents();
         }
       } catch (err) {
-        alert(err)
+        error.value = err
       }
       deleting.value = false;
     }
@@ -79,14 +84,14 @@ export default defineComponent({
           method: "POST"
         })
         if (!res.ok) {
-          alert(await res.text());
+          error.value = new Error(await res.text());
         } else {
           const data = JSON.parse(await res.text())
           newAgentID.value = data.id
           await copyAgentID()
         }
       } catch (err) {
-        alert(err)
+        error.value = err
       }
       creating.value = false;
     }
@@ -105,6 +110,7 @@ export default defineComponent({
       deleting,
       creating,
       newAgentID,
+      error,
       loadAgents,
       filterAgents,
       deleteAgents,
@@ -123,6 +129,7 @@ export default defineComponent({
 
 <template>
   <v-card class="agent-card">
+    <ErrorPanel v-if="error != null" :error=error/>
     <div v-if="this.agents.length === 0" class="mb-5">No agents. Add a new one in the toolbar.</div>
     <v-data-table
       v-model="selectedAgents"
