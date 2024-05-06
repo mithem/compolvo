@@ -20,3 +20,8 @@
         {% else %}
         state: {{ state }}
         {% endif %}
+    - name: Manjaro
+      when: ansible_distribution == "Manjaro"
+      community.general.pacman:
+        name: {{ pacman_package }}
+        state: {{ state }}

@@ -1,6 +1,6 @@
 services:
   - system_name: nginx
-    template: apt_homebrew_choco.yml.jinja
+    template: apt_homebrew_choco_pacman.yml.jinja
     versions:
       - 1.25.5
       - 1.25.4
