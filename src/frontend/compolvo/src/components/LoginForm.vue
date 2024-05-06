@@ -2,7 +2,7 @@
   <div class="form-card-container">
     <v-card class="form-card" title="Login">
       <v-card-item v-if="error != null">
-        <ErrorPanel :error=error/>
+        <ErrorPanel :error=error />
       </v-card-item>
       <v-form @submit.prevent="login">
         <v-col>

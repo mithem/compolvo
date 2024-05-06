@@ -2,7 +2,7 @@
   <v-container fluid>
     <v-container fluid class="container-row">
       <div>
-        <ErrorPanel v-if="error != null" :error=error/>
+        <ErrorPanel v-if="error != null" :error=error />
         <h2 @loggedIn="firstName = $event">Hello<span
           v-if="firstName !== null">, {{ firstName }}</span>!</h2>
         <div v-if="updates !== 0">There <span v-if="updates === 1">is</span><span v-else>are</span>

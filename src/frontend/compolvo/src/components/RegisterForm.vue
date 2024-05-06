@@ -2,7 +2,7 @@
   <div class="card-container">
     <v-card class="form-card" title="Register">
       <v-card-item v-if="error != null">
-        <ErrorPanel :error=error/>
+        <ErrorPanel :error=error />
       </v-card-item>
       <v-form @submit.prevent="validate" fast-fail validate-on="input" ref="form">
         <v-col>

@@ -129,7 +129,7 @@ export default defineComponent({
 
 <template>
   <v-card class="agent-card">
-    <ErrorPanel v-if="error != null" :error=error/>
+    <ErrorPanel v-if="error != null" :error=error />
     <div v-if="this.agents.length === 0" class="mb-5">No agents. Add a new one in the toolbar.</div>
     <v-data-table
       v-model="selectedAgents"

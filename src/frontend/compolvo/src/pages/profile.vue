@@ -124,7 +124,7 @@ export default defineComponent({
 <template>
   <div class="profile-container">
     <h1>Profile</h1>
-    <ErrorPanel v-if="error != null" :error=error/>
+    <ErrorPanel v-if="error != null" :error=error />
     <v-progress-linear v-if="loading" indeterminate></v-progress-linear>
     <div class="stats-container">
       <v-card class="stat-card" title="Total service plans">
