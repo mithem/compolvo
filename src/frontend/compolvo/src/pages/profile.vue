@@ -14,13 +14,14 @@ export default defineComponent({
     const softwareCount = ref<number>(null);
     const me = ref<UserMeObject>(null);
     const loadingUserInfo = ref(false);
+    const error = ref<Error | null>(null);
 
     const fetchServicePlans = async function () {
       loading.value = true
       try {
         const res = await fetch("/api/service/plan")
         if (!res.ok) {
-          alert(await res.text())
+          error.value = new Error(await res.text())
         } else {
           let text = await res.text();
           svcPlans.value = JSON.parse(text)
@@ -31,7 +32,7 @@ export default defineComponent({
             .reduce((cost, newCost) => cost + newCost, 0) * 30 * 100) / 100
         }
       } catch (err) {
-        alert(err)
+        error.value = err
       }
       loading.value = false
     }
@@ -40,7 +41,7 @@ export default defineComponent({
       loadingUserInfo.value = true
       const res = await fetch("/api/user/me")
       if (!res.ok) {
-        alert(await res.text())
+        error.value = new Error(await res.text())
       } else {
         me.value = await res.json()
       }
@@ -58,7 +59,7 @@ export default defineComponent({
       if (res.ok) {
         document.location.pathname = "/"
       } else {
-        alert(await res.text())
+        error.value = new Error(await res.text())
       }
     }
 
@@ -66,13 +67,13 @@ export default defineComponent({
       try {
         const res = await fetch("/api/agent/count")
         if (!res.ok) {
-          alert(await res.text())
+          error.value = new Error(await res.text())
         } else {
           const data = JSON.parse(await res.text())
           agentCount.value = data.count
         }
       } catch (err) {
-        alert(err)
+        error.value = err
       }
     }
 
@@ -80,13 +81,13 @@ export default defineComponent({
       try {
         const res = await fetch("/api/agent/software/count")
         if (!res.ok) {
-          alert(await res.text())
+          error.value = new Error(await res.text())
         } else {
           const data = JSON.parse(await res.text())
           softwareCount.value = data.count
         }
       } catch (err) {
-        alert(err)
+        error.value = err
       }
     }
 
@@ -110,6 +111,7 @@ export default defineComponent({
       softwareCount,
       me,
       loadingUserInfo,
+      error,
       fetchServicePlans,
       deleteAccount,
       fetchUserInfo,
@@ -120,10 +122,11 @@ export default defineComponent({
 </script>
 
 <template>
-  <v-container fluid>
-    <h1>Profile (+ Status)</h1>
+  <div class="profile-container">
+    <h1>Profile</h1>
+    <ErrorPanel v-if="error != null" :error=error/>
     <v-progress-linear v-if="loading" indeterminate></v-progress-linear>
-    <v-container class="stats-container">
+    <div class="stats-container">
       <v-card class="stat-card" title="Total service plans">
         <v-card-text class="stat-card-text">{{ svcPlans.length }}</v-card-text>
       </v-card>
@@ -142,21 +145,23 @@ export default defineComponent({
           {{ softwareCount != null ? softwareCount : "N/A" }}
         </v-card-text>
       </v-card>
-    </v-container>
-    <v-container>
+    </div>
+    <div>
       <v-row>
         <v-col cols="12" md="6" lg="4" v-for="plan in svcPlans" :key="plan.id">
           <ServicePlanCard @reloadStats="loadStats();fetchServicePlans()"
                            :service_plan="plan"></ServicePlanCard>
         </v-col>
       </v-row>
-    </v-container>
-    <div v-if="me != null">
-      <UserInfoForm :user=me></UserInfoForm>
     </div>
-    <div v-else-if="loadingUserInfo">
-      Loading user info...
-      <v-progress-linear indeterminate></v-progress-linear>
+    <div class="form-container">
+      <div v-if="me != null" class="user-form-container">
+        <UserInfoForm :user=me></UserInfoForm>
+      </div>
+      <div v-else-if="loadingUserInfo">
+        Loading user info...
+        <v-progress-linear indeterminate></v-progress-linear>
+      </div>
     </div>
     <v-btn
       @click="deleteAccount"
@@ -164,7 +169,7 @@ export default defineComponent({
       color="red"
     >Delete account
     </v-btn>
-  </v-container>
+  </div>
 </template>
 
 <style scoped>
@@ -177,10 +182,29 @@ export default defineComponent({
 .stat-card {
   flex-basis: 100%;
   border-radius: 10px;
+  min-width: 150px;
 }
 
 .stat-card-text {
   font-size: 20px;
   font-weight: bold;
+}
+
+.profile-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin: 20px;
+  width: 100%;
+}
+
+.form-container {
+  display: flex;
+  justify-content: center;
+}
+
+.user-form-container {
+  width: 100%;
+  max-width: 1000px;
 }
 </style>

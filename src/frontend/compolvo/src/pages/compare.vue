@@ -1,20 +1,22 @@
 <template>
-  <filter_panel @applyFilter="filterServices($event)" style="flex: 1; box-sizing: border-box" :licenses=licenses
+  <filter_panel @applyFilter="filterServices($event)" style="flex: 1; box-sizing: border-box"
+                :licenses=licenses
                 :oses="oses"/>
   <v-container class="cardsContainer">
-      <v-col cols="4" v-for="service in filteredServices" :key="service.service.id">
-        <compact-card
-          :filteredService=service
-          :targetDurationDays=targetDurationDays
-          :licenses=licenses
-          :oses=oses
-        />
-      </v-col>
+    <ErrorPanel v-if="error != null" :error=error style="width: 100%"/>
+    <v-col cols="4" v-for="service in filteredServices" :key="service.service.id">
+      <compact-card
+        :filteredService=service
+        :targetDurationDays=targetDurationDays
+        :licenses=licenses
+        :oses=oses
+      />
+    </v-col>
   </v-container>
 </template>
 
 <script lang="ts">
-import {defineComponent, ref, onMounted, getCurrentInstance} from 'vue';
+import {defineComponent, getCurrentInstance, onMounted, ref} from 'vue';
 import CompactCard from '@/components/compact_card.vue';
 import Constants from "../components/Constants";
 import {DetailedService, License, OperatingSystem, ServiceOffering} from '../components/models';
@@ -36,7 +38,8 @@ export default defineComponent({
     const filteredServices = ref<FilteredService[]>([]);
     const targetDurationDays = ref(30)
     const licenses = ref<License[]>([])
-    const oses = ref<OperatingSystem[]>([])
+    const oses = ref<OperatingSystem[]>([]);
+    const error = ref<Error | null>(null);
 
     const apiHost = Constants.HOST_URL + "/api/";
     const fetchData = async () => {
@@ -47,10 +50,10 @@ export default defineComponent({
           console.log("Services Maped", services.value);  // Debugging line to see what's fetched
           await filterServices(null)
         } else {
-          throw new Error('Failed to fetch');
+          error.value = new Error(await response.text());
         }
-      } catch (error) {
-        console.error('Fetch error:', error);
+      } catch (err) {
+        error.value = err
       }
     }
 
@@ -63,10 +66,10 @@ export default defineComponent({
           });
           console.log("oses", oses.value);  // Debugging line to see what's fetched
         } else {
-          throw new Error('Failed to fetch');
+          error.value = new Error(await response.text());
         }
-      } catch (error) {
-        console.error('Fetch error:', error);
+      } catch (err) {
+        error.value = err
       }
     }
     const fetchLicenseOptions = async () => {
@@ -78,10 +81,10 @@ export default defineComponent({
           });
           console.log("licenses", licenses.value);  // Debugging line to see what's fetched
         } else {
-          throw new Error('Failed to fetch');
+          error.value = new Error(await response.text());
         }
-      } catch (error) {
-        console.error('Fetch error:', error);
+      } catch (err) {
+        error.value = err
       }
     }
 
@@ -178,7 +181,8 @@ export default defineComponent({
       filterServices,
       getPriceForService,
       licenses,
-      oses
+      oses,
+      error
     };
   }
 });

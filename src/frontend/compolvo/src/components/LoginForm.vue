@@ -1,6 +1,9 @@
 <template>
   <div class="form-card-container">
     <v-card class="form-card" title="Login">
+      <v-card-item v-if="error != null">
+        <ErrorPanel :error=error/>
+      </v-card-item>
       <v-form @submit.prevent="login">
         <v-col>
           <v-text-field
@@ -57,8 +60,10 @@ export default defineComponent({
     const loading = ref(false)
     const email = ref("")
     const password = ref("")
+    const error = ref(null)
     const login = async function () {
       loading.value = true
+      error.value = null
       const params = new URLSearchParams(window.location.search)
       const redirectUrl = params.get("redirect_url") || Constants.HOST_URL
       try {
@@ -66,14 +71,14 @@ export default defineComponent({
         if (res.ok) {
           document.location.href = redirectUrl
         } else {
-          alert(await res.text())
+          error.value = new Error(await res.text())
         }
       } catch (err) {
-        alert(err);
+        error.value = err
       }
       loading.value = false
     }
-    return {email, password, loading, login}
+    return {email, password, loading, error, login}
   },
 });
 </script>

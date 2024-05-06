@@ -1,6 +1,9 @@
 <template>
   <div class="card-container">
-    <v-card class="form-card">
+    <v-card class="form-card" title="Register">
+      <v-card-item v-if="error != null">
+        <ErrorPanel :error=error/>
+      </v-card-item>
       <v-form @submit.prevent="validate" fast-fail validate-on="input" ref="form">
         <v-col>
           <v-row
@@ -92,6 +95,7 @@ export default defineComponent({
         return true
       }
     ]
+    const error = ref<Error | null>(null);
 
     const instance = getCurrentInstance().proxy
 
@@ -100,7 +104,7 @@ export default defineComponent({
       if (valid) {
         await register()
       } else {
-        alert("Error(s) valdiating form: " + errors.flatMap(err => err.errorMessages).join(", "))
+        error.value = new Error("Error(s) valdiating form: " + errors.flatMap(err => err.errorMessages).join(", "))
       }
     }
 
@@ -119,7 +123,7 @@ export default defineComponent({
       if (res.ok) {
         document.location.pathname = "/";
       } else {
-        alert(await res.text())
+        error.value = new Error(await res.text())
       }
     }
 
@@ -131,6 +135,7 @@ export default defineComponent({
       repeatPassword,
       loading,
       repeatPasswordValidation,
+      error,
       validate,
       register
     }

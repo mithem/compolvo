@@ -2,9 +2,16 @@
 </script>
 
 <template>
-  <h1>Register</h1>
-  <RegisterForm/>
+  <div class="register-container">
+    <RegisterForm/>
+  </div>
 </template>
 
 <style scoped>
+.register-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  margin: 20px;
+}
 </style>

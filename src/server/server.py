@@ -423,9 +423,7 @@ async def login(request: Request):
     if email is None or password is None:
         raise BadRequest("Missing email or password.")
     user = await User.get_or_none(email=email)
-    if not user:
-        raise NotFound("User not found.")
-    if not verify_password(password, user.password, user.salt):
+    if not user or not verify_password(password, user.password, user.salt):
         raise Unauthorized()
     expires = datetime.datetime.now() + datetime.timedelta(seconds=app.config.SESSION_TIMEOUT)
     token = jwt.encode({"id": str(user.id), "expires": expires.isoformat()}, app.config.SECRET_KEY,

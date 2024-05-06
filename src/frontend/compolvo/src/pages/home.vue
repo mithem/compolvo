@@ -2,6 +2,7 @@
   <v-container fluid>
     <v-container fluid class="container-row">
       <div>
+        <ErrorPanel v-if="error != null" :error=error/>
         <h2 @loggedIn="firstName = $event">Hello<span
           v-if="firstName !== null">, {{ firstName }}</span>!</h2>
         <div v-if="updates !== 0">There <span v-if="updates === 1">is</span><span v-else>are</span>
@@ -57,20 +58,21 @@ export default defineComponent({
     const updates = ref(0);
     const firstName = ref<string>(null);
     const loading = ref(false);
-    const agentCount = ref<number>(null)
+    const agentCount = ref<number>(null);
+    const error = ref<Error | null>(null);
     const fetchSoftware = async function () {
       try {
         loading.value = true;
         const res = await fetch("/api/agent/software");
         if (!res.ok) {
-          alert(await res.text());
+          error.value = new Error(await res.text())
         } else {
-          softwares.value = []
+          softwares.value = [];
           softwares.value = JSON.parse(await res.text())
           calculateAvailableUpdates()
         }
       } catch (err) {
-        alert(err)
+        error.value = err
       }
       loading.value = false;
     }
@@ -89,6 +91,7 @@ export default defineComponent({
           firstName.value = user.first_name;
         }
       } catch (err) {
+        error.value = err
       }
     }
 
@@ -96,12 +99,12 @@ export default defineComponent({
       try {
         const res = await fetch("/api/agent/count")
         if (!res.ok) {
-          alert(await res.text())
+          error.value = new Error(await res.text())
         } else {
           agentCount.value = JSON.parse(await res.text()).count
         }
       } catch (err) {
-        alert(err)
+        error.value = err
       }
     }
 
@@ -115,7 +118,7 @@ export default defineComponent({
       refresh();
     });
 
-    return {softwares, updates, firstName, loading, agentCount, fetchSoftware, refresh}
+    return {softwares, updates, firstName, loading, agentCount, error, fetchSoftware, refresh}
   }
 });
 </script>
