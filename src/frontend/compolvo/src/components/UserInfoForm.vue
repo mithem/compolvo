@@ -236,7 +236,6 @@ export default defineComponent({
 .account-info-card {
   display: flex;
   flex-direction: column;
-  gap: 20px;
 }
 
 .payment-method-config-container {
