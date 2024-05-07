@@ -11,7 +11,8 @@ import stripe
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sanic import Sanic, redirect, Request, text, Blueprint, json, HTTPResponse
-from sanic.exceptions import BadRequest, NotFound, Unauthorized
+from sanic.exceptions import BadRequest, NotFound
+from sanic.handlers import ErrorHandler
 from sanic.log import logger
 from sanic_openapi import openapi
 from tortoise.contrib.sanic import register_tortoise
@@ -28,6 +29,7 @@ from compolvo.models import Agent, AgentSoftware, Serializable, PackageManager, 
     BillingCycle, BillingCycleType, ServerStatus
 from compolvo.models import Service, OperatingSystem, Tag, UserRole, User, License, \
     ServiceOffering, ServicePlan
+from compolvo.utils import check_token, Unauthorized
 from compolvo.utils import verify_password, hash_password, generate_secret, test_email, \
     user_has_roles
 from compolvo.websockets import run_websocket_server, run_websocket_handler_queue_worker, \
@@ -38,7 +40,7 @@ HTTP_HEADER_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
 app = Sanic("compolvo")
 
 app.config.SERVER_NAME = os.environ["SERVER_NAME"]
-
+app.config.FALLBACK_ERROR_FORMAT = "text"
 app.config.SECRET_KEY = os.environ["COMPOLVO_SECRET_KEY"]
 app.config.SESSION_TIMEOUT = 60 * 60
 
@@ -79,7 +81,16 @@ api = Blueprint.group(user, service_group, tag, payment, agent, agent_software, 
 
 app.blueprint(api)
 
+
+class CustomErrorHandler(ErrorHandler):
+    def default(self, request: Request, exception: Exception) -> HTTPResponse:
+        status = getattr(exception, "status", 500)
+        logger.exception(exception)
+        return text(str(exception), status=status)
+
+
 app.register_middleware(cors.add_cors_headers, "response")
+app.error_handler = CustomErrorHandler()
 
 
 @app.get("/")
@@ -455,6 +466,15 @@ async def auth(request: Request):
     if not verify_password(password, user.password, user.salt):
         raise Unauthorized()
     return HTTPResponse(status=204)
+
+
+@app.get("/api/auth/token")
+@protected()
+async def get_token(request, user):
+    token = request.cookies.get("token", None)
+    await check_token(token, app.config.SECRET_KEY)
+    decoded = jwt.decode(token, app.config.SECRET_KEY, algorithms=["HS256"])
+    return json(decoded)
 
 
 @app.get("/api/logout")

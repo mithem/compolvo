@@ -8,22 +8,31 @@ from typing import Optional, Set
 import jwt
 from compolvo.models import UserRole, User
 from jwt.exceptions import InvalidTokenError
+from sanic import Request
+from sanic.exceptions import SanicException
 
 
-async def check_token(request) -> Optional[User]:
-    token = request.cookies.get("token")
-    if not token:
-        return None
-
+async def check_token(token: str, secret_key: str) -> Optional[User]:
     try:
         token = jwt.decode(
-            token, request.app.config.SECRET_KEY, algorithms=["HS256"]
+            token, secret_key, algorithms=["HS256"]
         )
         if datetime.datetime.fromisoformat(token["expires"]) <= datetime.datetime.now():
             return None
         return await User.get_or_none(id=token["id"])
     except (InvalidTokenError, KeyError):
         return None
+
+
+class Unauthorized(SanicException):
+    message = "Unauthorized. Please log in."
+
+
+async def check_token_for_request(request: Request) -> Optional[User]:
+    token = request.cookies.get("token")
+    if not token:
+        return None
+    return await check_token(token, request.app.config.SECRET_KEY)
 
 
 async def user_has_roles(user: User, roles: Set[UserRole.Role]) -> bool:

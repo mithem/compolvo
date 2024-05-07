@@ -3,9 +3,10 @@ from typing import Type, Set
 
 import stripe as stripe_module
 from compolvo.models import Serializable, UserRole, User
-from compolvo.utils import check_token, user_has_roles
+from compolvo.utils import check_token_for_request, Unauthorized
+from compolvo.utils import user_has_roles
 from sanic import HTTPResponse, text
-from sanic.exceptions import BadRequest, NotFound, Unauthorized
+from sanic.exceptions import BadRequest, NotFound
 
 
 def patch_endpoint(cls: Type[Serializable]):
@@ -81,8 +82,8 @@ def protected(requires_roles: Set[UserRole.Role] = None):
     def decorator(func):
         @wraps(func)
         async def decorated_function(request, *args, **kwargs):
-            unauthorized = Unauthorized("Unauthorized.")
-            user = await check_token(request)
+            unauthorized = Unauthorized()
+            user = await check_token_for_request(request)
             if user is None:
                 raise unauthorized
             if requires_roles is not None:
