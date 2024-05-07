@@ -196,10 +196,10 @@ export default defineComponent({
                     <v-icon color="green">mdi-check</v-icon>
                     copied to clipboard
                   </span>
-                  <br/><br/>
+                  <!--<br/><br/>
                   <div>Please run the following command on the machine you want to install the agent
                     on.
-                  </div>
+                  </div>-->
                   <!--TODO: Insert pagination for commands for different operating systems.-->
                   <v-card-actions>
                     <v-spacer/>

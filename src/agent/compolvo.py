@@ -153,6 +153,7 @@ class OperatingSystem(enum.StrEnum):
     debian = "debian"
     macos = "macOS"
     windows = "windows"
+    manjaro = "manjaro"
 
 
 class UnsupportedOperatingSystem(Exception):
@@ -168,6 +169,8 @@ def detect_operating_system(id: str = None) -> OperatingSystem:
             return OperatingSystem.macos
         case "windows":
             return OperatingSystem.windows
+        case "manjaro":
+            return OperatingSystem.manjaro
         case "":  # distro seemingly can't detect windows in my VM
             if platform.system() == "Windows":
                 return OperatingSystem.windows

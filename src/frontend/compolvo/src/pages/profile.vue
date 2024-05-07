@@ -7,7 +7,6 @@ export default defineComponent({
   name: "Profile",
   setup() {
     const loading = ref(false);
-    const deleting = ref(false);
     const svcPlans = ref<ServicePlan[]>([]);
     const monthlyPrice = ref<number>(null);
     const agentCount = ref<number>(null);
@@ -48,20 +47,6 @@ export default defineComponent({
       loadingUserInfo.value = false
     }
 
-    const deleteAccount = async function () {
-      deleting.value = true
-      const me = await fetch("/api/user/me")
-      const id = (await me.json()).id
-      const res = await fetch("/api/user?id=" + id, {
-        method: "DELETE"
-      })
-      deleting.value = false
-      if (res.ok) {
-        document.location.pathname = "/"
-      } else {
-        error.value = new Error(await res.text())
-      }
-    }
 
     const getAgentCount = async function () {
       try {
@@ -105,7 +90,6 @@ export default defineComponent({
     return {
       loading,
       svcPlans,
-      deleting,
       monthlyPrice,
       agentCount,
       softwareCount,
@@ -113,7 +97,6 @@ export default defineComponent({
       loadingUserInfo,
       error,
       fetchServicePlans,
-      deleteAccount,
       fetchUserInfo,
       loadStats
     }
@@ -163,12 +146,6 @@ export default defineComponent({
         <v-progress-linear indeterminate></v-progress-linear>
       </div>
     </div>
-    <v-btn
-      @click="deleteAccount"
-      :loading=deleting
-      color="red"
-    >Delete account
-    </v-btn>
   </div>
 </template>
 

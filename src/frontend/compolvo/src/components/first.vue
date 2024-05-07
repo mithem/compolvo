@@ -32,7 +32,7 @@ const pageTitle = ref('Compolvo');
 .page-container-cell {
   height: fit-content;
   position: relative;
-  top: -10rem;
+  top: -5rem;
 }
 
 .compolvo-container {

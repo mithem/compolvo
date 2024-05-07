@@ -25,6 +25,7 @@ export default createVuetify({
           "background-secondary": "#e1e1e1",
           "text-background-secondary": "#f4f4f4",
           "text-secondary": "#707070",
+          "second-layer-card-background": "#ffffff"
         }
       },
       dark: {
@@ -35,6 +36,7 @@ export default createVuetify({
           "background-secondary": "rgb(27, 30, 31)",
           "text-secondary": "#555",
           "text-background-secondary": "#333333",
+          "second-layer-card-background": "#333333"
         }
       }
     }

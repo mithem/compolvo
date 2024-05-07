@@ -1,15 +1,19 @@
 <template>
-  <v-toolbar>
+  <v-toolbar class="navbar">
     <v-toolbar-title style="cursor: pointer" @click="$router.push('/')">Compolvo</v-toolbar-title>
     <v-toolbar-items>
-      <v-switch
-        v-model="themeMode"
-        true-value="dark"
-        false-value="light"
-        indeterminate
-        prepend-icon="mdi-theme-light-dark"
-      >
-      </v-switch>
+      <div>
+        <v-switch
+          inline
+          style="margin-top: 4px"
+          v-model="themeMode"
+          true-value="dark"
+          false-value="light"
+          indeterminate
+          prepend-icon="mdi-theme-light-dark"
+        >
+        </v-switch>
+      </div>
       <v-btn
         v-for="item in menuItems"
         :key="item.title"
@@ -107,4 +111,15 @@ export default {
 </script>
 
 <style scoped>
+.theme-toggle {
+  height: 100%;
+}
+
+.theme-toggle > div {
+  height: 100%;
+}
+
+.navbar {
+  z-index: 1;
+}
 </style>

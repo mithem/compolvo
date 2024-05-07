@@ -108,6 +108,7 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   min-width: 20vw;
+  background-color: rgb(var(--v-theme-second-layer-card-background));
 }
 
 .cta-container {
