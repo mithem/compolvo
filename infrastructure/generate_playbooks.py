@@ -28,7 +28,7 @@ def generate_playbooks(config: str, verbose: bool):
         name = service["system_name"]
         versions = service["versions"]
         data = {"name": name}
-        keys = ["apt_module", "brew_module", "winget_packages"]
+        keys = ["apt_module", "brew_module", "winget_package", "pacman_package"]
         for key in keys:
             data[key] = service.get(key)
         template_file = service.get("template", f"{name}.yml.jinja")
