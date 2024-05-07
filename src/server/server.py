@@ -205,6 +205,9 @@ async def set_up_demo_db(user: User, services: bool = False,
         pm_choco = await PackageManager.create(
             name="choco"
         )
+        pm_pacman = await PackageManager.create(
+            name="pacman"
+        )
         svc_docker = await Service.create(
             system_name="docker-desktop",
             name="Docker Desktop",
@@ -264,6 +267,13 @@ async def set_up_demo_db(user: User, services: bool = False,
             service=svc_nginx,
             operating_system=os_mac,
             package_manager=pm_brew,
+            version="1.25.5",
+            latest=True
+        )
+        v_nginx_3 = await PackageManagerAvailableVersion.create(
+            service=svc_nginx,
+            operating_system=os_man,
+            package_manager=pm_pacman,
             version="1.25.5",
             latest=True
         )
@@ -817,6 +827,7 @@ async def get_own_agents(request, user):
         plan = await ServicePlan.get_or_none(id=plan)
         if plan is None:
             raise NotFound("Service plan not found.")
+        # TODO: Logic to check which agents software can be installed on
         softwares = await AgentSoftware.filter(service_plan=plan).all()
         agents = {await software.agent for software in softwares}
         installable_agents: Set[Serializable] = set(await Agent.filter(user=user).all()) - agents
@@ -961,6 +972,7 @@ async def create_agent_software(request, user):
         service_plan = await ServicePlan.get_or_none(id=request.json["service_plan"])
         if service_plan is None:
             raise NotFound("Service plan not found.")
+        # TODO: Test whether software can be installed on agent
         software = await AgentSoftware.create(
             agent=agent,
             service_plan=service_plan,
