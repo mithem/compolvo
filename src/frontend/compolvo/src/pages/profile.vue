@@ -1,7 +1,58 @@
+<template>
+  <div class="profile-container">
+    <h1>
+      Profile
+      <v-btn @click="toggleEdit" variant="text" :class="{'btn-filled': isEditing}">
+        <v-icon>
+          {{ isEditing ? 'mdi-pencil-off' : 'mdi-pencil' }}
+        </v-icon>
+      </v-btn>
+    </h1>
+    <ErrorPanel v-if="error != null" :error=error />
+    <v-progress-linear v-if="loading" indeterminate></v-progress-linear>
+    <div class="stats-container">
+      <v-card class="stat-card" title="Total service plans">
+        <v-card-text class="stat-card-text">{{ svcPlans.length }}</v-card-text>
+      </v-card>
+      <v-card class="stat-card" title="Total cost">
+        <v-card-text class="stat-card-text">{{ monthlyPrice }}€/month
+        </v-card-text>
+      </v-card>
+      <v-card class="stat-card" title="Agent count">
+        <v-card-text class="stat-card-text">{{
+            agentCount != null ? agentCount : "N/A"
+          }}
+        </v-card-text>
+      </v-card>
+      <v-card class="stat-card" title="Software count">
+        <v-card-text class="stat-card-text">
+          {{ softwareCount != null ? softwareCount : "N/A" }}
+        </v-card-text>
+      </v-card>
+    </div>
+    <div>
+      <v-row>
+        <v-col cols="12" md="6" lg="4" v-for="plan in svcPlans" :key="plan.id">
+          <ServicePlanCard @reloadStats="loadStats();fetchServicePlans()"
+                           :service_plan="plan"></ServicePlanCard>
+        </v-col>
+      </v-row>
+    </div>
+    <div class="form-container">
+      <div v-if="me != null && isEditing" class="user-form-container">
+        <UserInfoForm :user=me></UserInfoForm>
+      </div>
+      <div v-else-if="loadingUserInfo">
+        Loading user info...
+        <v-progress-linear indeterminate></v-progress-linear>
+      </div>
+    </div>
+  </div>
+</template>
+
 <script lang="ts">
 import {defineComponent, onMounted, ref} from "vue";
 import {ServicePlan, UserMeObject} from "../components/models";
-
 
 export default defineComponent({
   name: "Profile",
@@ -14,6 +65,11 @@ export default defineComponent({
     const me = ref<UserMeObject>(null);
     const loadingUserInfo = ref(false);
     const error = ref<Error | null>(null);
+    const isEditing = ref(false);
+
+    function toggleEdit() {
+      isEditing.value = !isEditing.value;
+    }
 
     const fetchServicePlans = async function () {
       loading.value = true
@@ -98,56 +154,13 @@ export default defineComponent({
       error,
       fetchServicePlans,
       fetchUserInfo,
-      loadStats
+      loadStats,
+      isEditing,
+      toggleEdit
     }
   }
 })
 </script>
-
-<template>
-  <div class="profile-container">
-    <h1>Profile</h1>
-    <ErrorPanel v-if="error != null" :error=error />
-    <v-progress-linear v-if="loading" indeterminate></v-progress-linear>
-    <div class="stats-container">
-      <v-card class="stat-card" title="Total service plans">
-        <v-card-text class="stat-card-text">{{ svcPlans.length }}</v-card-text>
-      </v-card>
-      <v-card class="stat-card" title="Total cost">
-        <v-card-text class="stat-card-text">{{ monthlyPrice }}€/month
-        </v-card-text>
-      </v-card>
-      <v-card class="stat-card" title="Agent count">
-        <v-card-text class="stat-card-text">{{
-            agentCount != null ? agentCount : "N/A"
-          }}
-        </v-card-text>
-      </v-card>
-      <v-card class="stat-card" title="Software count">
-        <v-card-text class="stat-card-text">
-          {{ softwareCount != null ? softwareCount : "N/A" }}
-        </v-card-text>
-      </v-card>
-    </div>
-    <div>
-      <v-row>
-        <v-col cols="12" md="6" lg="4" v-for="plan in svcPlans" :key="plan.id">
-          <ServicePlanCard @reloadStats="loadStats();fetchServicePlans()"
-                           :service_plan="plan"></ServicePlanCard>
-        </v-col>
-      </v-row>
-    </div>
-    <div class="form-container">
-      <div v-if="me != null" class="user-form-container">
-        <UserInfoForm :user=me></UserInfoForm>
-      </div>
-      <div v-else-if="loadingUserInfo">
-        Loading user info...
-        <v-progress-linear indeterminate></v-progress-linear>
-      </div>
-    </div>
-  </div>
-</template>
 
 <style scoped>
 .stats-container {
@@ -184,4 +197,5 @@ export default defineComponent({
   width: 100%;
   max-width: 1000px;
 }
+
 </style>

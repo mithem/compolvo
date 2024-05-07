@@ -48,7 +48,40 @@ export default {
     }
     const darkMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
-    return {theme, themeMode, darkMediaQuery, autoThemeHandler}
+    function getCookieValue(name) {
+      // Retrieve all cookies from the document
+      let cookieArray = document.cookie.split(';');
+      console.log(cookieArray);
+
+      // Find the specific cookie by name
+      let cookieValue = cookieArray.find(cookie => cookie.trim().startsWith(name + '='));
+
+      if (!cookieValue) {
+        return null; // Return null if the cookie is not found
+      }
+
+      // Extract only the value part of the cookie
+      let value = cookieValue.split('=')[1];
+
+      // Decode and parse the JSON value
+      let decodedValue = decodeURIComponent(value);
+      let parsedValue = JSON.parse(decodedValue);
+
+      return parsedValue;
+    }
+
+    function getCookieExpiration(name) {
+      let cookieData = getCookieValue(name);
+      if (cookieData && cookieData.expires) {
+        return new Date(cookieData.expires);
+      }
+      return null; // Return null if no expiration is found
+    }
+
+    let expirationDate = getCookieExpiration("token");
+    console.log(expirationDate);
+
+    return {theme, themeMode, darkMediaQuery, autoThemeHandler, getCookieExpiration, getCookieValue};
   },
   mounted() {
     this.setMenuItems()
