@@ -449,8 +449,10 @@ async def login(request: Request):
     user = await User.get_or_none(email=email)
     if not user or not verify_password(password, user.password, user.salt):
         raise Unauthorized()
-    expires = datetime.datetime.now() + datetime.timedelta(seconds=app.config.SESSION_TIMEOUT)
-    token = jwt.encode({"id": str(user.id), "expires": expires.isoformat()}, app.config.SECRET_KEY,
+    expires = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(
+        seconds=app.config.SESSION_TIMEOUT)
+    token = jwt.encode({"id": str(user.id), "expires": expires.strftime("%Y-%m-%dT%H:%M:%SZ")},
+                       app.config.SECRET_KEY,
                        algorithm="HS256")
     headers = {"Set-Cookie": f"token={token}; Expires={expires.strftime(HTTP_HEADER_DATE_FORMAT)}"}
     redirect_url = request.args.get("redirect_url", request.url_for("index"))

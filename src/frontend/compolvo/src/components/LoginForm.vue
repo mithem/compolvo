@@ -65,7 +65,11 @@ export default defineComponent({
       loading.value = true
       error.value = null
       const params = new URLSearchParams(window.location.search)
-      const redirectUrl = params.get("redirect_url") || Constants.HOST_URL
+      let redirUrl = params.get("redirect_url");
+      if (redirUrl === "/") {
+        redirUrl = "/home"
+      }
+      const redirectUrl = redirUrl || (Constants.HOST_URL + "/home")
       try {
         const res = await fetch(Constants.HOST_URL + "/api/login?redirect_url=" + redirectUrl + "&email=" + encodeURIComponent(email.value) + "&password=" + encodeURIComponent(password.value));
         if (res.ok) {

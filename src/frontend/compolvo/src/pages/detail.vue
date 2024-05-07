@@ -52,18 +52,28 @@
     <!-- Description -->
     <div class="desc" v-html=compileMarkdownDescription()></div>
     <hr/>
-    <div class="offering-slide-group">
-      <div
-        v-for="offering in service.offerings"
-      >
-        <ServiceOfferingCard :offering=offering></ServiceOfferingCard>
+    <div class="slide-group-container">
+      <v-icon
+        class="slide-group-hint"
+        @click="scrollOfferings(false)"
+      >mdi-chevron-left
+      </v-icon>
+      <div class="offering-slide-group" id="service-offering-slide-group">
+        <div
+          v-for="offering in service.offerings"
+        >
+          <ServiceOfferingCard :offering=offering></ServiceOfferingCard>
+        </div>
       </div>
+      <v-icon
+        class="slide-group-hint"
+        @click="scrollOfferings(true)"
+      >mdi-chevron-right
+      </v-icon>
     </div>
   </v-card>
   <v-progress-linear v-else indeterminate>
   </v-progress-linear>
-
-
 </template>
 
 <script lang="ts">
@@ -178,6 +188,14 @@ export default defineComponent({
       });
     }
 
+    const scrollOfferings = (direction: boolean) => {
+      const multiplicator = direction ? 1 : -1
+      document.getElementById("service-offering-slide-group").scrollBy({
+        left: multiplicator * 200,
+        behavior: "smooth"
+      })
+    }
+
     onMounted(async () => {
       await fetchLicenseOptions()
       await fetchOsOptions()
@@ -204,6 +222,7 @@ export default defineComponent({
       formatedOs,
       formatedLicense,
       scrollToBottom,
+      scrollOfferings,
       canScroll
     };
   },
@@ -296,6 +315,12 @@ export default defineComponent({
   font-weight: bold;
 }
 
+.slide-group-container {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .offering-slide-group {
   padding: 10px;
   border-radius: 10px;
@@ -311,26 +336,37 @@ export default defineComponent({
   background: transparent;
 }
 
+.slide-group-hint {
+  animation: blinker 1s linear infinite;
+}
+
+@keyframes blinker {
+  50% {
+    opacity: 50%;
+  }
+}
+
 .button-container {
   flex-grow: 0;
-  margin: 0 20px;  /* Adjust margin to ensure it does not stretch */
+  margin: 0 20px; /* Adjust margin to ensure it does not stretch */
 }
+
 .combined-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin: 10px 20px;
 }
+
 .download-container {
   flex: 1;
   text-align: right;
 }
+
 .tag-container {
   flex: 1;
   text-align: left;
   display: flex;
   gap: 20px;
 }
-
-
 </style>
