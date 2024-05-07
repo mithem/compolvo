@@ -1,5 +1,5 @@
 <template>
-  <v-toolbar>
+  <v-toolbar class="navbar">
     <v-toolbar-title style="cursor: pointer" @click="$router.push('/')">Compolvo</v-toolbar-title>
     <v-toolbar-items>
       <div>
@@ -117,5 +117,9 @@ export default {
 
 .theme-toggle > div {
   height: 100%;
+}
+
+.navbar {
+  z-index: 1;
 }
 </style>

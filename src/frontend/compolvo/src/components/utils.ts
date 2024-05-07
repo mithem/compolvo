@@ -37,7 +37,7 @@ export function evaluatePasswordRules(password: string): boolean | string {
       name: "numbers"
     },
     {
-      pattern: /[?!@$%^&*-]/,
+      pattern: /[?!@$%^&*\-_.;,:#+´`<>"'°§\/\\(){}\[\]|=]/,
       name: "special characters"
     }
   ]

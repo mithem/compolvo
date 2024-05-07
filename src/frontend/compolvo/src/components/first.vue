@@ -32,8 +32,7 @@ const pageTitle = ref('Compolvo');
 .page-container-cell {
   height: fit-content;
   position: relative;
-  top: -10rem;
-  z-index: -1; /* Can occlude the navbar on some weird resolutions */
+  top: -5rem;
 }
 
 .compolvo-container {
