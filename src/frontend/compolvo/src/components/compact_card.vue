@@ -106,12 +106,18 @@ export default defineComponent({
 .desc {
   height: 100px;
   overflow: auto;
+  padding: 15px;
+  line-height: 1.6;
+  font-size: 16px;
+  background-color: rgb(var(--v-theme-text-background-secondary));
+  border-radius: 8px;
+  margin: 20px;
 }
 
 .tags .tag {
   margin-right: 5px;
   padding: 3px 8px;
-  background-color: #ddd;
+  background-color: rgb(var(--v-theme-background-secondary));
   border-radius: 4px;
   font-size: 12px;
 }

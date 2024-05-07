@@ -1,6 +1,7 @@
 <template>
   <v-card class="card" v-if="service != null">
     <!-- Service Image -->
+    <!-- Service Image -->
     <v-img
       contain
       height="200"
@@ -8,25 +9,30 @@
       aspect-ratio="16/9"
       :src="'/static/images/'+ service.system_name + '.png'"
     ></v-img>
+
     <!-- Service Name -->
     <v-card-title class="title">
       {{ service.name }}
     </v-card-title>
-    <!-- Service Tags -->
-    <div class="row">
-      <div class="left-items">
+
+    <!-- Combined Row for Tags, Button, and Downloads -->
+    <div class="combined-row">
+      <div class="tag-container">
         <span v-for="tag in service.tags" :key="tag.id" class="tag">{{ tag.label }}</span>
       </div>
-      <v-btn @click="scrollToBottom" variant="text" color="secondary">
-        <v-icon>
-          mdi-chevron-double-down
-        </v-icon>
-      </v-btn>
 
-      <!-- Downloads -->
-      <div class="right-items">
-        <span class="data-label">Downloads:</span> <span
-        class="data-value">{{ service.download_count }}</span>
+      <!-- Scroll Down Button -->
+      <div class="button-container" v-if="canScroll">
+        <v-btn @click="scrollToBottom" variant="text" color="secondary">
+          <v-icon>
+            mdi-chevron-double-down
+          </v-icon>
+        </v-btn>
+      </div>
+
+      <div class="download-container">
+        <span class="data-label">Downloads:</span>
+        <span class="data-value">{{ service.download_count }}</span>
       </div>
     </div>
 
@@ -61,7 +67,7 @@
 </template>
 
 <script lang="ts">
-import {defineComponent, getCurrentInstance, onMounted, ref} from "vue";
+import {defineComponent, getCurrentInstance, onMounted, onUnmounted, ref} from "vue";
 import {DetailedService, License, OperatingSystem, ServiceOffering} from "../components/models";
 import {marked} from "marked";
 import ServiceOfferingCard from "./ServiceOfferingCard.vue";
@@ -85,6 +91,16 @@ export default defineComponent({
     const formatedOs = ref<string[]>(null)
     const licenses = ref<License[]>([])
     const oses = ref<OperatingSystem[]>([])
+    const canScroll = ref(false);
+
+    const checkScroll = () => {
+      const body = document.body;
+      const html = document.documentElement;
+      const docHeight = Math.max(body.scrollHeight, body.offsetHeight,
+        html.clientHeight, html.scrollHeight, html.offsetHeight);
+      const windowHeight = window.innerHeight;
+      canScroll.value = docHeight > windowHeight;
+    };
 
     const compileMarkdownDescription = () => {
       return marked(service.value.description)
@@ -166,6 +182,12 @@ export default defineComponent({
       await fetchLicenseOptions()
       await fetchOsOptions()
       await fetchServiceData()
+      window.addEventListener('resize', checkScroll);
+      checkScroll();
+    });
+
+    onUnmounted(() => {
+      window.removeEventListener('resize', checkScroll);
     });
 
     return {
@@ -181,7 +203,8 @@ export default defineComponent({
       fetchServiceData,
       formatedOs,
       formatedLicense,
-      scrollToBottom
+      scrollToBottom,
+      canScroll
     };
   },
   watch: {
@@ -221,8 +244,7 @@ export default defineComponent({
   padding: 15px;
   line-height: 1.6;
   font-size: 16px;
-  color: #444;
-  background-color: #f9f9f9;
+  background-color: rgb(var(--v-theme-text-background-secondary));
   border-radius: 8px;
   margin: 20px;
 }
@@ -237,7 +259,7 @@ export default defineComponent({
 
 .tag {
   padding: 3px 8px;
-  background-color: #e1e1e1;
+  background-color: rgb(var(--v-theme-background-secondary));
   border-radius: 4px;
   font-size: 0.9rem;
   display: inline-block;
@@ -246,6 +268,8 @@ export default defineComponent({
 .row {
   display: flex;
   justify-content: space-between;
+  position: relative;
+  z-index: 0;
   align-items: center;
   margin: 10px 20px;
 }
@@ -263,12 +287,12 @@ export default defineComponent({
 
 .data-label {
   font-weight: bold;
-  color: #555;
+  color: rgb(var(--v-theme-text-secondary));
 }
 
 .data-value {
   font-size: 16px;
-  color: #000;
+
   font-weight: bold;
 }
 
@@ -286,4 +310,27 @@ export default defineComponent({
   width: 0;
   background: transparent;
 }
+
+.button-container {
+  flex-grow: 0;
+  margin: 0 20px;  /* Adjust margin to ensure it does not stretch */
+}
+.combined-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 10px 20px;
+}
+.download-container {
+  flex: 1;
+  text-align: right;
+}
+.tag-container {
+  flex: 1;
+  text-align: left;
+  display: flex;
+  gap: 20px;
+}
+
+
 </style>
