@@ -107,3 +107,8 @@ export interface UserMeObject {
   has_payment_method: boolean
   billing_cycle: BillingCylce
 }
+
+export interface Token {
+  id: string
+  expires: Date
+}
