@@ -1,3 +1,87 @@
+<template>
+  <v-card class="form-card account-info-card">
+    <v-card-title>Account info</v-card-title>
+    <ErrorPanel v-if="error != null" :error="error"/>
+    <div class="payment-method-config-container">
+      <div v-if="!user.has_payment_method">
+        No payment method configured.
+      </div>
+      <div v-else class="payment-method-config-container no-space-between">
+        <v-icon color="green">mdi-check</v-icon>
+        Payment method configured.
+      </div>
+      <v-btn @click="$router.push('/payment-info')">
+        Configure
+      </v-btn>
+    </div>
+    <v-form
+      fast-fail
+      @submit.prevent
+      @submit="validate"
+      ref="form"
+      validate-on="input"
+    >
+      <v-text-field
+        v-model="user.first_name"
+        label="First name"
+        @change="didChangeInfo = true"
+      ></v-text-field>
+
+      <v-text-field
+        v-model="user.last_name"
+        label="Last name"
+        @change="didChangeInfo = true"
+      ></v-text-field>
+      <v-text-field
+        v-model="user.email"
+        type="email"
+        label="Email"
+        @change="didChangeInfo = true"
+      ></v-text-field>
+      <v-text-field
+        v-model="currentPassword"
+        type="password"
+        :rules="currentPasswordRules"
+        label="Current password"
+        mandatory
+      ></v-text-field>
+      <v-text-field
+        v-model="newPassword"
+        type="password"
+        :rules="newPasswordRules"
+        label="New password"
+      ></v-text-field>
+      <v-text-field
+        v-model="confirmPassword"
+        type="password"
+        label="Confirm password"
+        :rules="confirmPasswordRules"
+        validate-on="input"
+      ></v-text-field>
+      <v-card-actions>
+        <v-btn type="submit">Save</v-btn>
+        <v-spacer></v-spacer>
+        <v-btn
+          @click="deleteAccount"
+          :loading=deleting
+          color="red"
+        >Delete account
+        </v-btn>
+      </v-card-actions>
+    </v-form>
+  </v-card>
+  <v-snackbar
+    v-model="showingSnackbar"
+    :text="snackbarText"
+    color="green"
+  >
+    <template v-slot:actions>
+      <v-btn @click="showingSnackbar = false">Close</v-btn>
+    </template>
+  </v-snackbar>
+</template>
+
+
 <script lang="ts">
 import {defineComponent, getCurrentInstance, ref} from "vue"
 import {UserMeObject} from "./models";
@@ -149,88 +233,6 @@ export default defineComponent({
 })
 </script>
 
-<template>
-  <v-card class="form-card account-info-card">
-    <v-card-title>Account info</v-card-title>
-    <ErrorPanel v-if="error != null" :error="error" />
-    <div class="payment-method-config-container">
-      <div v-if="!user.has_payment_method">
-        No payment method configured.
-      </div>
-      <div v-else class="payment-method-config-container no-space-between">
-        <v-icon color="green">mdi-check</v-icon>
-        Payment method configured.
-      </div>
-      <v-btn @click="$router.push('/payment-info')">
-        Configure
-      </v-btn>
-    </div>
-    <v-form
-      fast-fail
-      @submit.prevent
-      @submit="validate"
-      ref="form"
-      validate-on="input"
-    >
-      <v-text-field
-        v-model="user.first_name"
-        label="First name"
-        @change="didChangeInfo = true"
-      ></v-text-field>
-
-      <v-text-field
-        v-model="user.last_name"
-        label="Last name"
-        @change="didChangeInfo = true"
-      ></v-text-field>
-      <v-text-field
-        v-model="user.email"
-        type="email"
-        label="Email"
-        @change="didChangeInfo = true"
-      ></v-text-field>
-      <v-text-field
-        v-model="currentPassword"
-        type="password"
-        :rules="currentPasswordRules"
-        label="Current password"
-        mandatory
-      ></v-text-field>
-      <v-text-field v-if="currentPassword !== ''"
-                    v-model="newPassword"
-                    type="password"
-                    :rules="newPasswordRules"
-                    label="New password"
-      ></v-text-field>
-      <v-text-field v-if="currentPassword !== ''"
-                    v-model="confirmPassword"
-                    type="password"
-                    label="Confirm password"
-                    :rules="confirmPasswordRules"
-                    validate-on="input"
-      ></v-text-field>
-      <v-card-actions>
-        <v-btn type="submit">Save</v-btn>
-        <v-spacer></v-spacer>
-        <v-btn
-          @click="deleteAccount"
-          :loading=deleting
-          color="red"
-        >Delete account
-        </v-btn>
-      </v-card-actions>
-    </v-form>
-  </v-card>
-  <v-snackbar
-    v-model="showingSnackbar"
-    :text="snackbarText"
-    color="green"
-  >
-    <template v-slot:actions>
-      <v-btn @click="showingSnackbar = false">Close</v-btn>
-    </template>
-  </v-snackbar>
-</template>
 
 <style scoped>
 .account-info-card {
