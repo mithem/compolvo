@@ -30,6 +30,8 @@ export default defineComponent({
     const showingSnackbar = ref(false);
     const snackbarText = ref<string>(null);
     const oldUser = {...props.user}
+    const deleting = ref(false);
+    const error = ref<Error | null>(null);
 
     const confirmPasswordRules = [
       (value) => {
@@ -41,14 +43,18 @@ export default defineComponent({
     ]
 
     const checkAuthStatus = async function (password: string) {
-      const res = await fetch("/api/auth", {
-        method: "POST",
-        body: JSON.stringify({
-          email: user.value.email,
-          password: password
+      try {
+        const res = await fetch("/api/auth", {
+          method: "POST",
+          body: JSON.stringify({
+            email: user.value.email,
+            password: password
+          })
         })
-      })
-      return res.ok
+        return res.ok
+      } catch (_) {
+        return false
+      }
     }
 
     let proxy = getCurrentInstance().proxy;
@@ -58,7 +64,7 @@ export default defineComponent({
       if (valid) {
         await saveInfo()
       } else {
-        alert("Error(s) valdiating form: " + errors.flatMap(err => err.errorMessages).join(", "))
+        error.value = new Error("Error(s) valdiating form: " + errors.flatMap(err => err.errorMessages).join(", "))
       }
     }
 
@@ -81,23 +87,46 @@ export default defineComponent({
 
       const authenticated = await checkAuthStatus(currentPassword.value);
       if (!authenticated) {
-        alert("Invalid password.")
+        error.value = new Error("Invalid password")
         return
       }
 
-      const res = await fetch("/api/user?id=" + user.value.id, {
-        method: "PATCH",
-        body: JSON.stringify(changedInfo)
-      })
-      if (!res.ok) {
-        alert(await res.text())
-      } else {
-        didChangeInfo.value = false
-        currentPassword.value = ""
-        newPassword.value = ""
-        confirmPassword.value = ""
-        snackbarText.value = "Updated user info."
-        showingSnackbar.value = true
+      try {
+        const res = await fetch("/api/user?id=" + user.value.id, {
+          method: "PATCH",
+          body: JSON.stringify(changedInfo)
+        })
+        if (!res.ok) {
+          error.value = new Error(await res.text())
+        } else {
+          didChangeInfo.value = false
+          currentPassword.value = ""
+          newPassword.value = ""
+          confirmPassword.value = ""
+          snackbarText.value = "Updated user info."
+          showingSnackbar.value = true
+        }
+      } catch (err) {
+        error.value = err
+      }
+    }
+
+    const deleteAccount = async function () {
+      deleting.value = true
+      try {
+        const me = await fetch("/api/user/me")
+        const id = (await me.json()).id
+        const res = await fetch("/api/user?id=" + id, {
+          method: "DELETE"
+        })
+        deleting.value = false
+        if (res.ok) {
+          document.location.pathname = "/"
+        } else {
+          error.value = new Error(await res.text())
+        }
+      } catch (err) {
+        error.value = err
       }
     }
 
@@ -110,8 +139,11 @@ export default defineComponent({
       confirmPasswordRules,
       showingSnackbar,
       snackbarText,
+      deleting,
+      error,
       saveInfo,
-      validate
+      validate,
+      deleteAccount
     }
   }
 })
@@ -120,6 +152,7 @@ export default defineComponent({
 <template>
   <v-card class="form-card account-info-card">
     <v-card-title>Account info</v-card-title>
+    <ErrorPanel v-if="error != null" :error="error" />
     <div class="payment-method-config-container">
       <div v-if="!user.has_payment_method">
         No payment method configured.
@@ -176,7 +209,16 @@ export default defineComponent({
                     :rules="confirmPasswordRules"
                     validate-on="input"
       ></v-text-field>
-      <v-btn type="submit">Save</v-btn>
+      <v-card-actions>
+        <v-btn type="submit">Save</v-btn>
+        <v-spacer></v-spacer>
+        <v-btn
+          @click="deleteAccount"
+          :loading=deleting
+          color="red"
+        >Delete account
+        </v-btn>
+      </v-card-actions>
     </v-form>
   </v-card>
   <v-snackbar
