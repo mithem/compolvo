@@ -164,7 +164,7 @@ export default defineComponent({
                 text="Install & close"
                 @click="install(() => {
                     isActive.value = false
-                    snackbarText = 'Software set up to be installed shortly.'
+                    snackbarText = 'Software set up to be installed shortly. Go to the home page to manage your software.'
                     showingSnackbar = true
                     fetchData()
                   })"

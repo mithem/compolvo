@@ -106,7 +106,7 @@ export default defineComponent({
         :loading="uninstalling"
         color="red"
         variant="outlined"
-        :disabled="software.installing || software.uninstalling"
+        :disabled="software.uninstalling"
       >
         Uninstall
       </v-btn>
