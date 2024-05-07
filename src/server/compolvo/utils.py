@@ -17,7 +17,8 @@ async def check_token(token: str, secret_key: str) -> Optional[User]:
         token = jwt.decode(
             token, secret_key, algorithms=["HS256"]
         )
-        if datetime.datetime.fromisoformat(token["expires"]) <= datetime.datetime.now():
+        if datetime.datetime.fromisoformat(token["expires"]) <= datetime.datetime.now(
+                tz=datetime.timezone.utc):
             return None
         return await User.get_or_none(id=token["id"])
     except (InvalidTokenError, KeyError):
