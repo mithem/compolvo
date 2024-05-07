@@ -21,14 +21,16 @@ export default createVuetify({
         dark: false,
         colors: {
           link: "#0d5aa7",
-          "on-link": "#3288de"
+          "on-link": "#3288de",
+          "second-layer-card-background": "#ffffff"
         }
       },
       dark: {
         dark: true,
         colors: {
           link: "#3988DE",
-          "on-link": "#50B3FA"
+          "on-link": "#50B3FA",
+          "second-layer-card-background": "#333333"
         }
       }
     }
