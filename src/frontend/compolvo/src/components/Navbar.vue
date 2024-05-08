@@ -32,7 +32,7 @@
 import {ref} from "vue";
 import {useTheme} from "vuetify";
 import Constants from "./Constants";
-import {License, Token} from "./models";
+import {Token} from "./models";
 
 export default {
   name: "Compolvo",
@@ -79,13 +79,11 @@ export default {
     const updateCountdown = () => {
       const now = new Date();
       const timeLeft = token.value.expires.getTime() - now.getTime(); // Time left in milliseconds
-      console.log(token.value.expires.getTime(),  now.getTime(), timeLeft)
 
       if (timeLeft > 0) {
         const seconds = Math.floor((timeLeft / 1000) % 60);
-        const minutes = Math.floor((timeLeft / (1000 * 60)) % 60);
-        const hours = Math.floor((timeLeft / (1000 * 60 * 60)) % 24);
-        countdown.value = `${hours}h ${minutes}m ${seconds}s`;
+        const minutes = Math.floor((timeLeft / (1000 * 60)));
+        countdown.value = `${minutes}m ${seconds}s`;
       } else {
         countdown.value = "Expired";
         clearInterval(timerInterval); // Stop the timer when expired
@@ -172,6 +170,7 @@ export default {
   z-index: 1;
 }
 .countdown {
-  align-content: center
+  align-content: center;
+  margin-right: 20px;
 }
 </style>
