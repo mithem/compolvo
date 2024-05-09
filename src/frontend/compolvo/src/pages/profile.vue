@@ -38,8 +38,12 @@
         </v-col>
       </v-row>
     </div>
-    <div class="form-container">
-      <div v-if="me != null && isEditing" class="user-form-container">
+    <div
+      v-if="isEditing"
+      class="form-container"
+      id="form-container"
+    >
+      <div v-if="me != null" class="user-form-container">
         <UserInfoForm :user=me></UserInfoForm>
       </div>
       <div v-else-if="loadingUserInfo">
@@ -69,6 +73,11 @@ export default defineComponent({
 
     function toggleEdit() {
       isEditing.value = !isEditing.value;
+      if (isEditing.value) {
+        setTimeout(() => {
+          document.getElementById("form-container").scrollIntoView({behavior: "smooth"});
+        }, 100)
+      }
     }
 
     const fetchServicePlans = async function () {

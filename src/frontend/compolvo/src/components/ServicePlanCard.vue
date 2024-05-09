@@ -142,21 +142,27 @@ export default defineComponent({
           <v-card class="pa-8">
             <h1>Install {{ plan.service_offering.service.name }}</h1>
             <v-progress-linear v-if="loadingAgents" indeterminate></v-progress-linear>
-            Select agents to install {{ plan.service_offering.service.name }} on:
-            <v-select
+            <div
               v-if="agents.length > 0"
-              v-model="selectedAgents"
-              :items="agents"
-              key="id"
-              multiple
-              clearable
-              placeholder="Select agent"
-              persistent-placeholder
             >
-            </v-select>
-            <div v-else>Create a new agent in the
+              Select agents to install {{ plan.service_offering.service.name }} on:
+              <v-select
+                v-model="selectedAgents"
+                :items="agents"
+                key="id"
+                multiple
+                clearable
+                placeholder="Select agent"
+                persistent-placeholder
+              >
+              </v-select>
+            </div>
+            <div v-else>
+              No compatible agents found. Assuming, you have already created and installed agents,
+              please make sure you initialized your agent by running the init command of the agent
+              script. If you need to create a new agent, you can do so from the
               <RouterLink class="link" to="/agents">agent panel</RouterLink>
-              first to select it here.
+              .
             </div>
             <v-card-actions>
               <v-spacer></v-spacer>
@@ -168,6 +174,7 @@ export default defineComponent({
                     showingSnackbar = true
                     fetchData()
                   })"
+                :disabled="selectedAgents.length === 0"
               >
               </v-btn>
             </v-card-actions>

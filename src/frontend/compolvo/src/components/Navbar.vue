@@ -25,11 +25,21 @@
       <span :class="['countdown', { 'text-red': countdown === 'Expired' }]">{{ countdown }}</span>
     </v-toolbar-items>
   </v-toolbar>
+  <v-snackbar color="error" v-model="showingErrorSnackbar">
+    {{ error.message }}
+    <template v-slot:actions>
+      <v-btn
+        variant="text"
+        @click="showingErrorSnackbar = false"
+      >Close
+      </v-btn>
+    </template>
+  </v-snackbar>
 </template>
 
 <script lang="ts">
 
-import {ref} from "vue";
+import {getCurrentInstance, ref} from "vue";
 import {useTheme} from "vuetify";
 import Constants from "./Constants";
 import {Token} from "./models";
@@ -39,8 +49,7 @@ export default {
   data() {
     return {
       appTitle: "Compolvo",
-      sidebar: true,
-      menuItems: []
+      sidebar: true
     }
   },
   setup() {
@@ -50,6 +59,10 @@ export default {
     const token = ref<Token>()
     const countdown = ref('');
     let timerInterval;
+    const menuItems = ref<{ title: string, path: string, icon: string }[]>([]);
+    const error = ref<Error | null>(null);
+    const instance = getCurrentInstance().proxy
+    const showingErrorSnackbar = ref(false);
 
     const autoThemeHandler = (query) => {
       theme.global.name.value = query.matches ? "dark" : "light"
@@ -66,19 +79,54 @@ export default {
               expires: new Date(token.expires),
             }
           })
-          console.log("Token", token.value);  // Debugging line to see what's fetched
-          updateCountdown()
-        } else {
-          alert(await response.text());
         }
+        await updateCountdown() // Update with "expired" if no valid token was retrieved
       } catch (err) {
-        alert(err);
+        error.value = err
+        showingErrorSnackbar.value = true
       }
     }
 
-    const updateCountdown = () => {
+    const isLoggedIn = async () => {
+      try {
+        const res = await fetch("/api/user/me")
+        if (!res.ok) {
+          return false
+        }
+        const data = JSON.parse(await res.text())
+        return data.id !== undefined
+      } catch (err) {
+        error.value = err
+        showingErrorSnackbar.value = true
+      }
+    }
+
+    const setMenuItems = async () => {
+      let items = []
+      if (await isLoggedIn()) {
+        items.push(
+          {title: "Home", path: "/home", icon: "mdi-home"},
+          {title: "Compare", path: "/compare", icon: "mdi-scale-balance"},
+          {title: "Agents", path: "/agents", icon: "mdi-dns"},
+          {title: "Profile", path: "/profile", icon: "mdi-account"},
+          {title: "Logout", path: "/logout", "icon": "mdi-account"}
+        )
+      } else {
+        items.push(
+          {
+            title: "Login",
+            path: "/login",
+            query: {redirect_url: instance.$route.fullPath},
+            icon: "mdi-account"
+          }
+        )
+      }
+      menuItems.value = items;
+    }
+
+    const updateCountdown = async () => {
       const now = new Date();
-      const timeLeft = token.value.expires.getTime() - now.getTime(); // Time left in milliseconds
+      const timeLeft = token.value !== undefined ? token.value.expires.getTime() - now.getTime() : -1; // Time left in milliseconds
 
       if (timeLeft > 0) {
         const seconds = Math.floor((timeLeft / 1000) % 60);
@@ -87,9 +135,25 @@ export default {
       } else {
         countdown.value = "Expired";
         clearInterval(timerInterval); // Stop the timer when expired
+        // Reset only if menu bar shows restricted pages (in order to not spam the auth check endpoint each time this method gets called)
+        if (menuItems.value.length >= 1) {
+          await setMenuItems()
+        }
       }
     };
-    return {theme, themeMode, darkMediaQuery, autoThemeHandler, fetchTokenData,updateCountdown,countdown};
+    return {
+      theme,
+      themeMode,
+      darkMediaQuery,
+      countdown,
+      menuItems,
+      showingErrorSnackbar,
+      error,
+      autoThemeHandler,
+      fetchTokenData,
+      updateCountdown,
+      setMenuItems
+    };
   },
   mounted() {
     this.fetchTokenData()
@@ -117,42 +181,6 @@ export default {
         this.theme.global.name.value = scheme
       }
     }
-  },
-  methods: {
-    async isLoggedIn(): Promise<boolean> {
-      try {
-        const res = await fetch("/api/user/me")
-        if (!res.ok) {
-          return false
-        }
-        const data = JSON.parse(await res.text())
-        return data.id !== undefined
-      } catch (err) {
-        return false
-      }
-    },
-    async setMenuItems() {
-      let items = []
-      if (await this.isLoggedIn()) {
-        items.push(
-          {title: "Home", path: "/home", icon: "mdi-home"},
-          {title: "Compare", path: "/compare", icon: "mdi-scale-balance"},
-          {title: "Agents", path: "/agents", icon: "mdi-dns"},
-          {title: "Profile", path: "/profile", icon: "mdi-account"},
-          {title: "Logout", path: "/logout", "icon": "mdi-account"}
-        )
-      } else {
-        items.push(
-          {
-            title: "Login",
-            path: "/login",
-            query: {redirect_url: this.$route.fullPath},
-            icon: "mdi-account"
-          }
-        )
-      }
-      this.menuItems = items;
-    }
   }
 }
 </script>
@@ -169,6 +197,7 @@ export default {
 .navbar {
   z-index: 1;
 }
+
 .countdown {
   align-content: center;
   margin-right: 20px;

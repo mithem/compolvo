@@ -3,7 +3,7 @@ import datetime
 import enum
 import os
 import signal
-from typing import Set, Tuple, Dict
+from typing import Set, Tuple, Dict, Iterable
 
 import jwt
 import jwt.exceptions
@@ -11,7 +11,6 @@ import stripe
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sanic import Sanic, redirect, Request, text, Blueprint, json, HTTPResponse
-from sanic.exceptions import BadRequest, NotFound
 from sanic.handlers import ErrorHandler
 from sanic.log import logger
 from sanic_openapi import openapi
@@ -29,8 +28,8 @@ from compolvo.models import Agent, AgentSoftware, Serializable, PackageManager, 
     BillingCycle, BillingCycleType, ServerStatus
 from compolvo.models import Service, OperatingSystem, Tag, UserRole, User, License, \
     ServiceOffering, ServicePlan
-from compolvo.utils import check_token, Unauthorized
-from compolvo.utils import verify_password, hash_password, generate_secret, test_email, \
+from compolvo.utils import verify_password, check_token, Unauthorized, BadRequest, NotFound, \
+    hash_password, generate_secret, test_email, \
     user_has_roles
 from compolvo.websockets import run_websocket_server, run_websocket_handler_queue_worker, \
     queue_websocket_msg
@@ -42,7 +41,7 @@ app = Sanic("compolvo")
 app.config.SERVER_NAME = os.environ["SERVER_NAME"]
 app.config.FALLBACK_ERROR_FORMAT = "text"
 app.config.SECRET_KEY = os.environ["COMPOLVO_SECRET_KEY"]
-app.config.SESSION_TIMEOUT = 60 * 60
+app.config.SESSION_TIMEOUT = 60 * 30
 
 SERVER_ID = os.environ["SERVER_ID"]
 STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY")
@@ -85,7 +84,8 @@ app.blueprint(api)
 class CustomErrorHandler(ErrorHandler):
     def default(self, request: Request, exception: Exception) -> HTTPResponse:
         status = getattr(exception, "status", 500)
-        logger.exception(exception)
+        if not 400 <= status <= 499:
+            logger.exception(exception)
         return text(str(exception), status=status)
 
 
@@ -312,7 +312,7 @@ async def set_up_demo_db(user: User, services: bool = False,
         svc_nextcloud = await Service.create(
             system_name="nextcloud",
             name="Nextcloud",
-            short_description ="Nextcloud is an open-source software suite that provides a secure and decentralized platform for file storage, collaboration, and communication. It allows users and organizations to host their own cloud storage service, managing files, contacts, calendars, and more, with full control over their data and privacy.",
+            short_description="Nextcloud is an open-source software suite that provides a secure and decentralized platform for file storage, collaboration, and communication. It allows users and organizations to host their own cloud storage service, managing files, contacts, calendars, and more, with full control over their data and privacy.",
             description="Nextcloud is a robust, open-source software solution designed to offer businesses and individuals alike the ability to operate their own private cloud storage and collaboration platform. As a self-hosted system, it empowers users to maintain complete control over their data, ensuring privacy and security in a world where these are increasingly at a premium. Nextcloud facilitates file sharing, calendar and contact management, task scheduling, and real-time document collaboration, all within a user-friendly interface accessible via web or mobile apps. A standout feature of Nextcloud is its extensibility, supported by a vibrant community of developers who contribute to a growing library of apps and plugins. These extensions can transform the core Nextcloud installation into a more customized and versatile tool, integrating features such as mail handling, video conferencing, and office suite tools. This modularity makes it an ideal solution for organizations looking to adapt the platform to their specific operational needs. Nextcloud also excels in providing enterprise-grade security. With features like end-to-end encryption, two-factor authentication, and easy-to-manage user permissions, it gives administrators the tools they need to secure data against unauthorized access. Furthermore, its compliance with major privacy standards, such as GDPR, makes it suitable for organizations needing to adhere to strict data protection regulations. For teams and organizations that prioritize data sovereignty and collaborative flexibility, Nextcloud offers a scalable and reliable platform. It supports a broad range of deployment scenarios, from small teams looking for file sharing solutions to large enterprises needing comprehensive collaboration suites. Nextcloud’s commitment to open-source principles and its proactive approach to security and privacy make it a preferred choice for those seeking an alternative to commercial cloud storage providers.",
             license=lic_mit,
             download_count=42069,
@@ -844,6 +844,17 @@ async def deassociate_tag_with_service(request, user):
     return HTTPResponse(status=204)
 
 
+async def get_os_compatible_agents(agents: Iterable[Agent], oses: Iterable[str]) -> Set[
+    Agent]:
+    async def agent_is_included(agent: Agent):
+        os = await agent.operating_system
+        if os is None:
+            return False
+        return str(os.id) in oses
+
+    return {agent for agent in agents if await agent_is_included(agent)}
+
+
 @agent.get("/")
 @protected()
 async def get_own_agents(request, user):
@@ -852,10 +863,19 @@ async def get_own_agents(request, user):
         plan = await ServicePlan.get_or_none(id=plan)
         if plan is None:
             raise NotFound("Service plan not found.")
+        service = await (await plan.service_offering).service
         # TODO: Logic to check which agents software can be installed on
-        softwares = await AgentSoftware.filter(service_plan=plan).all()
-        agents = {await software.agent for software in softwares}
-        installable_agents: Set[Serializable] = set(await Agent.filter(user=user).all()) - agents
+        softwares = await AgentSoftware.filter(
+            service_plan__service_offering__service=service).all()
+        agents_with_service = {await software.agent for software in softwares}
+        available_versions = await PackageManagerAvailableVersion.filter(
+            service=service).all().prefetch_related("operating_system")
+        available_oses = set(
+            map(lambda version: str(version.operating_system.id), available_versions))
+        agents = await Agent.filter(user=user).all()
+        agents_with_compatible_os = await get_os_compatible_agents(agents, available_oses)
+        installable_agents: Set[Serializable] = (
+                                                        set(agents) - agents_with_service) & agents_with_compatible_os
         return await Serializable.list_json(installable_agents)
 
     agents = await Agent.filter(user=user).all()
@@ -1491,8 +1511,6 @@ async def set_up_sigint_handler():
         loop.add_signal_handler(getattr(signal, sig),
                                 lambda: asyncio.create_task(signal_handler(sig)))
 
-
-# TODO: Add endpoints for creating, updating and deleting licenses + OSes
 
 app.add_task(run_websocket_server(app))
 app.add_task(run_websocket_handler_queue_worker())

@@ -24,9 +24,21 @@ async def check_token(token: str, secret_key: str) -> Optional[User]:
     except (InvalidTokenError, KeyError):
         return None
 
-
 class Unauthorized(SanicException):
+    status = 401
     message = "Unauthorized. Please log in."
+
+
+class BadRequest(SanicException):
+    def __init__(self, message: str, status=400):
+        self.message = message
+        self.status = status
+
+
+class NotFound(SanicException):
+    def __init__(self, message: str, status=404):
+        self.message = message
+        self.status = status
 
 
 async def check_token_for_request(request: Request) -> Optional[User]:

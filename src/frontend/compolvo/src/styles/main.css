@@ -6,3 +6,7 @@
 .link:hover {
     color: rgb(var(--v-theme-on-link)) !important;
 }
+
+html {
+    background-color: rgb(var(--v-theme-background));
+}
