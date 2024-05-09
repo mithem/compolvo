@@ -621,6 +621,30 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "event",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/event?user_id=all",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "event"
+          ],
+          "query": [
+            {
+              "key": "user_id",
+              "value": "all"
+            }
+          ]
+        }
+      },
+      "response": []
     }
   ],
   "event": [

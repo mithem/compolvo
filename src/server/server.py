@@ -20,6 +20,7 @@ from tortoise.expressions import Q
 from tortoise.functions import Coalesce
 
 from compolvo import cors
+from compolvo import notify
 from compolvo import options
 from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, protected, \
     requires_payment_details, requires_stripe_customer
@@ -28,6 +29,7 @@ from compolvo.models import Agent, AgentSoftware, Serializable, PackageManager, 
     BillingCycle, BillingCycleType, ServerStatus
 from compolvo.models import Service, OperatingSystem, Tag, UserRole, User, License, \
     ServiceOffering, ServicePlan
+from compolvo.notify import Event, Recipient, EventType, SubscriberType
 from compolvo.utils import verify_password, check_token, Unauthorized, BadRequest, NotFound, \
     hash_password, generate_secret, test_email, \
     user_has_roles
@@ -1281,7 +1283,6 @@ async def stop_server(request, user):
     app.stop(False)
     return text("Accepted.", status=202)
 
-
 async def perform_billing_maintenance():
     if STRIPE_API_KEY is None:
         logger.warning("Skipping billing maintenance as no stripe API key is found.")
@@ -1512,11 +1513,23 @@ async def set_up_sigint_handler():
                                 lambda: asyncio.create_task(signal_handler(sig)))
 
 
+@app.post("/api/event")
+@protected({UserRole.Role.ADMIN})
+async def create_event(request, user: User):
+    user_id = request.args.get("user_id", str(user.id))
+    if user_id == "all":
+        user_id = None
+    recipient = Recipient(SubscriberType.USER, user_id)
+    event = Event(EventType.RELOAD, recipient, "/home/agent/software")
+    await notify.notify(event)
+    return text("Accepted.", status=202)
+
 app.add_task(run_websocket_server(app))
 app.add_task(run_websocket_handler_queue_worker())
 app.add_task(run_schedules())
 app.add_task(perform_billing_maintenance())
 app.add_task(set_up_sigint_handler())
+app.add_task(notify.run_websocket_server())
 
 if __name__ == "__main__":
     app.run("0.0.0.0")
