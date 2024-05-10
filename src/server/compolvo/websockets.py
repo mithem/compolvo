@@ -6,7 +6,9 @@ from queue import Queue
 from typing import Dict
 
 import websockets
+from compolvo import notify
 from compolvo.models import AgentSoftware, Agent
+from compolvo.notify import Event, SubscriberType, EventType
 from sanic.log import logger
 from tortoise import BaseDBAsyncClient
 from websockets import ConnectionClosedError, ConnectionClosedOK
@@ -51,6 +53,14 @@ async def handle_websocket_msg(agent_id: str, message: str) -> str | None:
 
 
 async def websocket_handler(ws: websockets.WebSocketServerProtocol):
+    logged_in = False
+
+    async def validate_login(event: Event):
+        logged_in = True
+
+    notify.subscribe(SubscriberType.SERVER, EventType.AGENT_LOGIN, validate_login)  # TODO: Add ID
+    while not logged_in:
+        await asyncio.sleep(1)
     login_msg = await ws.recv()
     match = re.match(r"^login agent (?P<id>[\w-]{36})$", login_msg)
     if match is None:
@@ -111,7 +121,7 @@ async def run_websocket_server(app):
     for agent in agents:
         agent.connected = False
         await agent.save()
-    async with websockets.serve(websocket_handler, "0.0.0.0", 8001):
+    async with websockets.serve(websocket_handler, "0.0.0.0", 8002):
         logger.info("Started websocket server")
         await asyncio.Future()
 
@@ -124,15 +134,3 @@ async def run_websocket_handler_queue_worker():
             await handle_websocket_msg(agent_id, msg)
         except queue.Empty:
             await asyncio.sleep(1)
-
-
-def queue_websocket_msg(agent_id: str, message: str):
-    assert type(
-        agent_id) == str, "agent id isn't of type str. Don't search further why messages don't get delivered"
-    global websocket_message_queue
-    queue = websocket_message_queue.get(agent_id)
-    if queue is None:
-        queue = Queue()
-    queue.put(message)
-    websocket_message_queue[agent_id] = queue
-    logger.debug(f"Queued message for {agent_id}: {message}")

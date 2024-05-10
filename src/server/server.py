@@ -1,6 +1,5 @@
 import asyncio
 import datetime
-import enum
 import os
 import signal
 from typing import Set, Tuple, Dict, Iterable
@@ -33,8 +32,6 @@ from compolvo.notify import Event, Recipient, EventType, SubscriberType
 from compolvo.utils import verify_password, check_token, Unauthorized, BadRequest, NotFound, \
     hash_password, generate_secret, test_email, \
     user_has_roles
-from compolvo.websockets import run_websocket_server, run_websocket_handler_queue_worker, \
-    queue_websocket_msg
 
 HTTP_HEADER_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
 
@@ -1068,7 +1065,7 @@ async def bulk_create_agent_software(request, user):
                      agents]
         await AgentSoftware.bulk_create(softwares)
         for (software, agent) in zip(softwares, agents):
-            await send_agent_software_notification(AgentSoftwareAgentCommand.INSTALL, agent,
+            await send_agent_software_notification(EventType.INSTALL_SOFTWARE, agent,
                                                    service, software)
         return HTTPResponse(status=201)
     except KeyError:
@@ -1100,7 +1097,7 @@ async def update_agent_software(request, user):
         raise NotFound("AgentSoftware not found.")
     agent = await software.agent
     service = await (await (await software.service_plan).service_offering).service
-    await send_agent_software_notification(AgentSoftwareAgentCommand.INSTALL, agent, service,
+    await send_agent_software_notification(EventType.INSTALL_SOFTWARE, agent, service,
                                            software)
     software.installing = True
     await software.save()
@@ -1124,44 +1121,25 @@ async def uninstall_agent_software(request, user):
 
 
 async def perform_software_uninstallation(agent: Agent, service: Service, software: AgentSoftware):
-    await send_agent_software_notification(AgentSoftwareAgentCommand.UNINSTALL, agent, service,
+    await send_agent_software_notification(EventType.UNINSTALL_SOFTWARE, agent, service,
                                            software)
     software.uninstalling = True
     await software.save()
 
 
-class AgentSoftwareAgentCommand(enum.StrEnum):
-    INSTALL = "install"
-    UNINSTALL = "uninstall"
-
-
-async def send_agent_software_notification(command: AgentSoftwareAgentCommand, agent: Agent,
+async def send_agent_software_notification(command: EventType, agent: Agent,
                                            service: Service,
                                            software: AgentSoftware):
-    version = await get_latest_version(service, await agent.operating_system)
-    match command:
-        case AgentSoftwareAgentCommand.INSTALL:
-            version_info = f" v{version}"
-        case AgentSoftwareAgentCommand.UNINSTALL:
-            version_info = ""
-        case _:
-            raise ValueError("Unexpected AgentSoftwareAgentCommand.")
-    message = f"{command.value} {service.system_name} {software.id}{version_info}"
-    queue_websocket_msg(str(agent.id), message)
-
-
-@app.post("/api/agent/ws/queue")
-@protected({UserRole.Role.ADMIN})
-async def send_agent_queue_message(request, user):
-    try:
-        agent_id = request.json["agent"]
-        message = request.json["message"]
-        count = request.json.get("count", 1)
-        for i in range(count):
-            queue_websocket_msg(agent_id, message)
-        return text("Accepted.", status=202)
-    except KeyError:
-        raise BadRequest("Missing parameters. Expected `agent`, `message`")
+    assert command in [EventType.INSTALL_SOFTWARE, EventType.UNINSTALL_SOFTWARE]
+    msg = {
+        "service": service.system_name,
+        "software": str(software.id)
+    }
+    if command == EventType.INSTALL_SOFTWARE:
+        msg["version"] = await get_latest_version(service, await agent.operating_system)
+    recipient = Recipient(SubscriberType.AGENT, str(agent.id))
+    event = Event(command, recipient, msg, False)
+    notify.queue(event)
 
 
 @license.get("/")
@@ -1282,6 +1260,7 @@ async def get_server_stati(request, user, stati):
 async def stop_server(request, user):
     app.stop(False)
     return text("Accepted.", status=202)
+
 
 async def perform_billing_maintenance():
     if STRIPE_API_KEY is None:
@@ -1521,15 +1500,15 @@ async def create_event(request, user: User):
         user_id = None
     recipient = Recipient(SubscriberType.USER, user_id)
     event = Event(EventType.RELOAD, recipient, "/home/agent/software")
-    await notify.notify(event)
+    notify.queue(event)
     return text("Accepted.", status=202)
 
-app.add_task(run_websocket_server(app))
-app.add_task(run_websocket_handler_queue_worker())
+
 app.add_task(run_schedules())
 app.add_task(perform_billing_maintenance())
 app.add_task(set_up_sigint_handler())
 app.add_task(notify.run_websocket_server())
+app.add_task(notify.run_queue_worker())
 
 if __name__ == "__main__":
     app.run("0.0.0.0")

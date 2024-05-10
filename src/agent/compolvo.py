@@ -1,5 +1,6 @@
 import asyncio
 import enum
+import json
 import logging
 import os
 import platform
@@ -117,19 +118,45 @@ def run_playbook(system_name: str, software_id: str, playbook_name: str):
     return generate_software_status(software_id, installed_version, True, False, False)
 
 
+async def subscribe(ws: websockets.WebSocketClientProtocol, event_type: str):
+    subscription_data = {
+        "intent": "subscribe",
+        "subscriber_type": "agent",
+        "event_type": event_type,
+        "id": config.agent.id
+    }
+    await ws.send(json.dumps(subscription_data))
+    response = await ws.recv()
+    res = json.loads(response)
+    if not res.get("success", False):
+        raise Exception("Received unsuccessful message from server: " + response)
+
 async def run_websocket(retries: Optional[int] = 5):
-    uri = f"ws{'s' if config.compolvo.secure else ''}://{config.compolvo.host}/api/agent/ws"
+    uri = f"ws{'s' if config.compolvo.secure else ''}://{config.compolvo.host}/api/notify"
     logger.debug("logging in to WebSocket at %s", uri)
     while retries is None or retries > 0:
         try:
             async with websockets.connect(uri) as ws:
-                login_msg = f"login agent {config.agent.id}"
-                await ws.send(login_msg)
+                login_data = {
+                    "event": {
+                        "type": "agent-login",
+                        "recipient": None,
+                        "message": {
+                            "agent_id": config.agent.id
+                        }
+                    }
+                }
+                await ws.send(json.dumps(login_data))
                 response = await ws.recv()
-                if response == "login successful":
+                res = json.loads(response)
+                if res.get("success", False):
                     logger.info("Logged in successfully.")
                 else:
                     logger.info("Error logging in: %s", response)
+                _ = await ws.recv()
+                await subscribe(ws, "install-software")
+                await subscribe(ws, "uninstall-software")
+                logger.info("Subscribed to relevant notification topics.")
                 try:
                     while True:
                         data = await ws.recv()
