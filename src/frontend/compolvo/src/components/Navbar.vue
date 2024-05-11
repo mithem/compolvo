@@ -136,7 +136,7 @@ export default {
         countdown.value = "Expired";
         clearInterval(timerInterval); // Stop the timer when expired
         // Reset only if menu bar shows restricted pages (in order to not spam the auth check endpoint each time this method gets called)
-        if (menuItems.value.length >= 1) {
+        if (menuItems.value.length > 1) {
           await setMenuItems()
         }
       }
