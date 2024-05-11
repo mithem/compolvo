@@ -179,7 +179,10 @@ async def run_websocket(retries: Optional[int] = 5):
                 login_data = {
                     "event": {
                         "type": "agent-login",
-                        "recipient": None,
+                        "recipient": {
+                            "subscriber_type": "server",
+                            "id": None
+                        },
                         "message": {
                             "agent_id": config.agent.id
                         }

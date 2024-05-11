@@ -1509,6 +1509,7 @@ app.add_task(perform_billing_maintenance())
 app.add_task(set_up_sigint_handler())
 app.add_task(notify.run_websocket_server())
 app.add_task(notify.run_queue_worker())
+app.add_task(notify.run_event_worker())
 
 if __name__ == "__main__":
     app.run("0.0.0.0")

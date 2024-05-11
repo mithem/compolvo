@@ -159,9 +159,7 @@ async def _notify(event: Event) -> bool:
     connection_handlers = set(_connection_handlers.items())
     for subscription, handler in connection_handlers:
         if subscription.subscriber in subscribers:
-            logger.debug("Invoking subscriber %s for event %s", subscription.subscriber, event)
             result = await handler(event)
-            logger.debug("Result: %s", result)
             if result == False:  # A None return value is not a failure
                 success = False
     return success
@@ -169,6 +167,8 @@ async def _notify(event: Event) -> bool:
 
 def subscribe(type: SubscriberType, event_type: EventType, handler: EventHandler,
               id: str | None = None) -> Subscription:
+    # TODO: Checks that ensure users can only subscribe to the right events
+    # (e.g. reload & login events only for users with restricted id)
     subscriber = Subscriber(type, event_type, id)
     subscription = Subscription(subscriber, uuid.uuid4())
     _connection_handlers[subscription] = handler
@@ -282,6 +282,13 @@ async def handle_agent_software_status_update_event(event: Event, agent: Agent |
         await software.save()
         # Perform delete check after update as not all fields required for the check need to be sent in the event
         if software.installed_version is None and software.uninstalling == False and was_uninstalling and not software.installing and not software.corrupt:
+            recipient = Recipient(SubscriberType.SERVER)
+            event = Event(EventType.AGENT_SOFTWARE_STATUS_UPDATE, recipient,
+                          {"software_id": software_id})
+            event = await get_user_reload_event(event)
+            if event is not None:
+                logger.info("Queuing event: %s", event)
+                queue(event)
             await software.delete()
     else:
         fields_str = ", ".join(map(lambda field: "'" + field + "'", valid_fields))
@@ -294,6 +301,9 @@ async def handle_agent_disconnect(agent: Agent, error: ConnectionClosed):
     if isinstance(error, ConnectionClosedError):
         agent.connection_interrupted = True
     await agent.save()
+    recipient = Recipient(SubscriberType.SERVER)
+    event = Event(EventType.WS_DISCONNECT, recipient, {"agent_id": str(agent.id)})
+    await _notify(event)
 
 
 async def websocket_handler(ws: websockets.WebSocketServerProtocol):
@@ -360,3 +370,34 @@ async def run_queue_worker():
     while True:
         await process_queue()
         await asyncio.sleep(1)
+
+
+async def get_user_reload_event(event: Event):
+    agent_id: str | UUID | None = None
+    match event.type:
+        case EventType.AGENT_LOGIN | EventType.WS_DISCONNECT:
+            agent_id = event.message["agent_id"]
+        case EventType.AGENT_SOFTWARE_STATUS_UPDATE:
+            software_id = event.message["software_id"]
+            software = await AgentSoftware.get_or_none(id=software_id)
+            agent_id = (await software.agent).id if software is not None else None
+    if agent_id is None:
+        return
+    agent: Agent | None = await Agent.get_or_none(id=agent_id)
+    if agent is None:
+        return
+    user_id = str((await agent.user).id)
+    recipient = Recipient(SubscriberType.USER, user_id)
+    return Event(EventType.RELOAD, recipient, {"path": "/home/agent/software"})
+
+
+async def run_event_worker():
+    async def handler(event: Event):
+        event = await get_user_reload_event(event)
+        if event is not None:
+            await _notify(event)
+
+    logger.info("Running event worker")
+    subscribe(SubscriberType.SERVER, EventType.AGENT_LOGIN, handler)
+    subscribe(SubscriberType.SERVER, EventType.WS_DISCONNECT, handler)
+    subscribe(SubscriberType.SERVER, EventType.AGENT_SOFTWARE_STATUS_UPDATE, handler)

@@ -2,11 +2,13 @@
   <v-container fluid>
     <v-container fluid class="container-row">
       <div>
-        <ErrorPanel v-if="error != null" :error=error />
+        <ErrorPanel v-if="error != null" :error="error"/>
         <h2 @loggedIn="firstName = $event">Hello<span
           v-if="firstName !== null">, {{ firstName }}</span>!</h2>
-        <div v-if="updates !== 0">There <span v-if="updates === 1">is</span><span v-else>are</span>
-          {{ updates }} update<span v-if="updates > 1">s</span> available. Please apply any updates
+        <div v-if="updates !== 0">There <span v-if="updates === 1">is</span><span
+          v-else>are</span>
+          {{ updates }} update<span v-if="updates > 1">s</span> available. Please apply any
+          updates
           below.
         </div>
         <div v-else-if="softwares.length > 0">All agents up to date!</div>
@@ -60,6 +62,9 @@ export default defineComponent({
     const loading = ref(false);
     const agentCount = ref<number>(null);
     const error = ref<Error | null>(null);
+    const webSocket = new WebSocket("/api/notify");
+
+
     const fetchSoftware = async function () {
       try {
         loading.value = true;
@@ -89,9 +94,28 @@ export default defineComponent({
         if (res.ok) {
           const user: UserMeObject = await res.json()
           firstName.value = user.first_name;
+          subscribeToReloadEvents(user.id)
         }
       } catch (err) {
         error.value = err
+      }
+    }
+
+    const subscribeToReloadEvents = async function (userId: string) {
+      webSocket.send(JSON.stringify({
+        intent: "subscribe",
+        subscriber_type: "user",
+        event_type: "reload",
+        id: userId
+      }))
+    }
+
+    const handleWebSocketMessage = async function (ev: MessageEvent) {
+      const data = JSON.parse(ev.data)
+      if (data.event && data.event.type === "reload" && data.event.message.path === "/home/agent/software") {
+        fetchSoftware()
+      } else {
+        console.warn("Received invalid websocket message: ", ev.data)
       }
     }
 
@@ -118,6 +142,7 @@ export default defineComponent({
       refresh();
     });
 
+    webSocket.onmessage = handleWebSocketMessage
     return {softwares, updates, firstName, loading, agentCount, error, fetchSoftware, refresh}
   }
 });

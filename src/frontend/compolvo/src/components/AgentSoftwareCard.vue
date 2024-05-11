@@ -78,7 +78,11 @@ export default defineComponent({
       <div class="subtitle-container">
         <span v-if="software.agent.name !== null">{{ software.agent.name }}</span>
         <span v-else>{{ software.agent.id }}</span>
+        <v-spacer></v-spacer>
+        <span>
+          {{ software.agent.connected ? "connected" : "disconnected" }}
         <v-icon class="ml-2" :color="iconColor">{{ iconName }}</v-icon>
+        </span>
       </div>
     </v-card-subtitle>
     <v-card-text>
