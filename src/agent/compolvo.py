@@ -4,7 +4,6 @@ import json
 import logging
 import os
 import platform
-import re
 import sys
 from logging import Logger
 from typing import Dict, Any, Optional
@@ -75,31 +74,70 @@ def save_config(config: Config, config_file: str):
         yaml.safe_dump(config.to_dict(), f)
 
 
+def install_software(event: Dict) -> str | None:
+    system_name, software_id, version = extract_command_data_from_event(event)
+    return run_playbook(system_name, software_id, version)
+
+
+def extract_command_data_from_event(event: Dict):
+    msg = event["message"]
+    system_name = msg["service"]
+    software_id = msg["software"]
+    version = msg.get("version")
+    return system_name, software_id, version
+
+
+def uninstall_software(event: Dict) -> str | None:
+    system_name, software_id, _ = extract_command_data_from_event(event)
+    return run_playbook(system_name, software_id, "uninstall")
+
+
 def handle_websocket_command(command: str) -> str | None:
-    install_pattern = r"^install (?P<system_name>.+) (?P<software_id>[\w\d_-]{36}) v(?P<version>.+)$"
-    install_match = re.match(install_pattern, command)
-
-    uninstall_pattern = r"^uninstall (?P<system_name>.+) (?P<software_id>[\w\d_-]{36})$"
-
-    if install_match:
-        system_name = install_match.group("system_name")
-        software_id = install_match.group("software_id")
-        version = install_match.group("version")
-        return run_playbook(system_name, software_id, version)
-    else:
-        uninstall_match = re.match(uninstall_pattern, command)
-        if uninstall_match:
-            system_name = uninstall_match.group("system_name")
-            software_id = uninstall_match.group("software_id")
-            return run_playbook(system_name, software_id, "uninstall")
-        else:
-            logger.error("Got websocket message that can't be interpreted: %s", command)
+    data = json.loads(command)
+    event = data.get("event")
+    if data.get("success") == True:
+        logger.debug("Received positive confirmation: %s", data)
+        return
+    if event is None:
+        logger.warning("Received websocket message that can't be interpreted: %s", data)
+        return
+    recipient = event.get("recipient", {})
+    assert recipient.get(
+        "subscriber_type") == "agent", f"Received event for {recipient}: {event} (expected for agent)."
+    recipient_id = recipient.get("id")
+    assert recipient_id is None or recipient_id == config.agent.id, f"Received event for different agent: {event}"
+    type = event["type"]
+    match type:
+        case "install-software":
+            return install_software(event)
+        case "uninstall-software":
+            return uninstall_software(event)
+        case other:
+            logger.error("Received unsupported event of type '%s': %s", other, event)
     return None
 
 
 def generate_software_status(software_id: str, installed_version: str | None, corrupt=False,
                              installing=False, uninstalling=False):
-    return f"software status {software_id} installed_version={installed_version};corrupt={corrupt};installing={installing};uninstalling={uninstalling}".lower()
+    return json.dumps({
+        "event": {
+            "type": "software-status-update",
+            "recipient": {
+                "subscriber_type": "server",
+                "id": None
+            },
+            "message": {
+                "software_id": software_id,
+                "status": {
+                    "installed_version": installed_version,
+                    "corrupt": corrupt,
+                    "installing": installing,
+                    "uninstalling": uninstalling
+                }
+            }
+        }
+    })
+
 
 def run_playbook(system_name: str, software_id: str, playbook_name: str):
     playbook_url = f"http{'s' if config.compolvo.secure else ''}://{config.compolvo.host}/ansible/playbooks/{system_name}/{playbook_name}.yml"
@@ -131,6 +169,7 @@ async def subscribe(ws: websockets.WebSocketClientProtocol, event_type: str):
     if not res.get("success", False):
         raise Exception("Received unsuccessful message from server: " + response)
 
+
 async def run_websocket(retries: Optional[int] = 5):
     uri = f"ws{'s' if config.compolvo.secure else ''}://{config.compolvo.host}/api/notify"
     logger.debug("logging in to WebSocket at %s", uri)
@@ -161,20 +200,28 @@ async def run_websocket(retries: Optional[int] = 5):
                     while True:
                         data = await ws.recv()
                         logger.debug("received %s", data)
-                        data = handle_websocket_command(data)
-                        if data is not None:
-                            logger.debug("Sending %s", data)
-                            await ws.send(data)
+                        try:
+                            data = handle_websocket_command(data)
+                            if data is not None:
+                                logger.debug("Sending %s", data)
+                                await ws.send(data)
+                        except AssertionError as e:
+                            handle_error_for_user(e)
                 except KeyboardInterrupt:
                     return
                 except Exception as e:
-                    logger.error(e)
+                    handle_error_for_user(e)
         except Exception as e:
-            logger.error(e)
+            handle_error_for_user(e)
             if retries is not None:
                 retries = retries - 1
         await asyncio.sleep(1)
 
+
+def handle_error_for_user(err: Exception):
+    logger.error("Error occured: %s: %s", err.__class__.__name__, err)
+    if logger.level == logging.DEBUG:
+        logger.exception(err)
 
 class OperatingSystem(enum.StrEnum):
     debian = "debian"

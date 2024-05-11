@@ -148,21 +148,22 @@ def queue(event: Event):
     _event_queue.put(event)
 
 
-async def notify(event: Event) -> bool:
+async def _notify(event: Event) -> bool:
     subscribers = get_subscribers_for_event(event)
+    if len(subscribers) == 0:
+        logger.debug("No subscribers, unsuccessful delivery.")
+        return False
     success = True
-    print("Notifying subscribers:", subscribers)
     # collect items first as dict might change during iteration
     # that isn't fatal however, as newly unregistered handlers need to deal with potentially being invoked after that
     connection_handlers = set(_connection_handlers.items())
     for subscription, handler in connection_handlers:
         if subscription.subscriber in subscribers:
-            print("Notifying subscriber:", subscription.subscriber)
+            logger.debug("Invoking subscriber %s for event %s", subscription.subscriber, event)
             result = await handler(event)
+            logger.debug("Result: %s", result)
             if result == False:  # A None return value is not a failure
                 success = False
-        else:
-            print("Excluded subscriber:", subscription.subscriber)
     return success
 
 
@@ -273,19 +274,25 @@ async def handle_agent_software_status_update_event(event: Event, agent: Agent |
     if software is None:
         raise ValueError(f"Software '{software_id}' not found.")
     assert (await software.agent).id == agent.id, "This software isn't installed on this agent."
+    was_uninstalling = software.uninstalling
     valid_fields = {"corrupt", "installed_version", "installing", "uninstalling"}
     if set(status.keys()).issubset(valid_fields):
         for key, value in status.items():
             setattr(software, key, value)
         await software.save()
+        # Perform delete check after update as not all fields required for the check need to be sent in the event
+        if software.installed_version is None and software.uninstalling == False and was_uninstalling and not software.installing and not software.corrupt:
+            await software.delete()
     else:
         fields_str = ", ".join(map(lambda field: "'" + field + "'", valid_fields))
         raise ValueError(f"You can only alter the status of the fields {fields_str}")
 
 
-async def handle_agent_disconnect(agent: Agent):
+async def handle_agent_disconnect(agent: Agent, error: ConnectionClosed):
     agent.connected = False
     agent.last_connection_end = datetime.datetime.now()
+    if isinstance(error, ConnectionClosedError):
+        agent.connection_interrupted = True
     await agent.save()
 
 
@@ -300,10 +307,10 @@ async def websocket_handler(ws: websockets.WebSocketServerProtocol):
         await ws.send(json.dumps({"event": event.to_dict()}))
 
     async def subscription_callback(subscription: Subscription):
-        nonlocal sub_id
-        sub_id = subscription.id
+        nonlocal subs
+        subs.append(subscription.id)
 
-    sub_id: UUID | None = None
+    subs: List[UUID] = []
     agent: Agent | None = None
     try:
         while True:
@@ -314,23 +321,28 @@ async def websocket_handler(ws: websockets.WebSocketServerProtocol):
             msg = await ws.recv()
             res = await handle_incoming_message(msg, event_handler, subscription_callback)
             await ws.send(res)
-    except (ConnectionClosedOK, ConnectionClosedError):
+    except (ConnectionClosedOK, ConnectionClosedError) as error:
         # Unsubscribe to prevent memory leak
-        if sub_id is not None:
-            unsubscribe(sub_id)
+        for id in subs:
+            unsubscribe(id)
         if agent is not None:
-            await handle_agent_disconnect(agent)
+            await handle_agent_disconnect(agent, error)
 
 
 async def process_queue():
+    logger.debug("Processing queue: %s unfinished", _event_queue.unfinished_tasks)
+    failed_notifications = []
     while not _event_queue.empty():
         event = _event_queue.get(block=False)
         try:
-            success = await notify(event)
+            success = await _notify(event)
         except ConnectionClosed:
             success = False
         if not success and not event.ephemeral:
-            _event_queue.put(event)
+            failed_notifications.append(event)
+        _event_queue.task_done()
+    for event in failed_notifications:
+        _event_queue.put(event)
 
 
 async def run_websocket_server():
