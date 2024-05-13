@@ -1,0 +1,20 @@
+POST http://localhost:8000/api/service/offering
+
+{
+  "name": "second",
+  "price": 19.99,
+  "duration_days": 20,
+  "service": "d558f02e-8684-419d-856b-4b4f61c29e45"
+}
+
+###
+
+PATCH http://localhost:8000/api/service/offering?id=e803c9fb-926f-4ca8-b256-e49b39048cba
+
+{
+  "name": "year"
+}
+
+###
+
+DELETE http://localhost:8000/api/service/offering?id=b1046e1a-63ab-44b0-bcbc-0a8b63fde201

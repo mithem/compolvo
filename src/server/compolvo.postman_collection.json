@@ -1,0 +1,687 @@
+{
+  "info": {
+    "_postman_id": "b5810860-9c25-4d93-86fe-c3848e8db6a3",
+    "name": "compolvo",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "10720102"
+  },
+  "item": [
+    {
+      "name": "login",
+      "protocolProfileBehavior": {
+        "disabledSystemHeaders": {}
+      },
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/login?email=admin@example.com&password=admin",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "login"
+          ],
+          "query": [
+            {
+              "key": "email",
+              "value": "admin@example.com"
+            },
+            {
+              "key": "password",
+              "value": "admin"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "user/me",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/user/me",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "user",
+            "me"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "service",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.variables.set(\"SVC_ID\", pm.response.json().id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"compolvo-server\",\n  \"description\": \"Demo description\",\n  \"license\": \"MIT\",\n  \"download_count\": 69,\n  \"retrieval_method\": 1,\n  \"retrieval_data\": {\n    \"link\": \"http://localhost:8000/api/version\",\n    \"regex\": \"(?<version>.+)\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{HOST}}/api/service",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "service"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "service",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/service",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "service"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "service",
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"name\": \"Docker Desktop\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{HOST}}/api/service?id={{SVC_ID}}",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "service"
+          ],
+          "query": [
+            {
+              "key": "id",
+              "value": "{{SVC_ID}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "service/offering",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/service/offering",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "service",
+            "offering"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "service/offering",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.variables.set(\"SERVICE_OFFERING\", pm.response.json().id);;"
+            ],
+            "type": "text/javascript",
+            "packages": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"month\",\n  \"price\": 1290.99,\n  \"duration_days\": 30,\n  \"service\": \"{{SVC_ID}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{HOST}}/api/service/offering",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "service",
+            "offering"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "user",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/user",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "user"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "service/tag",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"service\": \"{{SVC_ID}}\",\n    \"tag\": \"{{TAG_1_ID}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{HOST}}/api/service/tag",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "service",
+            "tag"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "tag",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/tag",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "tag"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "tag",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.variables.set(\"TAG_1_ID\", pm.response.json().id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"label\": \"Developers\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{HOST}}/api/tag",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "tag"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "agent",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/agent",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "agent"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "agent",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"user\": \"45851e6d-afd0-4ae2-9d44-ce25c536efc2\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{HOST}}/api/agent",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "agent"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "agent/software",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"agent\": \"40e23b1d-4a47-4ca6-893a-55a3b9ef82bc\",\n    \"service_plan\": \"89b79da1-bd05-4b84-b921-c407da7ac064\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{HOST}}/api/agent/software",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "agent",
+            "software"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "service/plan",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/service/plan",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "service",
+            "plan"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "agent/software",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/agent/software",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "agent",
+            "software"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "service/plan",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"user\": \"176bb5cd-4c0c-4572-9843-b40b9f949bcc\",\n    \"service_offering\": \"ec899731-0e7f-4e6a-85e8-f1415d03e69a\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{HOST}}/api/service/plan",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "service",
+            "plan"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "setup",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"services\": true,\n    \"service_offerings\": true,\n    \"service_plans\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{HOST}}/api/setup",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "setup"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "agent/ws/queue",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"agent\": \"277311bd-bff2-41e0-9a87-0902a00e07d2\",\n    \"message\": \"Hello, world!\",\n    \"count\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{HOST}}/api/agent/ws/queue",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "agent",
+            "ws",
+            "queue"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "service/plan/cancel?id=",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/service/plan/cancel?id=a0528145-c619-4d7d-aa5e-0bf0ccd3a26a",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "service",
+            "plan",
+            "cancel"
+          ],
+          "query": [
+            {
+              "key": "id",
+              "value": "a0528145-c619-4d7d-aa5e-0bf0ccd3a26a"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "billing/setup",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/billing/setup",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "billing",
+            "setup"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "billing/maintenance",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/billing/maintenance",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "billing",
+            "maintenance"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "billing/cycle",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/billing/cycle",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "billing",
+            "cycle"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "server/status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/server/status",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "server",
+            "status"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "server/stop",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/server/stop",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "server",
+            "stop"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "event",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{HOST}}/api/event?user_id=all",
+          "host": [
+            "{{HOST}}"
+          ],
+          "path": [
+            "api",
+            "event"
+          ],
+          "query": [
+            {
+              "key": "user_id",
+              "value": "all"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "HOST",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "SVC_ID",
+      "value": "b4abfdd7-e0cc-4543-8cb0-30fc341792d0",
+      "type": "string"
+    },
+    {
+      "key": "TAG_1_ID",
+      "value": "c53625ea-d47b-48d6-bee0-a66e12d78d69",
+      "type": "string"
+    }
+  ]
+}

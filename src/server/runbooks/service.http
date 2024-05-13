@@ -1,0 +1,61 @@
+POST http://localhost:8000/api/service
+Cookie: token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImUwODE0NDgzLTJkNWYtNGMzNS1iMGVmLWUwYjgzMjdmM2QxMCIsImV4cGlyZXMiOiIyMDI0LTA0LTEyVDIzOjA5OjMyLjU3NjUwOSJ9.aj8sSoB3RqfTQWgj1dH1emmh-NHg9-hf8oFhAnzCNCk; textwrapon=false; textautoformat=false; wysiwyg=textarea; PHPSESSID=012aeb86ac95ea530dabb8783cacb497
+
+{
+  "name": "compolvo-server",
+  "description": "Demo description",
+  "license": "MIT",
+  "download_count": 69,
+  "retrieval_method": 1,
+  "retrieval_data": {
+    "link": "http://localhost:8000/api/version",
+    "regex": "(?<version>.+)"
+  }
+}
+
+###
+
+POST http://localhost:8000/api/service
+
+{
+  "name": "compolvo-server2",
+  "description": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.",
+  "license": "MIT2",
+  "download_count": 4000,
+  "retrieval_method": 1,
+  "retrieval_data": {
+    "link": "http://localhost:8000/api/version",
+    "regex": "(?<version>.+)"
+  }
+}
+
+###
+
+PATCH http://localhost:8000/api/service?id=52df2bad-8e34-4472-8920-19b79312d423
+
+{
+  "name": "Compolvo (Server)",
+  "retrieval_method": 2
+}
+
+###
+
+DELETE http://localhost:8000/api/service?id=52df2bad-8e34-4472-8920-19b79312d423
+
+###
+
+POST http://localhost:8000/api/service/tag
+
+{
+  "service": "a576d76d-3f62-41f0-b8fa-22713372ec2b",
+  "tag": "53149fa9-fc24-4fd4-ba49-93dd13e48554"
+}
+
+###
+
+DELETE http://localhost:8000/api/service/tag
+
+{
+  "service": "a576d76d-3f62-41f0-b8fa-22713372ec2b",
+  "tag": "53149fa9-fc24-4fd4-ba49-93dd13e48554"
+}

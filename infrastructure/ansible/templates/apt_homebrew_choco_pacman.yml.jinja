@@ -1,0 +1,25 @@
+- name: {{ name }}
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: debian
+      when: ansible_distribution == "Debian"
+      ansible.builtin.apt:
+        name: "{{ apt_module or name }}{{ "=" + version if version else "" }}"
+        state: "{{ state }}"
+    - name: macos
+      when: ansible_distribution == "MacOSX"
+      ansible.builtin.homebrew:
+        name: "{{ brew_module or name }}"
+        state: "{{ state }}"
+    - name: Windows
+      when: ansible_distribution == "Windows"
+      win_chocolatey:
+        name: "{{ choco_package or name }}"{% if state == "present" %}
+        version: "{{ version }}"{% else %}
+        state: "{{ state }}"{% endif %}
+    - name: Arch
+      when: ansible_distribution == "Archlinux"
+      community.general.pacman:
+        name: "{{ pacman_package or name }}"
+        state: "{{ state }}"
