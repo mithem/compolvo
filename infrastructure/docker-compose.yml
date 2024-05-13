@@ -4,12 +4,14 @@ services:
     image: compolvo-frontend:latest
     container_name: compolvo-frontend
     build: ../src/frontend/compolvo
+    restart: unless-stopped
     ports:
       - 3000:3000
   mariadb:
     container_name: compolvo-mariadb
     image: mariadb:11.3
     command: --port ${DB_PORT}
+    restart: unless-stopped
     ports:
       - target: ${DB_PORT}
         published: ${DB_PORT}
@@ -22,6 +24,7 @@ services:
     container_name: compolvo-server
     image: compolvo-server:latest
     build: ../src/server
+    restart: unless-stopped
     depends_on:
       - mariadb
     ports:
@@ -43,6 +46,7 @@ services:
   reverse-proxy:
     container_name: compolvo-reverse-proxy
     image: compolvo-reverse-proxy
+    restart: unless-stopped
     build:
       context: .
       dockerfile: ReverseProxy.Dockerfile
@@ -55,6 +59,7 @@ services:
   ssl-terminal:
     container_name: compolvo-ssl
     image: nginx:latest
+    restart: unless-stopped
     volumes:
       - ./ssl-terminal.conf:/etc/nginx/nginx.conf:r
       - /etc/letsencrypt:/ssl
