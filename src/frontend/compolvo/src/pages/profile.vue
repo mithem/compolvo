@@ -55,7 +55,7 @@
 </template>
 
 <script lang="ts">
-import {defineComponent, onMounted, ref} from "vue";
+import {defineComponent, getCurrentInstance, onMounted, ref} from "vue";
 import {ServicePlan, UserMeObject} from "../components/models";
 
 export default defineComponent({
@@ -69,7 +69,7 @@ export default defineComponent({
     const me = ref<UserMeObject>(null);
     const loadingUserInfo = ref(false);
     const error = ref<Error | null>(null);
-    const isEditing = ref(false);
+    const isEditing = ref(/^true$/.test((getCurrentInstance().proxy.$route.query.showForm || "").toString()));
 
     function toggleEdit() {
       isEditing.value = !isEditing.value;

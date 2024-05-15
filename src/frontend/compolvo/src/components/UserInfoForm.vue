@@ -116,6 +116,7 @@ export default defineComponent({
     const oldUser = {...props.user}
     const deleting = ref(false);
     const error = ref<Error | null>(null);
+    const proxy = getCurrentInstance().proxy;
 
     const confirmPasswordRules = [
       (value) => {
@@ -141,7 +142,6 @@ export default defineComponent({
       }
     }
 
-    let proxy = getCurrentInstance().proxy;
 
     const validate = async function () {
       const {valid: valid, errors: errors} = await proxy.$refs.form.validate()
@@ -183,11 +183,14 @@ export default defineComponent({
         if (!res.ok) {
           error.value = new Error(await res.text())
         } else {
-          didChangeInfo.value = false
-          currentPassword.value = ""
-          newPassword.value = ""
-          confirmPassword.value = ""
-          snackbarText.value = "Updated user info."
+          let text = "Updated user info."
+          if (changedInfo["password"] !== undefined) {
+            text += " Please login again."
+            setTimeout(() => {
+              proxy.$router.push({path: "/login", query: {redirect_url: "/profile?showForm=true"}})
+            }, 1500)
+          }
+          snackbarText.value = text
           showingSnackbar.value = true
         }
       } catch (err) {

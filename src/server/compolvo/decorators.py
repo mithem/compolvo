@@ -84,7 +84,7 @@ def protected(requires_roles: Set[UserRole.Role] = None):
         async def decorated_function(request, *args, **kwargs):
             unauthorized = Unauthorized()
             user = await check_token_for_request(request)
-            if user is None:
+            if user is None or not user.logged_in:
                 raise unauthorized
             if requires_roles is not None:
                 if not await user_has_roles(user, requires_roles):

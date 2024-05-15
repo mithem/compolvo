@@ -455,6 +455,8 @@ async def login(request: Request):
                        algorithm="HS256")
     headers = {"Set-Cookie": f"token={token}; Expires={expires.strftime(HTTP_HEADER_DATE_FORMAT)}"}
     redirect_url = request.args.get("redirect_url", request.url_for("index"))
+    user.logged_in = True
+    await user.save()
     return redirect(redirect_url, headers=headers)
 
 
@@ -467,7 +469,7 @@ async def auth(request: Request):
     user = await User.get_or_none(email=email)
     if user is None:
         raise NotFound("User not found.")
-    if not verify_password(password, user.password, user.salt):
+    if not user.logged_in or not verify_password(password, user.password, user.salt):
         raise Unauthorized()
     return HTTPResponse(status=204)
 
@@ -482,7 +484,10 @@ async def get_token(request, user):
 
 
 @app.get("/api/logout")
-async def logout(request: Request):
+@protected()
+async def logout(request: Request, user: User):
+    user.logged_in = False
+    await user.save()
     redirect_url = request.args.get("redirect_url", request.url_for("index"))
     return redirect(redirect_url, headers={"Set-Cookie": f"token=deleted"})
 
@@ -546,6 +551,7 @@ async def update_user(request, user: User):
     password = request.json.get("password")
     if password is not None:
         user.password = hash_password(password, user.salt)
+        user.logged_in = False
     if first_name is not None:
         user.first_name = first_name
     if last_name is not None:

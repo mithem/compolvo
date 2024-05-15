@@ -75,6 +75,7 @@ class User(Model, Serializable):
     email = CharField(255, unique=True)
     password = TextField(null=True)
     salt = TextField(null=True)
+    logged_in = BooleanField(default=False)
     stripe_id = TextField(null=True)
     billing_cycle = ForeignKeyField("models.BillingCycle", "users")
 
