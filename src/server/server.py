@@ -735,6 +735,13 @@ async def get_own_service_plans(request, user):
     return json(data)
 
 
+@service_plan.get("/count")
+@protected()
+async def get_service_plan_count(request, user):
+    count = await ServicePlan.filter(user=user, canceled_by_user=False).count()
+    return json({"count": count})
+
+
 @service_plan.post("/")
 @requires_payment_details(stripe)
 async def create_service_plan(request, user, methods):

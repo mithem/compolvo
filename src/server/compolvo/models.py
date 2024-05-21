@@ -137,9 +137,6 @@ class PackageManagerAvailableVersion(Model, Serializable):
     version = TextField()
     latest = BooleanField(default=False)
 
-    class Meta:
-        unique_together = (("service", "package_manager", "operating_system", "latest"),)
-
 
 class License(Model, Serializable):
     id = UUIDField(pk=True)

@@ -16,12 +16,12 @@
           <span v-if="agentCount == 0">Add an agent in the
           <RouterLink class="link" to="/agents">agent panel</RouterLink>
           .<br/></span>
+          <span v-else-if="servicePlanCount === 0">Check out new Software in the <RouterLink
+            class="link"
+            to="/compare">compare tab</RouterLink>.</span>
           <span v-else>You can install software on your agents from the
             <RouterLink class="link" to="/profile"
                         color="secondary">profile tab</RouterLink>.</span>
-          Or check out new Software in the
-          <RouterLink class="link" to="/compare">compare tab</RouterLink>
-          .
         </div>
         <br/>
         <v-progress-linear v-if="loading" indeterminate></v-progress-linear>
@@ -63,6 +63,7 @@ export default defineComponent({
     const agentCount = ref<number>(null);
     const error = ref<Error | null>(null);
     const webSocket = new WebSocket("/api/notify");
+    const servicePlanCount = ref<number>(null);
 
 
     const fetchSoftware = async function () {
@@ -80,6 +81,15 @@ export default defineComponent({
         error.value = err
       }
       loading.value = false;
+    }
+
+    const getServicePlanCount = async function () {
+      const res = await fetch("/api/service/plan/count")
+      if (!res.ok) {
+        error.value = new Error(await res.text())
+      } else {
+        servicePlanCount.value = JSON.parse(await res.text()).count
+      }
     }
 
     const calculateAvailableUpdates = function () {
@@ -136,6 +146,7 @@ export default defineComponent({
       await fetchSoftware()
       await getUserName()
       await getAgentCount()
+      await getServicePlanCount()
     }
 
     onMounted(() => {
@@ -143,7 +154,18 @@ export default defineComponent({
     });
 
     webSocket.onmessage = handleWebSocketMessage
-    return {softwares, updates, firstName, loading, agentCount, error, fetchSoftware, refresh}
+    return {
+      softwares,
+      updates,
+      firstName,
+      loading,
+      agentCount,
+      servicePlanCount,
+      error,
+      fetchSoftware,
+      refresh,
+      getServicePlanCount
+    }
   }
 });
 </script>
