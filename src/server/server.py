@@ -15,7 +15,6 @@ from sanic.log import logger
 from sanic_openapi import openapi
 from tortoise.contrib.sanic import register_tortoise
 from tortoise.exceptions import IntegrityError
-from tortoise.expressions import Q
 from tortoise.functions import Coalesce
 
 from compolvo import cors
@@ -712,9 +711,7 @@ async def get_own_service_plans(request, user):
     id = request.args.get("id")
     if id is not None:
         filter_data["id"] = id
-    plans = await ServicePlan.filter(Q(canceled_by_user=False) | Q(
-        canceled_at__gt=datetime.datetime.now() - datetime.timedelta(days=1.0)),
-                                     **filter_data).all()
+    plans = await ServicePlan.filter(canceled_by_user=False, **filter_data).all()
     data = []
     for plan in plans:
         offering: ServiceOffering = await plan.service_offering

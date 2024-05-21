@@ -5,7 +5,7 @@
         <ErrorPanel v-if="error != null" :error="error"/>
         <h2 @loggedIn="firstName = $event">Hello<span
           v-if="firstName !== null">, {{ firstName }}</span>!</h2>
-        <div v-if="updates !== 0">There <span v-if="updates === 1">is</span><span
+        <div v-if="updates !== null && updates > 0">There <span v-if="updates === 1">is</span><span
           v-else>are</span>
           {{ updates }} update<span v-if="updates > 1">s</span> available. Please apply any
           updates
@@ -62,7 +62,8 @@ export default defineComponent({
     const loading = ref(false);
     const agentCount = ref<number>(null);
     const error = ref<Error | null>(null);
-    const webSocket = new WebSocket("/api/notify");
+    const wsEndpoint = document.location.protocol === "https" ? "wss" : "ws" + "://" + document.location.host + "/api/notify";
+    const webSocket = new WebSocket(wsEndpoint);
     const servicePlanCount = ref<number>(null);
 
 

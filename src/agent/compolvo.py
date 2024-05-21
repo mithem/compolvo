@@ -4,8 +4,10 @@ import json
 import logging
 import os
 import platform
+import queue
 import sys
 from logging import Logger
+from threading import Thread
 from typing import Dict, Any, Optional
 
 import click
@@ -13,10 +15,12 @@ import distro
 import requests
 import websockets
 import yaml
+from websockets.exceptions import ConnectionClosedError
 
 config: "Config"
 logger: Logger
 config_filename: str
+message_queue = queue.Queue()
 
 
 class ConfigAgent:
@@ -101,19 +105,25 @@ def handle_websocket_command(command: str) -> str | None:
     if event is None:
         logger.warning("Received websocket message that can't be interpreted: %s", data)
         return
+    if event.get("type") == "software-status-update":
+        return
     recipient = event.get("recipient", {})
     assert recipient.get(
         "subscriber_type") == "agent", f"Received event for {recipient}: {event} (expected for agent)."
     recipient_id = recipient.get("id")
     assert recipient_id is None or recipient_id == config.agent.id, f"Received event for different agent: {event}"
     type = event["type"]
+    msg: str | None = None
     match type:
         case "install-software":
-            return install_software(event)
+            msg = install_software(event)
         case "uninstall-software":
-            return uninstall_software(event)
+            msg = uninstall_software(event)
         case other:
             logger.error("Received unsupported event of type '%s': %s", other, event)
+    if msg is not None:
+        logger.debug("Queueing message: %s", msg)
+        message_queue.put(msg)
     return None
 
 
@@ -201,15 +211,26 @@ async def run_websocket(retries: Optional[int] = 5):
                 logger.info("Subscribed to relevant notification topics.")
                 try:
                     while True:
-                        data = await ws.recv()
-                        logger.debug("received %s", data)
+                        data: str | bytes | None = None
+                        if ws.closed:
+                            raise ConnectionClosedError(ws.close_rcvd, ws.close_sent)
                         try:
-                            data = handle_websocket_command(data)
+                            async with asyncio.timeout(1):
+                                data = await ws.recv()
+                                logger.debug("received %s", data)
+                        except asyncio.TimeoutError:
+                            pass
+                        try:
                             if data is not None:
-                                logger.debug("Sending %s", data)
-                                await ws.send(data)
-                        except AssertionError as e:
+                                Thread(target=handle_websocket_command, args=(data,)).start()
+                            while message_queue.unfinished_tasks > 0:
+                                msg = message_queue.get()
+                                logger.debug("Sending %s", msg)
+                                await ws.send(msg)
+                                message_queue.task_done()
+                        except (AssertionError, ConnectionClosedError) as e:
                             handle_error_for_user(e)
+                            message_queue.put(data)
                 except KeyboardInterrupt:
                     return
                 except Exception as e:
