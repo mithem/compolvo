@@ -128,16 +128,25 @@ Compolvo website, as displayed in the images provided.
 
 ## 2. User Flow
 
-- **Description**: This section describes the overall user flow on the Compolvo website, guiding users from logging in
-  to managing/buying software and agents.
+This section describes the overall user flow on the Compolvo website, guiding users from logging in
+to managing/buying software and agents.
 
 1. Create an account by clicking on login and select 'No account yet?'
-2. After creating a new account sign in. You will now be greeted by your own customized homepage
-3. Next, install the agent (not in this version, available)
+2. After creating a new account, sign in. You will now be greeted by your own customized homepage
+3. Next, install the agent on the machine(s) you want to manage. TODO: At the moment this is
+   possible via the GitHub repo.
 4. Create an agent in the website by clicking on the agents tab in the navbar and then the blue create button
-5. The agent id is saved in your clipboard, copy it inside your installed agent on your computer to connect it to your
-   account
-6. Inside the agents tab you should now see the name and connection information of your installed agent
-7.
+5. The agent id is saved in your clipboard. Run the agent init script on your machine and paste the
+   agent id when prompted to.
+6. Inside the agents tab you should now see the name and connection information of your installed
+   agent (possibly after refreshing)
+7. Make sure to run the agent on the agent's machine using the run command.
+8. Add your payment details in the profile tab (after clicking on the edit icon)
+9. Compare different software options by clicking on the compare tab in the navbar
+10. Filter the available softwares by the criteria that are important to you
+11. Select a software to see more details and purchase options
+12. Subscribe to software by subscribing to a service offering
+13. After positive confirmation, go to the profile tab to install the software.
+14. On the home tab, observe the software being installed on the agent.
 
 ---
