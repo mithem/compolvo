@@ -1237,6 +1237,14 @@ async def attach_payment_method_to_customer(request, user, customer: stripe.Cust
         raise BadRequest("Expected method_id for the payment method to attach")
 
 
+@payment_method.delete("/all")
+@requires_stripe_customer(stripe)
+async def remove_all_payment_methods_from_customer(request, user, customer: stripe.Customer):
+    methods = await stripe.PaymentMethod.list_async(customer=customer.id)
+    for method in methods:
+        await stripe.PaymentMethod.detach_async(method.id)
+    return HTTPResponse(status=204)
+
 @app.get("/api/billing/cycle")
 @protected()
 @get_endpoint(BillingCycle)

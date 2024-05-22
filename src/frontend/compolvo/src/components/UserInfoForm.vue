@@ -10,6 +10,15 @@
         <v-icon color="green">mdi-check</v-icon>
         Payment method configured.
       </div>
+      <v-spacer></v-spacer>
+      <v-btn
+        v-if="user.has_payment_method"
+        variant="text"
+        :loading="deletingPaymentMethod"
+        @click="deletePaymentMethod"
+      >
+        <v-icon color="red">mdi-delete</v-icon>
+      </v-btn>
       <v-btn @click="$router.push('/payment-info')">
         Configure
       </v-btn>
@@ -116,6 +125,7 @@ export default defineComponent({
     const oldUser = {...props.user}
     const deleting = ref(false);
     const error = ref<Error | null>(null);
+    const deletingPaymentMethod = ref(false);
     const proxy = getCurrentInstance().proxy;
 
     const confirmPasswordRules = [
@@ -149,6 +159,19 @@ export default defineComponent({
         await saveInfo()
       } else {
         error.value = new Error("Error(s) valdiating form: " + errors.flatMap(err => err.errorMessages).join(", "))
+      }
+    }
+
+    const deletePaymentMethod = async function () {
+      const res = await fetch("/api/billing/payment/method/all", {
+        method: "DELETE"
+      })
+      if (!res.ok) {
+        error.value = new Error(await res.text())
+      } else {
+        user.value.has_payment_method = false
+        snackbarText.value = "Deleted payment method."
+        showingSnackbar.value = true
       }
     }
 
@@ -227,10 +250,12 @@ export default defineComponent({
       showingSnackbar,
       snackbarText,
       deleting,
+      deletingPaymentMethod,
       error,
       saveInfo,
       validate,
-      deleteAccount
+      deleteAccount,
+      deletePaymentMethod
     }
   }
 })
