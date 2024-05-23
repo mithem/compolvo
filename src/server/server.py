@@ -580,13 +580,12 @@ async def delete_own_user(request, user: User):
 
 
 @service.get("/")
-@protected()
 @get_endpoint(Service)
 @openapi.summary("Get all services")
 @openapi.description(
     "By default, returns a JSON list of all services including tags. If a `id` is specified in the query args, only that specific service will be returned (provided it is found).")
 # @openapi.response(200, {"application/json": Union[List[Service], Service]})
-async def get_services(request, services, user):
+async def get_services(request, services):
     async def expand(svc: Service) -> dict:
         query = (
             Service
@@ -815,9 +814,8 @@ async def delete_service_plan(request, plan, user):
 
 
 @tag.get("/")
-@protected()
 @get_endpoint(Tag)
-async def get_tags(request, tags, user):
+async def get_tags(request, tags):
     pass
 
 

@@ -102,7 +102,7 @@ class Service(Model, Serializable):
 
     id = UUIDField(pk=True)
     name = TextField()
-    system_name = TextField()
+    system_name = CharField(255, unique=True)
     short_description = TextField(null=True)
     description = TextField(null=True)
     license = ForeignKeyField("models.License", "services")

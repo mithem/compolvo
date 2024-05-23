@@ -32,7 +32,7 @@
             </template>
             Delete
           </v-btn>
-          <v-dialog max-width="750">
+          <v-dialog>
             <template v-slot:activator="{ props: activatorProps }">
               <v-btn
                 v-bind="activatorProps"
@@ -48,15 +48,41 @@
               <v-card class="pa-5">
                 <v-col>
                   <h1>Create Service</h1>
-                  <NewServiceForm
-                    @service-created="isActive.value = false;fetchServices()"
+                  <ErrorPanel :error="error"></ErrorPanel>
+                  <v-progress-linear v-if="creating" indeterminate :height="5"></v-progress-linear>
+                  <EditServiceForm
+                    :service="null"
+                    @service-save="createService($event).then(success => {if (success) isActive.value = false})"
                     :licenses="licenses"
-                  ></NewServiceForm>
+                  ></EditServiceForm>
                 </v-col>
               </v-card>
             </template>
           </v-dialog>
         </v-toolbar>
+      </template>
+      <template v-slot:item.actions="{item}">
+        <v-dialog>
+          <template v-slot:activator="{ props: activatorProps }">
+            <v-btn v-bind="activatorProps" icon variant="text">
+              <v-icon>mdi-pencil</v-icon>
+            </v-btn>
+          </template>
+          <template v-slot:default="{ isActive }">
+            <v-card class="pa-5">
+              <v-col>
+                <h1>Edit Service</h1>
+                <ErrorPanel :error="error"></ErrorPanel>
+                <v-progress-linear v-if="creating" indeterminate :height="5"></v-progress-linear>
+                <EditServiceForm
+                  :service="item"
+                  @service-save="editService(item.id, $event).then(success => {if (success) isActive.value = false})"
+                  :licenses="licenses"
+                ></EditServiceForm>
+              </v-col>
+            </v-card>
+          </template>
+        </v-dialog>
       </template>
     </v-data-table>
   </v-col>
@@ -65,6 +91,7 @@
 <script lang="ts">
 import {defineComponent, ref} from "vue"
 import {License, Service} from "../../components/models";
+import {OptionalService} from "../../components/admin/EditServiceForm.vue";
 
 export default defineComponent({
   data() {
@@ -77,10 +104,12 @@ export default defineComponent({
           key: "id"
         },
         {title: "System name", key: "system_name"},
+        {title: "Name", key: "name"},
         {title: "Short description", key: "short_description"},
         {title: "Description", key: "description"},
         {title: "Download count", key: "download_count"},
         {title: "Stripe product", key: "stripe_product_id"},
+        {title: "Actions", key: "actions"}
       ]
     }
   },
@@ -91,6 +120,7 @@ export default defineComponent({
     const loading = ref(false)
     const deleting = ref(false)
     const licenses = ref<License[]>([])
+    const creating = ref(false)
 
     const fetchServices = async function () {
       loading.value = true
@@ -101,6 +131,22 @@ export default defineComponent({
         services.value = await res.json()
       }
       loading.value = false
+    }
+
+    const createService = async function (svc: OptionalService) {
+      creating.value = true
+      const res = await fetch("/api/service", {
+        method: "POST",
+        body: JSON.stringify(svc)
+      })
+      const success = res.ok;
+      if (!success) {
+        error.value = new Error(await res.text())
+      } else {
+        fetchServices()
+      }
+      creating.value = false
+      return success
     }
 
     const deleteServices = async function () {
@@ -128,14 +174,39 @@ export default defineComponent({
       }
     }
 
+    const editService = async function (id: string, svc: OptionalService) {
+      loading.value = true
+      const keysToRemove = ["id", "tags", "operating_systems", "offerings"]
+      for (const key of keysToRemove) {
+        if (svc[key] !== undefined) {
+          delete svc[key]
+        }
+      }
+      const res = await fetch("/api/service?id=" + id, {
+        method: "PATCH",
+        body: JSON.stringify(svc)
+      })
+      const success = res.ok;
+      if (!success) {
+        error.value = new Error(await res.text())
+      } else {
+        fetchServices()
+      }
+      loading.value = false
+      return success
+    }
+
     return {
       services,
       selectedServices,
       licenses,
       error,
       loading,
+      creating,
       deleting,
       fetchServices,
+      createService,
+      editService,
       deleteServices,
       fetchLicenses
     }

@@ -51,9 +51,14 @@ export default defineComponent({
     }
 
     const filterAgents = async function () {
-      console.log("Filtering agents...");
+      console.log(filteredAgents)
+      const searchKeys = ["id", "user", "name", "connected", "connection_from_ip_address", "last_connection_start", "last_connection_end", "connection_interrupted", "initialized"]
+      const query = searchQuery.value.toLowerCase()
       filteredAgents.value = searchQuery.value == "" ? agents.value : agents.value.filter((agent: Agent) => {
-        return (agent.id && agent.id.includes(searchQuery.value)) || (agent.user && agent.user.includes(searchQuery.value))
+        return searchKeys.some((key) => {
+          const val = agent[key]
+          return val !== null && val !== undefined && val.toString().toLowerCase().includes(query)
+        })
       })
     }
 
