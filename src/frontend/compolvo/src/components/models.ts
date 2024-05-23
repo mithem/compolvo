@@ -45,7 +45,7 @@ export interface Tag {
 
 export interface License {
   id: string
-  props: { title: string }
+  props: { title: string, subtitle: string | undefined }
 }
 
 export interface OperatingSystem {

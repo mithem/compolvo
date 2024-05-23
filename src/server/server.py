@@ -521,7 +521,8 @@ async def get_user(request, user):
             **await user.to_dict(),
             "roles": [await role.to_dict() for role in await user.roles],
             "connected_to_billing_provider": user.stripe_id != None,
-            "has_payment_method": has_payment_method
+            "has_payment_method": has_payment_method,
+            "is_admin": await user_has_roles(user, {UserRole.Role.ADMIN})
         }
     )
 
@@ -626,11 +627,9 @@ async def create_service(request, user):
         system_name=request.json["system_name"],
         name=request.json["name"],
         description=request.json.get("description"),
+        short_description=request.json.get("short_description"),
         license=license,
-        download_count=request.json.get("download_count"),
-        retrieval_method=request.json["retrieval_method"],
-        retrieval_data=request.json["retrieval_data"],
-        image=request.json.get("image")
+        download_count=request.json.get("download_count")
     )
     oses = request.json.get("operating_systems")
     if oses is not None:
@@ -652,6 +651,16 @@ async def update_service(request, svc, user):
 @delete_endpoint(Service)
 async def delete_service(request, svc, user):
     pass
+
+
+@service.delete("/bulk")
+@protected({UserRole.Role.ADMIN})
+async def delete_services_bulk(request, user):
+    if request.json is None:
+        raise BadRequest("No services provided.")
+    ids = request.json.get("services", [])
+    await Service.filter(id__in=ids).delete()
+    return json({"deleted": ids})
 
 
 @service_offering.get("/")
@@ -1244,6 +1253,7 @@ async def remove_all_payment_methods_from_customer(request, user, customer: stri
     for method in methods:
         await stripe.PaymentMethod.detach_async(method.id)
     return HTTPResponse(status=204)
+
 
 @app.get("/api/billing/cycle")
 @protected()
