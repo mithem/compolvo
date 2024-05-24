@@ -287,7 +287,6 @@ async def handle_agent_software_status_update_event(event: Event, agent: Agent |
                           {"software_id": software_id})
             event = await get_user_reload_event(event)
             if event is not None:
-                logger.info("Queuing event: %s", event)
                 queue(event)
             await software.delete()
     else:

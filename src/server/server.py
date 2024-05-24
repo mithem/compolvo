@@ -15,6 +15,7 @@ from sanic.log import logger
 from sanic_openapi import openapi
 from tortoise.contrib.sanic import register_tortoise
 from tortoise.exceptions import IntegrityError
+from tortoise.expressions import F
 from tortoise.functions import Coalesce
 
 from compolvo import cors
@@ -223,7 +224,7 @@ async def set_up_demo_db(user: User, services: bool = False,
             short_description="Docker Desktop is an integrated development environment (IDE) that allows developers to easily create, manage, and operate Docker containers on both Mac and Windows systems. The application offers a user-friendly interface that facilitates the seamless transition from code to container, incorporating advanced features like container orchestration, network management, and security settings.",
             description="Docker Desktop is a comprehensive, professional development environment designed to simplify developers' work with Docker technology. It provides a robust, user-friendly platform for building, testing, and deploying applications in Docker containers on macOS and Windows operating systems. Docker Desktop enables developers to develop their applications in an isolated environment, ensuring consistency between different development settings and the production environment. The platform supports both Linux and Windows containers and offers flexible tools for network design, volume management, and security. Docker Desktop seamlessly integrates into existing development workflows and offers support for popular IDEs and development tools. It also includes advanced features like an integrated Kubernetes cluster, allowing developers to test their applications in an orchestrated environment. The ability to manage containers directly from the desktop enhances efficiency and enables faster iteration and debugging. Moreover, Docker Desktop provides a secure environment for application development. With built-in security features like automatic updates and easily configurable network settings, Docker Desktop helps developers follow security best practices and minimizes vulnerability to security threats. For businesses seeking an efficient, reliable, and scalable solution for containerizing their applications, Docker Desktop is an excellent choice. It promotes a collaborative development environment and provides developers with the tools needed to effectively develop and manage modern, container-based applications. Docker Desktop thus serves as a bridge between development and production environments, ensuring that applications operate smoothly and without environmental dependencies at every stage of the development cycle.",
             license=lic_mit,
-            download_count=42069,
+            download_count=100,
             image="",
             latest_version="1.2.5"
         )
@@ -258,7 +259,7 @@ async def set_up_demo_db(user: User, services: bool = False,
             short_description="Nginx is a high-performance web server, reverse proxy, and email (IMAP/POP3) proxy, known for its stability, rich feature set, simple configuration, and low resource consumption. Originally designed to solve the C10K problem, it efficiently serves a large number of simultaneous connections.",
             description='Nginx (pronounced "engine-x") is an open-source web server software designed to provide a balance of high performance, scalability, and low resource usage. It serves as a web server, as well as a reverse proxy and an email proxy for IMAP, POP3, and SMTP. Nginx is renowned for its speed and efficiency, particularly in environments where the scalability and performance of web applications are critical. It is commonly used to manage static content, load balancing, and for caching in a distributed environment. The architecture of Nginx is event-driven and asynchronous, which makes it particularly efficient at handling multiple connections simultaneously. This design allows it to scale vertically on modern hardware with minimal resource overhead. Nginx’s performance advantages become especially apparent in serving static content and in handling simultaneous connections by not tying up resources to keep connections open, which in contrast, is a common issue in traditional web servers like Apache. Nginx also functions effectively as a reverse proxy server, providing security, additional layers of functionality, and performance enhancements to an application stack. For instance, Nginx can manage SSL/TLS termination, WebSocket, and HTTP/2 connections, enhancing the capability of the underlying server without additional load. Its configuration system is straightforward, allowing fine-grained control over its operational parameters with minimal configuration overhead. For businesses and developers looking for a reliable and robust server solution, Nginx offers a compelling choice due to its ability to handle high traffic loads and its flexibility in integrating into existing technology stacks. Whether deploying a simple static website or a complex web application requiring robust security and high availability, Nginx provides a performance-optimized solution that has been adopted by some of the largest sites on the Internet, including Netflix, Airbnb, and many others.',
             license=lic_mit,
-            download_count=13098438,
+            download_count=200,
             image="",
             latest_version="1.25.5"
         )
@@ -293,7 +294,7 @@ async def set_up_demo_db(user: User, services: bool = False,
             short_description="Git is a distributed version control system that enables developers to track and manage changes to code projects efficiently. It facilitates collaborative coding by allowing multiple developers to work on different parts of a project simultaneously without interfering with each other's work. Git is known for its robust branching and merging capabilities, which make it an essential tool for modern software development.",
             description="Git is a powerful, distributed version control system that is pivotal in managing modern software development projects. It allows individual developers and large teams alike to track every single change made to the codebase, ensuring comprehensive version control and historical traceability. By decentralizing the repository management, Git enables team members to work on local copies of the project, which can be synchronized with the main repository as needed. One of Git's hallmark features is its sophisticated branching and merging mechanics. Developers can create branches to experiment with new features or fixes without affecting the main codebase, making it safe to explore innovative solutions. Once the new code is ready and tested, it can be seamlessly merged back into the main branch, maintaining a clean and stable production codebase. Git also excels in performance. Its efficient handling of large repositories and fast operation speeds make it suitable for projects of all sizes, from small startups to large-scale enterprise systems. Additionally, Git's strong support for non-linear development allows for flexible integration of various workflows, such as feature branches, forks, and pull requests, enhancing collaborative efforts and peer review processes. Moreover, Git integrates well with various development tools and platforms, from local IDEs to remote collaboration platforms like GitHub and GitLab. This integration facilitates a smooth workflow for continuous integration (CI) and continuous deployment (CD), crucial for automating the testing and deployment of code changes. For organizations looking to maintain a high standard of code integrity and collaboration, Git offers a reliable, scalable, and efficient solution. It not only helps developers to manage changes effectively but also supports a culture of transparency and collaboration, making it indispensable in the realm of software development. Git's flexibility and power ensure that it remains at the forefront of version control technology, adapting to the evolving needs of developers and projects worldwide.",
             license=lic_mit,
-            download_count=42069,
+            download_count=300,
             image=""
         )
         v_git_1 = await PackageManagerAvailableVersion.create(
@@ -313,7 +314,7 @@ async def set_up_demo_db(user: User, services: bool = False,
             short_description="Nextcloud is an open-source software suite that provides a secure and decentralized platform for file storage, collaboration, and communication. It allows users and organizations to host their own cloud storage service, managing files, contacts, calendars, and more, with full control over their data and privacy.",
             description="Nextcloud is a robust, open-source software solution designed to offer businesses and individuals alike the ability to operate their own private cloud storage and collaboration platform. As a self-hosted system, it empowers users to maintain complete control over their data, ensuring privacy and security in a world where these are increasingly at a premium. Nextcloud facilitates file sharing, calendar and contact management, task scheduling, and real-time document collaboration, all within a user-friendly interface accessible via web or mobile apps. A standout feature of Nextcloud is its extensibility, supported by a vibrant community of developers who contribute to a growing library of apps and plugins. These extensions can transform the core Nextcloud installation into a more customized and versatile tool, integrating features such as mail handling, video conferencing, and office suite tools. This modularity makes it an ideal solution for organizations looking to adapt the platform to their specific operational needs. Nextcloud also excels in providing enterprise-grade security. With features like end-to-end encryption, two-factor authentication, and easy-to-manage user permissions, it gives administrators the tools they need to secure data against unauthorized access. Furthermore, its compliance with major privacy standards, such as GDPR, makes it suitable for organizations needing to adhere to strict data protection regulations. For teams and organizations that prioritize data sovereignty and collaborative flexibility, Nextcloud offers a scalable and reliable platform. It supports a broad range of deployment scenarios, from small teams looking for file sharing solutions to large enterprises needing comprehensive collaboration suites. Nextcloud’s commitment to open-source principles and its proactive approach to security and privacy make it a preferred choice for those seeking an alternative to commercial cloud storage providers.",
             license=lic_mit,
-            download_count=42069,
+            download_count=400,
             retrieval_method=Service.RetrievalMethod.COMMAND,
             retrieval_data='{"hello": "world"}',
             image=""
@@ -1084,6 +1085,7 @@ async def bulk_create_agent_software(request, user):
         for (software, agent) in zip(softwares, agents):
             await send_agent_software_notification(EventType.INSTALL_SOFTWARE, agent,
                                                    service, software)
+        await _increase_download_count_for_service(str(service.id), len(agent_ids))
         return HTTPResponse(status=201)
     except KeyError:
         raise missing_params
@@ -1528,6 +1530,11 @@ async def create_event(request, user: User):
     event = Event(EventType.RELOAD, recipient, "/home/agent/software")
     notify.queue(event)
     return text("Accepted.", status=202)
+
+
+async def _increase_download_count_for_service(id: str, count: int = None):
+    cnt = count if count is not None else 1
+    await Service.filter(id=id).update(download_count=F("download_count") + cnt)
 
 
 app.add_task(run_schedules())
