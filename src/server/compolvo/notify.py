@@ -4,7 +4,7 @@ import enum
 import json
 import uuid
 from queue import Queue
-from typing import Callable, Dict, List, Coroutine
+from typing import Callable, Dict, List, Coroutine, Set
 from uuid import UUID
 
 import websockets
@@ -72,6 +72,9 @@ class Recipient:
     def __repr__(self):
         return str(self.to_dict())
 
+    def __hash__(self):
+        return hash((self.subscriber_type, self.id))
+
 
 class Event:
     type: EventType
@@ -125,11 +128,33 @@ class Subscription:
         }
 
 
+class Cancellation:
+    type: EventType
+    recipient: Recipient
+
+    def __init__(self, type: EventType, recipient: Recipient):
+        self.type = type
+        self.recipient = recipient
+
+    def to_dict(self):
+        return {
+            "type": self.type.value,
+            "recipient": self.recipient.to_dict()
+        }
+
+    def __hash__(self):
+        return hash((self.type, self.recipient))
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
+
 EventHandler = Callable[[Event], Coroutine[None, None, bool | None]]
 SubscriptionCallback = Callable[[Subscription], Coroutine[None, None, None]]
 
 _connection_handlers: Dict[Subscription, EventHandler] = {}
 _event_queue: Queue[Event] = Queue()
+_cancellations: Set[Cancellation] = set()
 
 
 def get_subscribers_for_event(event: Event) -> List[Subscriber]:
@@ -306,6 +331,11 @@ async def handle_agent_disconnect(agent: Agent, error: ConnectionClosed):
     await _notify(event)
 
 
+def cancel_event(type: EventType, recipient: Recipient):
+    cancellation = Cancellation(type, recipient)
+    _cancellations.add(cancellation)
+
+
 async def websocket_handler(ws: websockets.WebSocketServerProtocol):
     async def event_handler(event: Event):
         nonlocal agent
@@ -344,6 +374,12 @@ async def process_queue():
     failed_notifications = []
     while not _event_queue.empty():
         event = _event_queue.get(block=False)
+        cancellation = Cancellation(event.type, event.recipient)
+        if cancellation in _cancellations:
+            logger.debug("Skipping event %s due to cancellation", event)
+            _cancellations.remove(cancellation)
+            _event_queue.task_done()
+            continue
         try:
             success = await _notify(event)
         except ConnectionClosed:

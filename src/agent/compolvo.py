@@ -326,7 +326,11 @@ def init(compolvo_host: str, agent_id: str, overwrite: bool, insecure: bool):
         if not response.ok:
             logger.error("Error initializing agent: %s.", response.text)
             error = True
-        name = response.json().get("name")
+        try:
+            name = response.json().get("name")
+        except requests.JSONDecodeError:
+            logger.error("Received unexpected response from server: %s", response.text)
+            return
         logger.info(
             f"Initialized {'successfully' if not error else 'with errors'} as agent '{name}'.")
     except UnsupportedOperatingSystem as e:

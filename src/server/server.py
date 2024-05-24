@@ -28,7 +28,7 @@ from compolvo.models import Agent, AgentSoftware, Serializable, PackageManager, 
     BillingCycle, BillingCycleType, ServerStatus
 from compolvo.models import Service, OperatingSystem, Tag, UserRole, User, License, \
     ServiceOffering, ServicePlan
-from compolvo.notify import Event, Recipient, EventType, SubscriberType
+from compolvo.notify import Event, Recipient, EventType, SubscriberType, cancel_event
 from compolvo.utils import verify_password, check_token, Unauthorized, BadRequest, NotFound, \
     hash_password, generate_secret, test_email, \
     user_has_roles
@@ -1107,8 +1107,9 @@ async def patch_agent_software(request, software, user):
 @agent_software.delete("/")
 @protected({UserRole.Role.ADMIN})
 @delete_endpoint(AgentSoftware)
-async def delete_agent_software(request, software, user):
-    pass
+async def delete_agent_software(request, software: AgentSoftware, user):
+    recipient = Recipient(SubscriberType.AGENT, str((await software.agent).id))
+    cancel_event(EventType.INSTALL_SOFTWARE, recipient)
 
 
 @agent_software.post("/update")
