@@ -389,22 +389,25 @@ async def set_up_demo_db(user: User, services: bool = False,
                 plan_docker = await ServicePlan.create(
                     user=user,
                     service_offering=off_docker_month,
-                    start_date=datetime.datetime.now()
+                    start_date=datetime.datetime.now(tz=datetime.timezone.utc)
                 )
                 plan_git = await ServicePlan.create(
                     user=user,
                     service_offering=off_git_month,
-                    start_date=datetime.datetime.now() - datetime.timedelta(days=7)
+                    start_date=datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(
+                        days=7)
                 )
                 plan_nextcloud = await ServicePlan.create(
                     user=user,
                     service_offering=off_nextcloud_year,
-                    start_date=datetime.datetime.now() - datetime.timedelta(days=45)
+                    start_date=datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(
+                        days=45)
                 )
                 plan_nginx = await ServicePlan.create(
                     user=user,
                     service_offering=off_nginx_quarter,
-                    start_date=datetime.datetime.now() - datetime.timedelta(days=45)
+                    start_date=datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(
+                        days=45)
                 )
 
 
@@ -758,7 +761,8 @@ async def create_service_plan(request, user, methods):
             raise NotFound("Specified service offering not found.")
         start_date = request.json.get("start_date")
         start = datetime.date.fromisoformat(
-            start_date) if start_date is not None else datetime.datetime.now()
+            start_date) if start_date is not None else datetime.datetime.now(
+            tz=datetime.timezone.utc)
         data = {"user": user, "service_offering": offering, "start_date": start}
         end = request.json.get("end_date")
         if end is not None:
@@ -795,7 +799,7 @@ async def cancel_service_plan(request, user):
 async def cancel_service_plan_for_user(plan: ServicePlan):
     plan.canceled_by_user = True
     if plan.canceled_at is None:
-        plan.canceled_at = datetime.datetime.now()
+        plan.canceled_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await plan.save()
     offering: ServiceOffering = await plan.service_offering
     service: Service = await offering.service
@@ -1150,6 +1154,8 @@ async def send_agent_software_notification(command: EventType, agent: Agent,
                                            service: Service,
                                            software: AgentSoftware):
     assert command in [EventType.INSTALL_SOFTWARE, EventType.UNINSTALL_SOFTWARE]
+    software.last_updated = datetime.datetime.now(tz=datetime.timezone.utc)
+    # await software.save()
     msg = {
         "service": service.system_name,
         "software": str(software.id)

@@ -9,6 +9,7 @@ export interface AgentSoftware {
   service: Service
   installing: boolean
   uninstalling: boolean
+  last_updated: Date
 }
 
 export interface ServiceOffering {

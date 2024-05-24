@@ -251,7 +251,7 @@ async def handle_agent_login_event(event: Event,
         error = "Agent is already connected."
         close_code = 4003
     else:
-        agent.last_connection_start = datetime.datetime.now()
+        agent.last_connection_start = datetime.datetime.now(tz=datetime.timezone.utc)
         agent.connected = True
         agent.connection_interrupted = False
         agent.connection_from_ip_address = ws.request_headers.get(
@@ -270,7 +270,7 @@ async def handle_agent_software_status_update_event(event: Event, agent: Agent |
     software_id = event.message["software_id"]
     status: Dict = event.message["status"]
     assert isinstance(status, dict)
-    software = await AgentSoftware.get_or_none(id=software_id)
+    software: AgentSoftware | None = await AgentSoftware.get_or_none(id=software_id)
     if software is None:
         raise ValueError(f"Software '{software_id}' not found.")
     assert (await software.agent).id == agent.id, "This software isn't installed on this agent."
@@ -279,6 +279,7 @@ async def handle_agent_software_status_update_event(event: Event, agent: Agent |
     if set(status.keys()).issubset(valid_fields):
         for key, value in status.items():
             setattr(software, key, value)
+        software.last_updated = datetime.datetime.now(tz=datetime.timezone.utc)
         await software.save()
         # Perform delete check after update as not all fields required for the check need to be sent in the event
         if software.installed_version is None and software.uninstalling == False and was_uninstalling and not software.installing and not software.corrupt:
@@ -296,7 +297,7 @@ async def handle_agent_software_status_update_event(event: Event, agent: Agent |
 
 async def handle_agent_disconnect(agent: Agent, error: ConnectionClosed):
     agent.connected = False
-    agent.last_connection_end = datetime.datetime.now()
+    agent.last_connection_end = datetime.datetime.now(tz=datetime.timezone.utc)
     if isinstance(error, ConnectionClosedError):
         agent.connection_interrupted = True
     await agent.save()

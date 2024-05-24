@@ -203,9 +203,10 @@ class AgentSoftware(Model, Serializable):
     corrupt = BooleanField(default=False)
     installing = BooleanField(default=False)
     uninstalling = BooleanField(default=False)
+    last_updated = DatetimeField(null=True)
 
     fields = ["id", "agent", "service_plan", "installed_version", "corrupt", "installing",
-              "uninstalling"]
+              "uninstalling", "last_updated"]
 
     class Meta:
         unique_together = (("agent", "service_plan"),)
