@@ -108,6 +108,7 @@ export default {
       if (await isLoggedIn()) {
         if (isAdmin.value) {
           items.push(
+            {title: "Admin", path: "/admin", icon: "mdi-security"},
             {title: "Services", path: "/admin/services", icon: "mdi-server"}
           )
         }

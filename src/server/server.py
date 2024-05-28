@@ -63,9 +63,10 @@ register_tortoise(app,
 user = Blueprint("user", url_prefix="/api/user")
 service = Blueprint("service", url_prefix="/api/service")
 service_offering = Blueprint("service_offering", url_prefix="/api/service/offering")
+available_version = Blueprint("version", url_prefix="/api/service/version")
 service_plan = Blueprint("service_plan", url_prefix="/api/service/plan")
 tag = Blueprint("tag", url_prefix="/api/tag")
-service_group = Blueprint.group(service, service_offering, service_plan)
+service_group = Blueprint.group(service, service_offering, available_version, service_plan)
 payment = Blueprint("payment", url_prefix="/api/payment")
 agent = Blueprint("agent", url_prefix="/api/agent")
 agent_software = Blueprint("agent_software", url_prefix="/api/agent/software")
@@ -1307,6 +1308,9 @@ async def perform_billing_maintenance():
         logger.warning("Already performing billing maintenance, therefore skipping this one.")
         return
     logger.info("Performing billing maintenance...")
+    event = Event(EventType.BILLING_MAINTENANCE, Recipient(SubscriberType.USER),
+                  {"status": "running"}, True)
+    notify.queue(event)
     await update_server_status(billing_maintenance=True)
     try:
         await set_up_stripe_products()
@@ -1316,6 +1320,9 @@ async def perform_billing_maintenance():
     except Exception as e:
         logger.exception(e)
     await update_server_status(billing_maintenance=False)
+    event = Event(EventType.BILLING_MAINTENANCE, Recipient(SubscriberType.USER), {"status": "done"},
+                  True)
+    notify.queue(event)
     logger.info("Billing maintenance complete")
 
 
@@ -1537,6 +1544,42 @@ async def create_event(request, user: User):
     event = Event(EventType.RELOAD, recipient, "/home/agent/software")
     notify.queue(event)
     return text("Accepted.", status=202)
+
+
+@available_version.get("/")
+@protected({UserRole.Role.ADMIN})
+async def get_available_versions(request: Request, user):
+    service_id = request.args.get("service_id")
+    if service_id is None:
+        raise BadRequest("Expected service_id query parameter.")
+    service = await Service.get_or_none(id=service_id)
+    if service is None:
+        raise NotFound(f"Service '{service_id}' not found.")
+    versions = await PackageManagerAvailableVersion.filter(service=service).all()
+    data = [{
+        **await version.to_dict(),
+        "operating_system": await (await version.operating_system).to_dict(),
+        "package_manager": await (await version.package_manager).to_dict()
+    } for version in versions]
+    return json(data)
+
+
+@available_version.delete("/bulk")
+@protected({UserRole.Role.ADMIN})
+async def delete_available_versions_bulk(request: Request, user):
+    try:
+        ids = request.json.get("ids", [])
+    except (NameError, AttributeError):
+        raise BadRequest("Missing ids parameter.")
+    await PackageManagerAvailableVersion.filter(id__in=ids).delete()
+    return HTTPResponse(status=204)
+
+
+@app.get("/api/server-status")
+@protected({UserRole.Role.ADMIN})
+@get_endpoint(ServerStatus)
+async def server_status(request, stati, user):
+    pass
 
 
 async def _increase_download_count_for_service(id: str, count: int = None):

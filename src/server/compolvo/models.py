@@ -137,6 +137,8 @@ class PackageManagerAvailableVersion(Model, Serializable):
     version = TextField()
     latest = BooleanField(default=False)
 
+    fields = ["id", "service", "operating_system", "package_manager", "version", "latest"]
+
 
 class License(Model, Serializable):
     id = UUIDField(pk=True)

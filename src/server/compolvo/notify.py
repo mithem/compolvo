@@ -20,6 +20,7 @@ class EventType(enum.StrEnum):
     AGENT_SOFTWARE_STATUS_UPDATE = "software-status-update"
     AGENT_LOGIN = "agent-login"
     WS_DISCONNECT = "ws-disconnect"
+    BILLING_MAINTENANCE = "billing-maintenance"
 
 
 class SubscriberType(enum.StrEnum):

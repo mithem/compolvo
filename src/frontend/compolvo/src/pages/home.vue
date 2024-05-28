@@ -50,7 +50,7 @@
 import {defineComponent, onMounted, ref} from 'vue';
 import AgentSoftwareCard from "../components/AgentSoftwareCard.vue";
 import {AgentSoftware, UserMeObject} from "../components/models";
-import {isHigherVersion} from "../components/utils";
+import {getWsEndpoint, isHigherVersion} from "../components/utils";
 
 
 export default defineComponent({
@@ -62,7 +62,7 @@ export default defineComponent({
     const loading = ref(false);
     const agentCount = ref<number>(null);
     const error = ref<Error | null>(null);
-    const wsEndpoint = document.location.protocol === "https" ? "wss" : "ws" + "://" + document.location.host + "/api/notify";
+    const wsEndpoint = getWsEndpoint("/api/notify");
     const webSocket = new WebSocket(wsEndpoint);
     const servicePlanCount = ref<number>(null);
 

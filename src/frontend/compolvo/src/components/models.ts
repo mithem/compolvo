@@ -12,6 +12,25 @@ export interface AgentSoftware {
   last_updated: Date
 }
 
+export interface PackageManager {
+  id: string
+  name: string
+}
+
+export interface ServerStatus {
+  id: string
+  server_id: string
+  server_running: boolean
+  performing_billing_maintenance: boolean
+}
+
+export interface PackageManagerAvailableVersion {
+  id: string
+  version: string
+  operating_system: OperatingSystem
+  package_manager: PackageManager
+}
+
 export interface ServiceOffering {
   id: string
   name: string

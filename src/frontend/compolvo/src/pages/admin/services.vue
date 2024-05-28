@@ -83,6 +83,10 @@
             </v-card>
           </template>
         </v-dialog>
+        <v-btn icon variant="text"
+               @click="$router.push({path: `/admin/service/${item.id}/versions`})">
+          <v-icon>mdi-cog</v-icon>
+        </v-btn>
       </template>
     </v-data-table>
   </v-col>
