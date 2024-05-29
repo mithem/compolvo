@@ -34,6 +34,8 @@ export default defineComponent({
     const creating = ref(false);
     const newAgentID = ref<string>(null);
     const error = ref<Error | null>(null);
+    const showingAgentInstallationCard = ref(false)
+
     const loadAgents = async function () {
       loading.value = true;
       try {
@@ -116,6 +118,7 @@ export default defineComponent({
       creating,
       newAgentID,
       error,
+      showingAgentInstallationCard,
       loadAgents,
       filterAgents,
       deleteAgents,
@@ -207,6 +210,20 @@ export default defineComponent({
                   </div>-->
                   <!--TODO: Insert pagination for commands for different operating systems.-->
                   <v-card-actions>
+                    <v-dialog max-width="750">
+                      <template v-slot:activator="{props: activatorProps}">
+                        <v-btn
+                          text="Download"
+                          v-bind="activatorProps"
+                        >
+                        </v-btn>
+                      </template>
+                      <template v-slot:default="showingAgentInstallationCard">
+                        <AgentInstallationCard
+                          @close-card="console.log('closing'); showingAgentInstallationCard.value = false;isActive.value = false"
+                        ></AgentInstallationCard>
+                      </template>
+                    </v-dialog>
                     <v-spacer/>
                     <v-btn
                       text="Done"

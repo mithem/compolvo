@@ -71,6 +71,7 @@ export interface License {
 export interface OperatingSystem {
   id: string
   props: { title: string }
+  system_name: string
 }
 
 
