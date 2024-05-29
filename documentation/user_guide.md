@@ -154,4 +154,45 @@ to managing/buying software and agents.
 14. After positive confirmation, go to the profile tab to install the software.
 15. On the home tab, observe the software being installed on the agent.
 
+### Registering an user account
+
+Go to the [https://compolvo.mithem.uk/compolvo](website). You are greeted by the start page:
+![Homepage](../images/homepage.png)
+
+Optionally, you can select your preferred color scheme by clicking on the theme mode toggle in the
+top right corner besides the login button.
+
+Click on login to see the login page:
+![Login Page](../images/login_page.png)
+
+As, when starting out, you probably don't have an account yet, click on the "No account yet?" link
+to be redirected to the registration page:
+![Registration Page](../images/registration_submit_highlighted.png)
+
+After filling out your information, click on the submit button to create your account. You will be
+redirected to the login page.
+
+# TODO: Update for new login flow (auto-login after registration)
+
+### Adding an agent
+
+After logging in, you will be greeted by the home page:
+![Home page](../images/home_page_empty.png)
+
+Dort wird unmittelbar eine Hilfestellung angezeigt, welche weiteren Aktionen für den Benutzer
+empfohlen werden, um die Software optimal zu nutzen.
+Beim Klick auf "agent panel" wird die Agent-Verwaltung geöffnet. Hier können neue Agents hinzugefügt
+und bestehende Agents verwaltet werden:
+![Agent Panel](../images/agent_management_create_highlighted.png)
+
+Wenn der create-Button gedrückt wird, wird ein Dialogfenster angezeigt, welches die ID des neu
+erstellten Agents anzeigt:
+![Agent added](../images/agent_added.png)
+Diese wird automatisch zur Zwischenablage des Benutzer-Rechners kopiert. Sie wird nun zur
+Initialisierung des Agents benötigt.
+
+### Initializing the agent
+
+Der Benutzer lädt sich die aktuelle Software für den Agent herunter (mittels des gezeigten Knopfes).
+
 ---
