@@ -126,7 +126,7 @@ async def _get_svc_and_tag_from_request(request):
 
 
 async def create_user(email: str, first: str | None, last: str | None, password: str,
-                      role: UserRole.Role = None) -> User:
+                      role: UserRole.Role = None, skip: bool = False) -> User:
     if not test_email(email):
         raise BadRequest("Invalid email.")
     user = await User.get_or_none(email=email)
@@ -144,6 +144,8 @@ async def create_user(email: str, first: str | None, last: str | None, password:
             salt=salt,
             billing_cycle=billing_cycle
         )
+    elif not skip:
+        raise IntegrityError("Email already taken.")
     if role is None:
         role = UserRole.Role.USER
     existing_role = await UserRole.get_or_none(user=user, role=role)
@@ -159,7 +161,7 @@ async def create_user(email: str, first: str | None, last: str | None, password:
         else:
             customer = await stripe.Customer.create_async(
                 email=email,
-                name=first + " " + last
+                name=first or "" + " " + last or ""
             )
             id = customer.id
         user.stripe_id = id
@@ -415,8 +417,8 @@ async def set_up_demo_db(user: User, services: bool = False,
 @app.listener("before_server_start")
 async def test_user(app):
     options.setup_options(app)
-    await create_user("test@example.com", "Test", "user", "test", None)
-    await create_user("admin@example.com", "Admin", "Istrator", "admin", UserRole.Role.ADMIN)
+    await create_user("test@example.com", "Test", "user", "test", None, True)
+    await create_user("admin@example.com", "Admin", "Istrator", "admin", UserRole.Role.ADMIN, True)
 
 
 @app.listener("after_server_start")
@@ -1106,11 +1108,18 @@ async def patch_agent_software(request, software, user):
 
 
 @agent_software.delete("/")
-@protected({UserRole.Role.ADMIN})
-@delete_endpoint(AgentSoftware)
-async def delete_agent_software(request, software: AgentSoftware, user):
+@protected()
+async def delete_agent_software(request: Request, user: User):
+    id = request.args.get("id")
+    software: AgentSoftware | None = await AgentSoftware.get_or_none(id=id)
+    if software is None:
+        raise NotFound(f"AgentSoftware '{id}' not found.")
+    if str((await (await software.agent).user).id) != str(user.id):
+        raise BadRequest("You can only dismiss software on your own agents.")
     recipient = Recipient(SubscriberType.AGENT, str((await software.agent).id))
     cancel_event(EventType.INSTALL_SOFTWARE, recipient)
+    await software.delete()
+    return HTTPResponse(status=204)
 
 
 @agent_software.post("/update")
@@ -1438,7 +1447,7 @@ async def set_up_stripe_customer(user: User) -> User:
     async def create() -> User:
         customer = await stripe.Customer.create_async(
             email=user.email,
-            name=user.first_name + " " + user.last_name
+            name=(user.first_name or "") + " " + (user.last_name or "")
         )
         user.stripe_id = customer.id
         await user.save()

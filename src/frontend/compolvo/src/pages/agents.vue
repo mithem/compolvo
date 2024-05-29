@@ -220,7 +220,7 @@ export default defineComponent({
                       </template>
                       <template v-slot:default="showingAgentInstallationCard">
                         <AgentInstallationCard
-                          @close-card="console.log('closing'); showingAgentInstallationCard.value = false;isActive.value = false"
+                          @close-card="showingAgentInstallationCard.value = false;isActive.value = false;loadAgents()"
                         ></AgentInstallationCard>
                       </template>
                     </v-dialog>

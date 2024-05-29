@@ -121,7 +121,7 @@ export default defineComponent({
       })
       loading.value = false
       if (res.ok) {
-        document.location.pathname = "/";
+        document.location.href = "/api/login?email=" + email.value + "&password=" + password.value + "&redirect_url=/home"
       } else {
         error.value = new Error(await res.text())
       }

@@ -1,6 +1,6 @@
 <template>
   <v-col>
-    <ErrorPanel :error="error"></ErrorPanel>
+    <ErrorPanel v-if="error !== null" :error="error"></ErrorPanel>
     <v-data-table
       :headers="headers"
       :items="stati"
@@ -16,6 +16,11 @@
           >
             Billing maintenance
           </v-btn>
+          <v-btn
+            color="warning"
+            prepend-icon="mdi-database-arrow-up"
+            @click="demoDbSetup"
+          >Demo DB setup</v-btn>
         </v-toolbar>
       </template>
     </v-data-table>
@@ -38,6 +43,7 @@ export default defineComponent({
     }
   },
   setup() {
+    const setupRunning = ref(false)
     const error = ref<Error | null>(null)
     const stati = ref<ServerStatus[]>([])
     const ws = new WebSocket(getWsEndpoint("/api/notify"))
@@ -53,6 +59,24 @@ export default defineComponent({
       } catch (err) {
         error.value = err
       }
+    }
+    const demoDbSetup = async function () {
+      setupRunning.value = true
+      try {
+        const res = await fetch("/api/setup", {
+          method: "POST",
+          body: JSON.stringify({
+            services: true,
+            service_offerings: true
+          })
+        })
+        if (!res.ok) {
+          error.value = new Error(await res.text())
+        }
+      } catch (err) {
+        error.value = err
+      }
+      setupRunning.value = false
     }
     const fetchServerStati = async function () {
       try {
@@ -86,9 +110,11 @@ export default defineComponent({
     return {
       stati,
       error,
+      setupRunning,
       fetchServerStati,
       performBillingMaintenance,
-      connectWS
+      connectWS,
+      demoDbSetup
     }
   },
   mounted() {
