@@ -144,9 +144,14 @@ to managing/buying software and agents.
 8. Add your payment details in the profile tab (after clicking on the edit icon)
 9. Compare different software options by clicking on the compare tab in the navbar
 10. Filter the available softwares by the criteria that are important to you
-11. Select a software to see more details and purchase options
-12. Subscribe to software by subscribing to a service offering
-13. After positive confirmation, go to the profile tab to install the software.
-14. On the home tab, observe the software being installed on the agent.
+11. For easier comparison, when you select a time span in the filter, all prices are displayed for the chosen period. If
+    a service offering exists for that specific duration, its price is shown. If not, the price is adjusted to fit the
+    selected time span. For example, if only a monthly offering is available but you want to compare services over a
+    year, the monthly cost is multiplied by 12, or the annual offering is displayed. This ensures a clear and accurate
+    comparison across different services for your desired time frame.
+12. Select a software to see more details and purchase options
+13. Subscribe to software by subscribing to a service offering
+14. After positive confirmation, go to the profile tab to install the software.
+15. On the home tab, observe the software being installed on the agent.
 
 ---
