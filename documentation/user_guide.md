@@ -169,15 +169,10 @@ As, when starting out, you probably don't have an account yet, click on the "No 
 to be redirected to the registration page:
 ![Registration Page](../images/registration_submit_highlighted.png)
 
-After filling out your information, click on the submit button to create your account. You will be
-redirected to the login page.
-
-# TODO: Update for new login flow (auto-login after registration)
+After filling out your information, click on the submit button to create your account. You will be automatically logged in and redirected to the home page.
+![Home page](../images/home_page_empty.png)
 
 ### Adding an agent
-
-After logging in, you will be greeted by the home page:
-![Home page](../images/home_page_empty.png)
 
 Dort wird unmittelbar eine Hilfestellung angezeigt, welche weiteren Aktionen für den Benutzer
 empfohlen werden, um die Software optimal zu nutzen.
@@ -200,4 +195,59 @@ für die jeweilige Umgebung heruntergeladen werden kann:
 ![Agent-Installation](../images/agent_installation.png)
 Anschließend wird eine ausführbare Datei für das jeweilige System heruntergeladen.
 
----
+Der Benutzer führt die entsprechende Datei aus und gibt als Argument den Befehl `init --compolvo-host compolvo.mithem.uk` an:
+In einer Unix-Umgebung also bspw.:
+
+```shell
+./compolvo-agent-manjaro-x64 init --compolvo-host compolvo.mithem.uk
+```
+
+Das Programm fragt nun nach der Agent-ID, die zuvor in die Zwischenablage kopiert wurde. Außerdem kann ein Name für den Agenten vergeben werden, um die gemanagten Rechner besser unterscheiden zu können.
+Damit gilt der Agent als initialisiert und betriebsbereit.
+![Agent initialization](../images/agent_init.png)
+
+Nun muss der Agent nur noch gestartet werden, damit er auf Befehle zur Installation von Software hören kann.
+Dafür muss dieselbe Datei mit dem Argument `run` ausgeführt werden. Damit Software installiert werden kann, muss der Prozess über ausreichende Berechtigungen verfügen. Unter Unix-System kann es also z.B. so ausgeführt werden:
+
+```shell
+sudo ./compolvo-agent-manjaro-x64 run
+```
+![Agent running](../images/agent_run.png)
+Damit ist der Agent empfangsbereit.
+
+### Auswahl von Software
+
+Nun empfiehlt sich ein Blick auf die Software-Übersicht. Dazu kann der Reiter "compare" in der
+Navigationsleiste ausgewählt werden:
+![Software Comparison](../images/comparison.png)
+Hier kann zwischen verschiedenen Software-Optionen gefiltert werden. Die Software kann nach Tags,
+Preis, Lizenz, und unterstützten Betriebssystem und weiteren Kriterien gefiltert werden.
+Insbesondere kann das Zahlintervall angepasst werden, um die Software-Preise für den gewünschten
+Zeitraum zu vergleichen. Falls ein Service nur für einen anderen Zeitraum als ausgewählt angeboten wird, wird der Preis dafür
+automatisch umgerechnet.
+Sollte für eine Software Kaufinteresse bestehen, können durch einen Klick auf die Karte weitere Informationen angezeigt werden:
+
+![Software Details](../images/software_detail.png)
+
+### Kauf von Software
+
+Die Kaufoptionen (Abonnement-Pläne) können im unteren Teil angesehen werden.
+Beim Klick auf "buy now" bei einem Angebot wird darauf hingewiesen, dass der Benutzer noch nicht über hinterlegte Zahlungsinformationen verfügt und gebeten, diese auszufüllen:
+![Payment details](../images/payment_details.png)
+
+Nach dem Abschicken der Informationen wird der Benutzer zurück zur Service-Detail-Seite weitergeleitet. Nachdem er erneut den Kauf betätigt, wird er aufgefordert, die profile-Seite aufzusuchen.
+Beim Klick auf "profile" in der Navigationsleiste kann der Benutzer die bestellte Software sehen:
+
+![Profile](../images/profile.png)
+
+Nach einem Klick auf "install" können bestehende und kompatible Agents ausgewählt werden, auf denen die Software installiert werden soll:
+![Agent selection](../images/software_install_agent_select.png)
+
+Nach der Bestätigung wird darauf hingewiesen, die home page zu besuchen.
+Dort wird der Installationsprozess der Software auf dem Agenten angezeigt:
+
+![Software installation](../images/home_page_installing.png)
+
+Die Software wird nun installiert (sobald der Agent verbunden ist).
+Sie kann über dieselben Kacheln, die für die Statusinformation genutzt werden, auch wieder deinstalliert werden.
+Abonnements können über die profile-Seite gekündigt werden (was automatisch die Software von allen verbundenen Agents entfernt).
