@@ -193,6 +193,11 @@ Initialisierung des Agents benötigt.
 
 ### Initializing the agent
 
-Der Benutzer lädt sich die aktuelle Software für den Agent herunter (mittels des gezeigten Knopfes).
+Da auf dem Rechner, der verwaltet werden soll, noch kein Agent installiert ist, muss dieser zunächst
+heruntergeladen werden.
+Dazu kann der "download"-Knopf gedrückt werden. Dieser zeigt dann ein Fenster an, in dem der Agent
+für die jeweilige Umgebung heruntergeladen werden kann:
+![Agent-Installation](../images/agent_installation.png)
+Anschließend wird eine ausführbare Datei für das jeweilige System heruntergeladen.
 
 ---
