@@ -235,7 +235,7 @@ Die Kaufoptionen (Abonnement-Pläne) können im unteren Teil angesehen werden.
 Beim Klick auf "buy now" bei einem Angebot wird darauf hingewiesen, dass der Benutzer noch nicht über hinterlegte Zahlungsinformationen verfügt und gebeten, diese auszufüllen:
 ![Payment details](../images/payment_details.png)
 
-Nach dem Abschicken der Informationen wird der Benutzer zurück zur Service-Detail-Seite weitergeleitet. Nachdem er erneut den Kauf betätigt, wird er aufgefordert, die profile-Seite aufzusuchen.
+Nach dem Abschicken der Informationen wird die Software abonniert, und der Benutzer aufgefordert, die profile-Seite zu besuchen.
 Beim Klick auf "profile" in der Navigationsleiste kann der Benutzer die bestellte Software sehen:
 
 ![Profile](../images/profile.png)
