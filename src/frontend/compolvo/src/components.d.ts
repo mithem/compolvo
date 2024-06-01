@@ -18,9 +18,11 @@ declare module 'vue' {
     LoginForm: typeof import('./components/LoginForm.vue')['default']
     Navbar: typeof import('./components/Navbar.vue')['default']
     NewServiceForm: typeof import('./components/admin/NewServiceForm.vue')['default']
+    PaymentInfoCard: typeof import('./components/PaymentInfoCard.vue')['default']
     RegisterForm: typeof import('./components/RegisterForm.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    ServiceOfferingCard: typeof import('./components/ServiceOfferingCard.vue')['default']
     ServicePlanCard: typeof import('./components/ServicePlanCard.vue')['default']
     UserInfoForm: typeof import('./components/UserInfoForm.vue')['default']
   }

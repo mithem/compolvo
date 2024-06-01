@@ -1,12 +1,11 @@
 <script lang="ts">
 import {defineComponent, ref} from "vue"
-import {ServiceOffering} from "../components/models";
+import {ServiceOffering} from "./models";
 import {useTheme} from "vuetify";
 
 export default defineComponent({
   props: ["offering"],
   setup(props: { offering: ServiceOffering }) {
-    console.log("offering:", props.offering)
     const offering = props.offering
     const intervals = [
       ["year", 360],
@@ -27,8 +26,16 @@ export default defineComponent({
     const formattedName = ref<string>(formattedNameValue);
     const showingSnackbar = ref(false);
     const snackbarText = ref("");
+    const snackbarColor = ref("success")
     const creating = ref(false);
     const theme = useTheme();
+    const showingPaymentInfoCard = ref(false)
+
+    const showSnackbar = function (message: string, color: string = "success") {
+      snackbarText.value = message
+      snackbarColor.value = color
+      showingSnackbar.value = true
+    }
 
     const createServicePlan = async function () {
       creating.value = true;
@@ -40,15 +47,24 @@ export default defineComponent({
           })
         })
         if (!res.ok) {
-          alert(await res.text())
+          if (res.status === 402) { // requires payment details
+            showingPaymentInfoCard.value = true
+          } else {
+            showSnackbar(await res.text(), "error")
+          }
         } else {
-          snackbarText.value = "Order successful. Go to profile to install it on your agents."
-          showingSnackbar.value = true;
+          showSnackbar("Order successful. Go to profile to install it on your agents.")
         }
       } catch (err) {
-        alert(err)
+        showSnackbar(err.toString(), "error")
       }
       creating.value = false;
+    }
+
+    const onPaymentMethodAttached = function() {
+      showingPaymentInfoCard.value = false
+      showSnackbar("Payment details added. Subscribing to service plan...")
+      createServicePlan()
     }
 
     return {
@@ -56,9 +72,12 @@ export default defineComponent({
       formattedName,
       snackbarText,
       showingSnackbar,
+      snackbarColor,
       creating,
       theme,
-      createServicePlan
+      showingPaymentInfoCard,
+      createServicePlan,
+      onPaymentMethodAttached
     }
   },
   watch: {
@@ -83,11 +102,14 @@ export default defineComponent({
       </v-btn>
     </div>
   </v-card>
+  <v-dialog v-model="showingPaymentInfoCard" location="top" >
+    <PaymentInfoCard @attachment-successful="onPaymentMethodAttached()"/>
+  </v-dialog>
 
 
   <v-snackbar
     v-model="showingSnackbar"
-    color="success"
+    :color="snackbarColor"
   >
     {{ snackbarText }}
     <template v-slot:actions>

@@ -80,7 +80,7 @@
 import {defineComponent, getCurrentInstance, onMounted, onUnmounted, ref} from "vue";
 import {DetailedService, License, OperatingSystem, ServiceOffering} from "../components/models";
 import {marked} from "marked";
-import ServiceOfferingCard from "./ServiceOfferingCard.vue";
+import ServiceOfferingCard from "../components/ServiceOfferingCard.vue";
 
 interface SelectableOffering {
   props: { title: string, subtitle: string },
