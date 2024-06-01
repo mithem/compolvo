@@ -7,17 +7,22 @@ export {}
 
 declare module 'vue' {
   export interface GlobalComponents {
+    AgentInstallationCard: typeof import('./components/AgentInstallationCard.vue')['default']
     AgentSoftwareCard: typeof import('./components/AgentSoftwareCard.vue')['default']
     Compact_card: typeof import('./components/compact_card.vue')['default']
+    EditServiceForm: typeof import('./components/admin/EditServiceForm.vue')['default']
     ErrorPanel: typeof import('./components/ErrorPanel.vue')['default']
     Filter_panel: typeof import('./components/filter_panel.vue')['default']
     First: typeof import('./components/first.vue')['default']
     HelloWorld: typeof import('./components/HelloWorld.vue')['default']
     LoginForm: typeof import('./components/LoginForm.vue')['default']
     Navbar: typeof import('./components/Navbar.vue')['default']
+    NewServiceForm: typeof import('./components/admin/NewServiceForm.vue')['default']
+    PaymentInfoCard: typeof import('./components/PaymentInfoCard.vue')['default']
     RegisterForm: typeof import('./components/RegisterForm.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    ServiceOfferingCard: typeof import('./components/ServiceOfferingCard.vue')['default']
     ServicePlanCard: typeof import('./components/ServicePlanCard.vue')['default']
     UserInfoForm: typeof import('./components/UserInfoForm.vue')['default']
   }

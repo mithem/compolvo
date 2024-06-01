@@ -5,7 +5,7 @@
         <ErrorPanel v-if="error != null" :error="error"/>
         <h2 @loggedIn="firstName = $event">Hello<span
           v-if="firstName !== null">, {{ firstName }}</span>!</h2>
-        <div v-if="updates !== 0">There <span v-if="updates === 1">is</span><span
+        <div v-if="updates !== null && updates > 0">There <span v-if="updates === 1">is</span><span
           v-else>are</span>
           {{ updates }} update<span v-if="updates > 1">s</span> available. Please apply any
           updates
@@ -16,12 +16,12 @@
           <span v-if="agentCount == 0">Add an agent in the
           <RouterLink class="link" to="/agents">agent panel</RouterLink>
           .<br/></span>
+          <span v-else-if="servicePlanCount === 0">Check out new Software in the <RouterLink
+            class="link"
+            to="/compare">compare tab</RouterLink>.</span>
           <span v-else>You can install software on your agents from the
             <RouterLink class="link" to="/profile"
                         color="secondary">profile tab</RouterLink>.</span>
-          Or check out new Software in the
-          <RouterLink class="link" to="/compare">compare tab</RouterLink>
-          .
         </div>
         <br/>
         <v-progress-linear v-if="loading" indeterminate></v-progress-linear>
@@ -50,7 +50,7 @@
 import {defineComponent, onMounted, ref} from 'vue';
 import AgentSoftwareCard from "../components/AgentSoftwareCard.vue";
 import {AgentSoftware, UserMeObject} from "../components/models";
-import {isHigherVersion} from "../components/utils";
+import {getWsEndpoint, isHigherVersion} from "../components/utils";
 
 
 export default defineComponent({
@@ -62,7 +62,9 @@ export default defineComponent({
     const loading = ref(false);
     const agentCount = ref<number>(null);
     const error = ref<Error | null>(null);
-    const webSocket = new WebSocket("/api/notify");
+    const wsEndpoint = getWsEndpoint("/api/notify");
+    const webSocket = new WebSocket(wsEndpoint);
+    const servicePlanCount = ref<number>(null);
 
 
     const fetchSoftware = async function () {
@@ -80,6 +82,15 @@ export default defineComponent({
         error.value = err
       }
       loading.value = false;
+    }
+
+    const getServicePlanCount = async function () {
+      const res = await fetch("/api/service/plan/count")
+      if (!res.ok) {
+        error.value = new Error(await res.text())
+      } else {
+        servicePlanCount.value = JSON.parse(await res.text()).count
+      }
     }
 
     const calculateAvailableUpdates = function () {
@@ -136,6 +147,7 @@ export default defineComponent({
       await fetchSoftware()
       await getUserName()
       await getAgentCount()
+      await getServicePlanCount()
     }
 
     onMounted(() => {
@@ -143,7 +155,18 @@ export default defineComponent({
     });
 
     webSocket.onmessage = handleWebSocketMessage
-    return {softwares, updates, firstName, loading, agentCount, error, fetchSoftware, refresh}
+    return {
+      softwares,
+      updates,
+      firstName,
+      loading,
+      agentCount,
+      servicePlanCount,
+      error,
+      fetchSoftware,
+      refresh,
+      getServicePlanCount
+    }
   }
 });
 </script>

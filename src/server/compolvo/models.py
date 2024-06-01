@@ -75,6 +75,7 @@ class User(Model, Serializable):
     email = CharField(255, unique=True)
     password = TextField(null=True)
     salt = TextField(null=True)
+    logged_in = BooleanField(default=False)
     stripe_id = TextField(null=True)
     billing_cycle = ForeignKeyField("models.BillingCycle", "users")
 
@@ -101,7 +102,7 @@ class Service(Model, Serializable):
 
     id = UUIDField(pk=True)
     name = TextField()
-    system_name = TextField()
+    system_name = CharField(255, unique=True)
     short_description = TextField(null=True)
     description = TextField(null=True)
     license = ForeignKeyField("models.License", "services")
@@ -136,8 +137,7 @@ class PackageManagerAvailableVersion(Model, Serializable):
     version = TextField()
     latest = BooleanField(default=False)
 
-    class Meta:
-        unique_together = (("service", "package_manager", "operating_system", "latest"),)
+    fields = ["id", "service", "operating_system", "package_manager", "version", "latest"]
 
 
 class License(Model, Serializable):
@@ -205,9 +205,10 @@ class AgentSoftware(Model, Serializable):
     corrupt = BooleanField(default=False)
     installing = BooleanField(default=False)
     uninstalling = BooleanField(default=False)
+    last_updated = DatetimeField(null=True)
 
     fields = ["id", "agent", "service_plan", "installed_version", "corrupt", "installing",
-              "uninstalling"]
+              "uninstalling", "last_updated"]
 
     class Meta:
         unique_together = (("agent", "service_plan"),)

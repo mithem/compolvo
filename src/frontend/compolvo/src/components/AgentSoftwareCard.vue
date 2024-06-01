@@ -9,10 +9,17 @@ export default defineComponent({
     const software = ref(props.software);
     const upgrading = ref(false);
     const uninstalling = ref(false);
+    const removing = ref(false)
     const updateAvailable = ref(false);
     const iconName = ref<string>(software.value.agent.connected ? "mdi-check-circle" : "mdi-cancel");
     const iconColor = ref<string>(software.value.agent.connected ? "success" : "red");
     const instance = getCurrentInstance();
+    const staleTresholdDate = new Date()
+    staleTresholdDate.setTime(staleTresholdDate.getTime() - 1000 * 60 * 60) // 1 hour ago
+    const lastUpdated = props.software.last_updated !== null ? new Date(props.software.last_updated) : null;
+    // lastUpdated === null means no status update every occured (e.g. installation while agent isn't running)
+    const isStale = ref(lastUpdated === null || (props.software.installing || props.software.uninstalling) && lastUpdated < staleTresholdDate)
+    const staleWarningTooltip = "No updates where received " + (lastUpdated ? "since " + lastUpdated.toLocaleString() + "." : "from agent (yet).")
 
     const startUpdate = async function () {
       upgrading.value = true;
@@ -52,6 +59,23 @@ export default defineComponent({
       uninstalling.value = false;
     }
 
+    const remove = async function () {
+      removing.value = true
+      try {
+        const res = await fetch("/api/agent/software?id=" + software.value.id, {
+          method: "DELETE"
+        })
+        if (!res.ok) {
+          alert(await res.text())
+        } else {
+          instance.proxy.$emit("reload")
+        }
+      } catch (err) {
+        alert(err)
+      }
+      removing.value = false
+    }
+
     onMounted(checkForUpdate)
 
     return {
@@ -59,11 +83,15 @@ export default defineComponent({
       updateAvailable,
       upgrading,
       uninstalling,
+      removing,
       iconName,
       iconColor,
+      isStale,
+      staleWarningTooltip,
       startUpdate,
       checkForUpdate,
-      uninstall
+      uninstall,
+      remove
     };
   }
 });
@@ -72,7 +100,17 @@ export default defineComponent({
 <template>
   <v-card class="software-card">
     <v-card-title>
-      {{ software.service.name }}
+      <div style="display: flex">
+        {{ software.service.name }}
+        <template v-if="isStale">
+          <v-spacer></v-spacer>
+          <v-tooltip :text="staleWarningTooltip">
+            <template v-slot:activator="{ props }">
+              <v-icon v-bind="props" color="warning" id="stale-warning">mdi-alert</v-icon>
+            </template>
+          </v-tooltip>
+        </template>
+      </div>
     </v-card-title>
     <v-card-subtitle>
       <div class="subtitle-container">
@@ -104,8 +142,18 @@ export default defineComponent({
           software.latest_version
         }}</span>
     </v-card-text>
-    <v-card-actions :v-if="updateAvailable">
+    <v-card-actions>
       <v-btn
+        v-if="isStale"
+        @click="remove"
+        :removing="removing"
+        color="red"
+        variant="outlined"
+      >
+        Dismiss
+      </v-btn>
+      <v-btn
+        v-else
         @click="uninstall"
         :loading="uninstalling"
         color="red"

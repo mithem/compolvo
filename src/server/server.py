@@ -15,7 +15,7 @@ from sanic.log import logger
 from sanic_openapi import openapi
 from tortoise.contrib.sanic import register_tortoise
 from tortoise.exceptions import IntegrityError
-from tortoise.expressions import Q
+from tortoise.expressions import F
 from tortoise.functions import Coalesce
 
 from compolvo import cors
@@ -28,7 +28,7 @@ from compolvo.models import Agent, AgentSoftware, Serializable, PackageManager, 
     BillingCycle, BillingCycleType, ServerStatus
 from compolvo.models import Service, OperatingSystem, Tag, UserRole, User, License, \
     ServiceOffering, ServicePlan
-from compolvo.notify import Event, Recipient, EventType, SubscriberType
+from compolvo.notify import Event, Recipient, EventType, SubscriberType, cancel_event
 from compolvo.utils import verify_password, check_token, Unauthorized, BadRequest, NotFound, \
     hash_password, generate_secret, test_email, \
     user_has_roles
@@ -63,9 +63,10 @@ register_tortoise(app,
 user = Blueprint("user", url_prefix="/api/user")
 service = Blueprint("service", url_prefix="/api/service")
 service_offering = Blueprint("service_offering", url_prefix="/api/service/offering")
+available_version = Blueprint("version", url_prefix="/api/service/version")
 service_plan = Blueprint("service_plan", url_prefix="/api/service/plan")
 tag = Blueprint("tag", url_prefix="/api/tag")
-service_group = Blueprint.group(service, service_offering, service_plan)
+service_group = Blueprint.group(service, service_offering, available_version, service_plan)
 payment = Blueprint("payment", url_prefix="/api/payment")
 agent = Blueprint("agent", url_prefix="/api/agent")
 agent_software = Blueprint("agent_software", url_prefix="/api/agent/software")
@@ -125,7 +126,7 @@ async def _get_svc_and_tag_from_request(request):
 
 
 async def create_user(email: str, first: str | None, last: str | None, password: str,
-                      role: UserRole.Role = None) -> User:
+                      role: UserRole.Role = None, skip: bool = False) -> User:
     if not test_email(email):
         raise BadRequest("Invalid email.")
     user = await User.get_or_none(email=email)
@@ -143,6 +144,8 @@ async def create_user(email: str, first: str | None, last: str | None, password:
             salt=salt,
             billing_cycle=billing_cycle
         )
+    elif not skip:
+        raise IntegrityError("Email already taken.")
     if role is None:
         role = UserRole.Role.USER
     existing_role = await UserRole.get_or_none(user=user, role=role)
@@ -158,7 +161,7 @@ async def create_user(email: str, first: str | None, last: str | None, password:
         else:
             customer = await stripe.Customer.create_async(
                 email=email,
-                name=first + " " + last
+                name=first or "" + " " + last or ""
             )
             id = customer.id
         user.stripe_id = id
@@ -224,7 +227,7 @@ async def set_up_demo_db(user: User, services: bool = False,
             short_description="Docker Desktop is an integrated development environment (IDE) that allows developers to easily create, manage, and operate Docker containers on both Mac and Windows systems. The application offers a user-friendly interface that facilitates the seamless transition from code to container, incorporating advanced features like container orchestration, network management, and security settings.",
             description="Docker Desktop is a comprehensive, professional development environment designed to simplify developers' work with Docker technology. It provides a robust, user-friendly platform for building, testing, and deploying applications in Docker containers on macOS and Windows operating systems. Docker Desktop enables developers to develop their applications in an isolated environment, ensuring consistency between different development settings and the production environment. The platform supports both Linux and Windows containers and offers flexible tools for network design, volume management, and security. Docker Desktop seamlessly integrates into existing development workflows and offers support for popular IDEs and development tools. It also includes advanced features like an integrated Kubernetes cluster, allowing developers to test their applications in an orchestrated environment. The ability to manage containers directly from the desktop enhances efficiency and enables faster iteration and debugging. Moreover, Docker Desktop provides a secure environment for application development. With built-in security features like automatic updates and easily configurable network settings, Docker Desktop helps developers follow security best practices and minimizes vulnerability to security threats. For businesses seeking an efficient, reliable, and scalable solution for containerizing their applications, Docker Desktop is an excellent choice. It promotes a collaborative development environment and provides developers with the tools needed to effectively develop and manage modern, container-based applications. Docker Desktop thus serves as a bridge between development and production environments, ensuring that applications operate smoothly and without environmental dependencies at every stage of the development cycle.",
             license=lic_mit,
-            download_count=42069,
+            download_count=100,
             image="",
             latest_version="1.2.5"
         )
@@ -259,7 +262,7 @@ async def set_up_demo_db(user: User, services: bool = False,
             short_description="Nginx is a high-performance web server, reverse proxy, and email (IMAP/POP3) proxy, known for its stability, rich feature set, simple configuration, and low resource consumption. Originally designed to solve the C10K problem, it efficiently serves a large number of simultaneous connections.",
             description='Nginx (pronounced "engine-x") is an open-source web server software designed to provide a balance of high performance, scalability, and low resource usage. It serves as a web server, as well as a reverse proxy and an email proxy for IMAP, POP3, and SMTP. Nginx is renowned for its speed and efficiency, particularly in environments where the scalability and performance of web applications are critical. It is commonly used to manage static content, load balancing, and for caching in a distributed environment. The architecture of Nginx is event-driven and asynchronous, which makes it particularly efficient at handling multiple connections simultaneously. This design allows it to scale vertically on modern hardware with minimal resource overhead. Nginx’s performance advantages become especially apparent in serving static content and in handling simultaneous connections by not tying up resources to keep connections open, which in contrast, is a common issue in traditional web servers like Apache. Nginx also functions effectively as a reverse proxy server, providing security, additional layers of functionality, and performance enhancements to an application stack. For instance, Nginx can manage SSL/TLS termination, WebSocket, and HTTP/2 connections, enhancing the capability of the underlying server without additional load. Its configuration system is straightforward, allowing fine-grained control over its operational parameters with minimal configuration overhead. For businesses and developers looking for a reliable and robust server solution, Nginx offers a compelling choice due to its ability to handle high traffic loads and its flexibility in integrating into existing technology stacks. Whether deploying a simple static website or a complex web application requiring robust security and high availability, Nginx provides a performance-optimized solution that has been adopted by some of the largest sites on the Internet, including Netflix, Airbnb, and many others.',
             license=lic_mit,
-            download_count=13098438,
+            download_count=200,
             image="",
             latest_version="1.25.5"
         )
@@ -294,7 +297,7 @@ async def set_up_demo_db(user: User, services: bool = False,
             short_description="Git is a distributed version control system that enables developers to track and manage changes to code projects efficiently. It facilitates collaborative coding by allowing multiple developers to work on different parts of a project simultaneously without interfering with each other's work. Git is known for its robust branching and merging capabilities, which make it an essential tool for modern software development.",
             description="Git is a powerful, distributed version control system that is pivotal in managing modern software development projects. It allows individual developers and large teams alike to track every single change made to the codebase, ensuring comprehensive version control and historical traceability. By decentralizing the repository management, Git enables team members to work on local copies of the project, which can be synchronized with the main repository as needed. One of Git's hallmark features is its sophisticated branching and merging mechanics. Developers can create branches to experiment with new features or fixes without affecting the main codebase, making it safe to explore innovative solutions. Once the new code is ready and tested, it can be seamlessly merged back into the main branch, maintaining a clean and stable production codebase. Git also excels in performance. Its efficient handling of large repositories and fast operation speeds make it suitable for projects of all sizes, from small startups to large-scale enterprise systems. Additionally, Git's strong support for non-linear development allows for flexible integration of various workflows, such as feature branches, forks, and pull requests, enhancing collaborative efforts and peer review processes. Moreover, Git integrates well with various development tools and platforms, from local IDEs to remote collaboration platforms like GitHub and GitLab. This integration facilitates a smooth workflow for continuous integration (CI) and continuous deployment (CD), crucial for automating the testing and deployment of code changes. For organizations looking to maintain a high standard of code integrity and collaboration, Git offers a reliable, scalable, and efficient solution. It not only helps developers to manage changes effectively but also supports a culture of transparency and collaboration, making it indispensable in the realm of software development. Git's flexibility and power ensure that it remains at the forefront of version control technology, adapting to the evolving needs of developers and projects worldwide.",
             license=lic_mit,
-            download_count=42069,
+            download_count=300,
             image=""
         )
         v_git_1 = await PackageManagerAvailableVersion.create(
@@ -314,7 +317,7 @@ async def set_up_demo_db(user: User, services: bool = False,
             short_description="Nextcloud is an open-source software suite that provides a secure and decentralized platform for file storage, collaboration, and communication. It allows users and organizations to host their own cloud storage service, managing files, contacts, calendars, and more, with full control over their data and privacy.",
             description="Nextcloud is a robust, open-source software solution designed to offer businesses and individuals alike the ability to operate their own private cloud storage and collaboration platform. As a self-hosted system, it empowers users to maintain complete control over their data, ensuring privacy and security in a world where these are increasingly at a premium. Nextcloud facilitates file sharing, calendar and contact management, task scheduling, and real-time document collaboration, all within a user-friendly interface accessible via web or mobile apps. A standout feature of Nextcloud is its extensibility, supported by a vibrant community of developers who contribute to a growing library of apps and plugins. These extensions can transform the core Nextcloud installation into a more customized and versatile tool, integrating features such as mail handling, video conferencing, and office suite tools. This modularity makes it an ideal solution for organizations looking to adapt the platform to their specific operational needs. Nextcloud also excels in providing enterprise-grade security. With features like end-to-end encryption, two-factor authentication, and easy-to-manage user permissions, it gives administrators the tools they need to secure data against unauthorized access. Furthermore, its compliance with major privacy standards, such as GDPR, makes it suitable for organizations needing to adhere to strict data protection regulations. For teams and organizations that prioritize data sovereignty and collaborative flexibility, Nextcloud offers a scalable and reliable platform. It supports a broad range of deployment scenarios, from small teams looking for file sharing solutions to large enterprises needing comprehensive collaboration suites. Nextcloud’s commitment to open-source principles and its proactive approach to security and privacy make it a preferred choice for those seeking an alternative to commercial cloud storage providers.",
             license=lic_mit,
-            download_count=42069,
+            download_count=400,
             retrieval_method=Service.RetrievalMethod.COMMAND,
             retrieval_data='{"hello": "world"}',
             image=""
@@ -389,30 +392,33 @@ async def set_up_demo_db(user: User, services: bool = False,
                 plan_docker = await ServicePlan.create(
                     user=user,
                     service_offering=off_docker_month,
-                    start_date=datetime.datetime.now()
+                    start_date=datetime.datetime.now(tz=datetime.timezone.utc)
                 )
                 plan_git = await ServicePlan.create(
                     user=user,
                     service_offering=off_git_month,
-                    start_date=datetime.datetime.now() - datetime.timedelta(days=7)
+                    start_date=datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(
+                        days=7)
                 )
                 plan_nextcloud = await ServicePlan.create(
                     user=user,
                     service_offering=off_nextcloud_year,
-                    start_date=datetime.datetime.now() - datetime.timedelta(days=45)
+                    start_date=datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(
+                        days=45)
                 )
                 plan_nginx = await ServicePlan.create(
                     user=user,
                     service_offering=off_nginx_quarter,
-                    start_date=datetime.datetime.now() - datetime.timedelta(days=45)
+                    start_date=datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(
+                        days=45)
                 )
 
 
 @app.listener("before_server_start")
 async def test_user(app):
     options.setup_options(app)
-    await create_user("test@example.com", "Test", "user", "test", None)
-    await create_user("admin@example.com", "Admin", "Istrator", "admin", UserRole.Role.ADMIN)
+    await create_user("test@example.com", "Test", "user", "test", None, True)
+    await create_user("admin@example.com", "Admin", "Istrator", "admin", UserRole.Role.ADMIN, True)
 
 
 @app.listener("after_server_start")
@@ -455,6 +461,8 @@ async def login(request: Request):
                        algorithm="HS256")
     headers = {"Set-Cookie": f"token={token}; Expires={expires.strftime(HTTP_HEADER_DATE_FORMAT)}"}
     redirect_url = request.args.get("redirect_url", request.url_for("index"))
+    user.logged_in = True
+    await user.save()
     return redirect(redirect_url, headers=headers)
 
 
@@ -467,7 +475,7 @@ async def auth(request: Request):
     user = await User.get_or_none(email=email)
     if user is None:
         raise NotFound("User not found.")
-    if not verify_password(password, user.password, user.salt):
+    if not user.logged_in or not verify_password(password, user.password, user.salt):
         raise Unauthorized()
     return HTTPResponse(status=204)
 
@@ -482,7 +490,10 @@ async def get_token(request, user):
 
 
 @app.get("/api/logout")
-async def logout(request: Request):
+@protected()
+async def logout(request: Request, user: User):
+    user.logged_in = False
+    await user.save()
     redirect_url = request.args.get("redirect_url", request.url_for("index"))
     return redirect(redirect_url, headers={"Set-Cookie": f"token=deleted"})
 
@@ -517,7 +528,8 @@ async def get_user(request, user):
             **await user.to_dict(),
             "roles": [await role.to_dict() for role in await user.roles],
             "connected_to_billing_provider": user.stripe_id != None,
-            "has_payment_method": has_payment_method
+            "has_payment_method": has_payment_method,
+            "is_admin": await user_has_roles(user, {UserRole.Role.ADMIN})
         }
     )
 
@@ -546,6 +558,7 @@ async def update_user(request, user: User):
     password = request.json.get("password")
     if password is not None:
         user.password = hash_password(password, user.salt)
+        user.logged_in = False
     if first_name is not None:
         user.first_name = first_name
     if last_name is not None:
@@ -574,13 +587,12 @@ async def delete_own_user(request, user: User):
 
 
 @service.get("/")
-@protected()
 @get_endpoint(Service)
 @openapi.summary("Get all services")
 @openapi.description(
     "By default, returns a JSON list of all services including tags. If a `id` is specified in the query args, only that specific service will be returned (provided it is found).")
 # @openapi.response(200, {"application/json": Union[List[Service], Service]})
-async def get_services(request, services, user):
+async def get_services(request, services):
     async def expand(svc: Service) -> dict:
         query = (
             Service
@@ -621,11 +633,9 @@ async def create_service(request, user):
         system_name=request.json["system_name"],
         name=request.json["name"],
         description=request.json.get("description"),
+        short_description=request.json.get("short_description"),
         license=license,
-        download_count=request.json.get("download_count"),
-        retrieval_method=request.json["retrieval_method"],
-        retrieval_data=request.json["retrieval_data"],
-        image=request.json.get("image")
+        download_count=request.json.get("download_count")
     )
     oses = request.json.get("operating_systems")
     if oses is not None:
@@ -647,6 +657,16 @@ async def update_service(request, svc, user):
 @delete_endpoint(Service)
 async def delete_service(request, svc, user):
     pass
+
+
+@service.delete("/bulk")
+@protected({UserRole.Role.ADMIN})
+async def delete_services_bulk(request, user):
+    if request.json is None:
+        raise BadRequest("No services provided.")
+    ids = request.json.get("services", [])
+    await Service.filter(id__in=ids).delete()
+    return json({"deleted": ids})
 
 
 @service_offering.get("/")
@@ -706,9 +726,7 @@ async def get_own_service_plans(request, user):
     id = request.args.get("id")
     if id is not None:
         filter_data["id"] = id
-    plans = await ServicePlan.filter(Q(canceled_by_user=False) | Q(
-        canceled_at__gt=datetime.datetime.now() - datetime.timedelta(days=1.0)),
-                                     **filter_data).all()
+    plans = await ServicePlan.filter(canceled_by_user=False, **filter_data).all()
     data = []
     for plan in plans:
         offering: ServiceOffering = await plan.service_offering
@@ -729,6 +747,13 @@ async def get_own_service_plans(request, user):
     return json(data)
 
 
+@service_plan.get("/count")
+@protected()
+async def get_service_plan_count(request, user):
+    count = await ServicePlan.filter(user=user, canceled_by_user=False).count()
+    return json({"count": count})
+
+
 @service_plan.post("/")
 @requires_payment_details(stripe)
 async def create_service_plan(request, user, methods):
@@ -739,7 +764,8 @@ async def create_service_plan(request, user, methods):
             raise NotFound("Specified service offering not found.")
         start_date = request.json.get("start_date")
         start = datetime.date.fromisoformat(
-            start_date) if start_date is not None else datetime.datetime.now()
+            start_date) if start_date is not None else datetime.datetime.now(
+            tz=datetime.timezone.utc)
         data = {"user": user, "service_offering": offering, "start_date": start}
         end = request.json.get("end_date")
         if end is not None:
@@ -776,7 +802,7 @@ async def cancel_service_plan(request, user):
 async def cancel_service_plan_for_user(plan: ServicePlan):
     plan.canceled_by_user = True
     if plan.canceled_at is None:
-        plan.canceled_at = datetime.datetime.now()
+        plan.canceled_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await plan.save()
     offering: ServiceOffering = await plan.service_offering
     service: Service = await offering.service
@@ -796,9 +822,8 @@ async def delete_service_plan(request, plan, user):
 
 
 @tag.get("/")
-@protected()
 @get_endpoint(Tag)
-async def get_tags(request, tags, user):
+async def get_tags(request, tags):
     pass
 
 
@@ -1067,6 +1092,7 @@ async def bulk_create_agent_software(request, user):
         for (software, agent) in zip(softwares, agents):
             await send_agent_software_notification(EventType.INSTALL_SOFTWARE, agent,
                                                    service, software)
+        await _increase_download_count_for_service(str(service.id), len(agent_ids))
         return HTTPResponse(status=201)
     except KeyError:
         raise missing_params
@@ -1082,10 +1108,18 @@ async def patch_agent_software(request, software, user):
 
 
 @agent_software.delete("/")
-@protected({UserRole.Role.ADMIN})
-@delete_endpoint(AgentSoftware)
-async def delete_agent_software(request, software, user):
-    pass
+@protected()
+async def delete_agent_software(request: Request, user: User):
+    id = request.args.get("id")
+    software: AgentSoftware | None = await AgentSoftware.get_or_none(id=id)
+    if software is None:
+        raise NotFound(f"AgentSoftware '{id}' not found.")
+    if str((await (await software.agent).user).id) != str(user.id):
+        raise BadRequest("You can only dismiss software on your own agents.")
+    recipient = Recipient(SubscriberType.AGENT, str((await software.agent).id))
+    cancel_event(EventType.INSTALL_SOFTWARE, recipient)
+    await software.delete()
+    return HTTPResponse(status=204)
 
 
 @agent_software.post("/update")
@@ -1131,6 +1165,8 @@ async def send_agent_software_notification(command: EventType, agent: Agent,
                                            service: Service,
                                            software: AgentSoftware):
     assert command in [EventType.INSTALL_SOFTWARE, EventType.UNINSTALL_SOFTWARE]
+    software.last_updated = datetime.datetime.now(tz=datetime.timezone.utc)
+    # await software.save()
     msg = {
         "service": service.system_name,
         "software": str(software.id)
@@ -1227,6 +1263,15 @@ async def attach_payment_method_to_customer(request, user, customer: stripe.Cust
         raise BadRequest("Expected method_id for the payment method to attach")
 
 
+@payment_method.delete("/all")
+@requires_stripe_customer(stripe)
+async def remove_all_payment_methods_from_customer(request, user, customer: stripe.Customer):
+    methods = await stripe.PaymentMethod.list_async(customer=customer.id)
+    for method in methods:
+        await stripe.PaymentMethod.detach_async(method.id)
+    return HTTPResponse(status=204)
+
+
 @app.get("/api/billing/cycle")
 @protected()
 @get_endpoint(BillingCycle)
@@ -1272,6 +1317,9 @@ async def perform_billing_maintenance():
         logger.warning("Already performing billing maintenance, therefore skipping this one.")
         return
     logger.info("Performing billing maintenance...")
+    event = Event(EventType.BILLING_MAINTENANCE, Recipient(SubscriberType.USER),
+                  {"status": "running"}, True)
+    notify.queue(event)
     await update_server_status(billing_maintenance=True)
     try:
         await set_up_stripe_products()
@@ -1281,6 +1329,9 @@ async def perform_billing_maintenance():
     except Exception as e:
         logger.exception(e)
     await update_server_status(billing_maintenance=False)
+    event = Event(EventType.BILLING_MAINTENANCE, Recipient(SubscriberType.USER), {"status": "done"},
+                  True)
+    notify.queue(event)
     logger.info("Billing maintenance complete")
 
 
@@ -1396,7 +1447,7 @@ async def set_up_stripe_customer(user: User) -> User:
     async def create() -> User:
         customer = await stripe.Customer.create_async(
             email=user.email,
-            name=user.first_name + " " + user.last_name
+            name=(user.first_name or "") + " " + (user.last_name or "")
         )
         user.stripe_id = customer.id
         await user.save()
@@ -1502,6 +1553,47 @@ async def create_event(request, user: User):
     event = Event(EventType.RELOAD, recipient, "/home/agent/software")
     notify.queue(event)
     return text("Accepted.", status=202)
+
+
+@available_version.get("/")
+@protected({UserRole.Role.ADMIN})
+async def get_available_versions(request: Request, user):
+    service_id = request.args.get("service_id")
+    if service_id is None:
+        raise BadRequest("Expected service_id query parameter.")
+    service = await Service.get_or_none(id=service_id)
+    if service is None:
+        raise NotFound(f"Service '{service_id}' not found.")
+    versions = await PackageManagerAvailableVersion.filter(service=service).all()
+    data = [{
+        **await version.to_dict(),
+        "operating_system": await (await version.operating_system).to_dict(),
+        "package_manager": await (await version.package_manager).to_dict()
+    } for version in versions]
+    return json(data)
+
+
+@available_version.delete("/bulk")
+@protected({UserRole.Role.ADMIN})
+async def delete_available_versions_bulk(request: Request, user):
+    try:
+        ids = request.json.get("ids", [])
+    except (NameError, AttributeError):
+        raise BadRequest("Missing ids parameter.")
+    await PackageManagerAvailableVersion.filter(id__in=ids).delete()
+    return HTTPResponse(status=204)
+
+
+@app.get("/api/server-status")
+@protected({UserRole.Role.ADMIN})
+@get_endpoint(ServerStatus)
+async def server_status(request, stati, user):
+    pass
+
+
+async def _increase_download_count_for_service(id: str, count: int = None):
+    cnt = count if count is not None else 1
+    await Service.filter(id=id).update(download_count=F("download_count") + cnt)
 
 
 app.add_task(run_schedules())

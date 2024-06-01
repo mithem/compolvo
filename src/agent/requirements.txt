@@ -4,3 +4,4 @@ click==8.1.7
 requests==2.31.0
 ansible==9.5.1
 distro==1.9.0
+PyInstaller==6.7.0

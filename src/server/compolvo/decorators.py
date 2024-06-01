@@ -13,12 +13,14 @@ def patch_endpoint(cls: Type[Serializable]):
     def decorator(func):
         @wraps(func)
         async def wrapper(request, *args, **kwargs):
+            id = None
             try:
-                instance = await cls.get_or_none(id=request.args["id"][0])
+                id = request.args["id"][0]
+                instance = await cls.get_or_none(id=id)
             except KeyError:
                 raise BadRequest(f"Please specify the {cls.__name__}'s id in the query parameters.")
             if instance is None:
-                raise NotFound(f"Specified {cls.__name__} not found.")
+                raise NotFound(f"Specified {cls.__name__} '{id}' not found.")
             for key, value in request.json.items():
                 fields = set(getattr(cls, "patch_fields", cls.fields)) - {"id"}
                 if key not in fields:
@@ -53,8 +55,10 @@ def get_endpoint(cls: Type[Serializable], listing_requires: Set[UserRole.Role] =
     def decorator(func):
         @wraps(func)
         async def wrapper(request, *args, **kwargs):
-            assert isinstance(args[0], User), "Please use the @protected decorator before this one."
-            user = args[0]
+            if listing_requires is not None:
+                assert isinstance(args[0],
+                                  User), "Please use the @protected decorator before this one."
+                user = args[0]
             instance_id = request.args.get("id", None)
             if instance_id is None:
                 if listing_requires is not None and not await user_has_roles(user,
@@ -84,7 +88,7 @@ def protected(requires_roles: Set[UserRole.Role] = None):
         async def decorated_function(request, *args, **kwargs):
             unauthorized = Unauthorized()
             user = await check_token_for_request(request)
-            if user is None:
+            if user is None or not user.logged_in:
                 raise unauthorized
             if requires_roles is not None:
                 if not await user_has_roles(user, requires_roles):

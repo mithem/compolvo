@@ -11,3 +11,8 @@ services:
     versions:
       - 1:2.39.2-1.1 # Debian
       - 2.45.0 # Homebrew
+  - system_name: docker-desktop
+    template: apt_homebrew_choco_pacman.yml.jinja
+    brew_module: homebrew/cask/docker
+    versions:
+      - 4.30.0,149282

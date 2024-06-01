@@ -63,6 +63,7 @@ export default {
     const error = ref<Error | null>(null);
     const instance = getCurrentInstance().proxy
     const showingErrorSnackbar = ref(false);
+    const isAdmin = ref(false);
 
     const autoThemeHandler = (query) => {
       theme.global.name.value = query.matches ? "dark" : "light"
@@ -94,6 +95,7 @@ export default {
           return false
         }
         const data = JSON.parse(await res.text())
+        isAdmin.value = data.is_admin
         return data.id !== undefined
       } catch (err) {
         error.value = err
@@ -104,6 +106,12 @@ export default {
     const setMenuItems = async () => {
       let items = []
       if (await isLoggedIn()) {
+        if (isAdmin.value) {
+          items.push(
+            {title: "Admin", path: "/admin", icon: "mdi-security"},
+            {title: "Services", path: "/admin/services", icon: "mdi-server"}
+          )
+        }
         items.push(
           {title: "Home", path: "/home", icon: "mdi-home"},
           {title: "Compare", path: "/compare", icon: "mdi-scale-balance"},

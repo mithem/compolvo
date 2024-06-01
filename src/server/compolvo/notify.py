@@ -4,7 +4,7 @@ import enum
 import json
 import uuid
 from queue import Queue
-from typing import Callable, Dict, List, Coroutine
+from typing import Callable, Dict, List, Coroutine, Set
 from uuid import UUID
 
 import websockets
@@ -20,6 +20,7 @@ class EventType(enum.StrEnum):
     AGENT_SOFTWARE_STATUS_UPDATE = "software-status-update"
     AGENT_LOGIN = "agent-login"
     WS_DISCONNECT = "ws-disconnect"
+    BILLING_MAINTENANCE = "billing-maintenance"
 
 
 class SubscriberType(enum.StrEnum):
@@ -71,6 +72,9 @@ class Recipient:
 
     def __repr__(self):
         return str(self.to_dict())
+
+    def __hash__(self):
+        return hash((self.subscriber_type, self.id))
 
 
 class Event:
@@ -125,11 +129,33 @@ class Subscription:
         }
 
 
+class Cancellation:
+    type: EventType
+    recipient: Recipient
+
+    def __init__(self, type: EventType, recipient: Recipient):
+        self.type = type
+        self.recipient = recipient
+
+    def to_dict(self):
+        return {
+            "type": self.type.value,
+            "recipient": self.recipient.to_dict()
+        }
+
+    def __hash__(self):
+        return hash((self.type, self.recipient))
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
+
 EventHandler = Callable[[Event], Coroutine[None, None, bool | None]]
 SubscriptionCallback = Callable[[Subscription], Coroutine[None, None, None]]
 
 _connection_handlers: Dict[Subscription, EventHandler] = {}
 _event_queue: Queue[Event] = Queue()
+_cancellations: Set[Cancellation] = set()
 
 
 def get_subscribers_for_event(event: Event) -> List[Subscriber]:
@@ -251,7 +277,7 @@ async def handle_agent_login_event(event: Event,
         error = "Agent is already connected."
         close_code = 4003
     else:
-        agent.last_connection_start = datetime.datetime.now()
+        agent.last_connection_start = datetime.datetime.now(tz=datetime.timezone.utc)
         agent.connected = True
         agent.connection_interrupted = False
         agent.connection_from_ip_address = ws.request_headers.get(
@@ -270,7 +296,7 @@ async def handle_agent_software_status_update_event(event: Event, agent: Agent |
     software_id = event.message["software_id"]
     status: Dict = event.message["status"]
     assert isinstance(status, dict)
-    software = await AgentSoftware.get_or_none(id=software_id)
+    software: AgentSoftware | None = await AgentSoftware.get_or_none(id=software_id)
     if software is None:
         raise ValueError(f"Software '{software_id}' not found.")
     assert (await software.agent).id == agent.id, "This software isn't installed on this agent."
@@ -279,6 +305,7 @@ async def handle_agent_software_status_update_event(event: Event, agent: Agent |
     if set(status.keys()).issubset(valid_fields):
         for key, value in status.items():
             setattr(software, key, value)
+        software.last_updated = datetime.datetime.now(tz=datetime.timezone.utc)
         await software.save()
         # Perform delete check after update as not all fields required for the check need to be sent in the event
         if software.installed_version is None and software.uninstalling == False and was_uninstalling and not software.installing and not software.corrupt:
@@ -287,7 +314,6 @@ async def handle_agent_software_status_update_event(event: Event, agent: Agent |
                           {"software_id": software_id})
             event = await get_user_reload_event(event)
             if event is not None:
-                logger.info("Queuing event: %s", event)
                 queue(event)
             await software.delete()
     else:
@@ -297,13 +323,18 @@ async def handle_agent_software_status_update_event(event: Event, agent: Agent |
 
 async def handle_agent_disconnect(agent: Agent, error: ConnectionClosed):
     agent.connected = False
-    agent.last_connection_end = datetime.datetime.now()
+    agent.last_connection_end = datetime.datetime.now(tz=datetime.timezone.utc)
     if isinstance(error, ConnectionClosedError):
         agent.connection_interrupted = True
     await agent.save()
     recipient = Recipient(SubscriberType.SERVER)
     event = Event(EventType.WS_DISCONNECT, recipient, {"agent_id": str(agent.id)})
     await _notify(event)
+
+
+def cancel_event(type: EventType, recipient: Recipient):
+    cancellation = Cancellation(type, recipient)
+    _cancellations.add(cancellation)
 
 
 async def websocket_handler(ws: websockets.WebSocketServerProtocol):
@@ -344,6 +375,12 @@ async def process_queue():
     failed_notifications = []
     while not _event_queue.empty():
         event = _event_queue.get(block=False)
+        cancellation = Cancellation(event.type, event.recipient)
+        if cancellation in _cancellations:
+            logger.debug("Skipping event %s due to cancellation", event)
+            _cancellations.remove(cancellation)
+            _event_queue.task_done()
+            continue
         try:
             success = await _notify(event)
         except ConnectionClosed:

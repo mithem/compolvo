@@ -9,6 +9,26 @@ export interface AgentSoftware {
   service: Service
   installing: boolean
   uninstalling: boolean
+  last_updated: Date
+}
+
+export interface PackageManager {
+  id: string
+  name: string
+}
+
+export interface ServerStatus {
+  id: string
+  server_id: string
+  server_running: boolean
+  performing_billing_maintenance: boolean
+}
+
+export interface PackageManagerAvailableVersion {
+  id: string
+  version: string
+  operating_system: OperatingSystem
+  package_manager: PackageManager
 }
 
 export interface ServiceOffering {
@@ -45,12 +65,13 @@ export interface Tag {
 
 export interface License {
   id: string
-  props: { title: string }
+  props: { title: string, subtitle: string | undefined }
 }
 
 export interface OperatingSystem {
   id: string
   props: { title: string }
+  system_name: string
 }
 
 

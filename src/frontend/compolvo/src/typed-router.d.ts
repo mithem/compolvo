@@ -19,6 +19,10 @@ declare module 'vue-router/auto-routes' {
    */
   export interface RouteNamedMap {
     '/': RouteRecordInfo<'/', '/', Record<never, never>, Record<never, never>>,
+    '/admin/': RouteRecordInfo<'/admin/', '/admin', Record<never, never>, Record<never, never>>,
+    '/admin/service/[id]/': RouteRecordInfo<'/admin/service/[id]/', '/admin/service/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
+    '/admin/service/[id]/versions': RouteRecordInfo<'/admin/service/[id]/versions', '/admin/service/:id/versions', { id: ParamValue<true> }, { id: ParamValue<false> }>,
+    '/admin/services': RouteRecordInfo<'/admin/services', '/admin/services', Record<never, never>, Record<never, never>>,
     '/agents': RouteRecordInfo<'/agents', '/agents', Record<never, never>, Record<never, never>>,
     '/compare': RouteRecordInfo<'/compare', '/compare', Record<never, never>, Record<never, never>>,
     '/detail': RouteRecordInfo<'/detail', '/detail', Record<never, never>, Record<never, never>>,
@@ -28,6 +32,5 @@ declare module 'vue-router/auto-routes' {
     '/payment-info': RouteRecordInfo<'/payment-info', '/payment-info', Record<never, never>, Record<never, never>>,
     '/profile': RouteRecordInfo<'/profile', '/profile', Record<never, never>, Record<never, never>>,
     '/register': RouteRecordInfo<'/register', '/register', Record<never, never>, Record<never, never>>,
-    '/ServiceOfferingCard': RouteRecordInfo<'/ServiceOfferingCard', '/ServiceOfferingCard', Record<never, never>, Record<never, never>>,
   }
 }

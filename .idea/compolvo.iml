@@ -5,6 +5,12 @@
       <excludeFolder url="file://$MODULE_DIR$/.tmp" />
       <excludeFolder url="file://$MODULE_DIR$/temp" />
       <excludeFolder url="file://$MODULE_DIR$/tmp" />
+      <excludeFolder url="file://$MODULE_DIR$/infrastructure/ansible/venv" />
+      <excludeFolder url="file://$MODULE_DIR$/infrastructure/venv" />
+      <excludeFolder url="file://$MODULE_DIR$/src/agent/venv" />
+      <excludeFolder url="file://$MODULE_DIR$/src/server/venv" />
+      <excludeFolder url="file://$MODULE_DIR$/src/agent/build" />
+      <excludeFolder url="file://$MODULE_DIR$/src/agent/dist" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.11 (compolvo)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
