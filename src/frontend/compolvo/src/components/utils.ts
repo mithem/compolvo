@@ -67,5 +67,5 @@ export function formatLargeNumber(count: number): string {
 }
 
 export function getWsEndpoint(endpoint: string) {
-  return document.location.protocol === "https" ? "wss" : "ws" + "://" + document.location.host + endpoint
+  return (document.location.protocol === "https:" ? "wss" : "ws") + "://" + document.location.host + endpoint
 }
