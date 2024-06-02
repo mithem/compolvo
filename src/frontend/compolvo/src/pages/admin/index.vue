@@ -47,6 +47,12 @@ export default defineComponent({
     const error = ref<Error | null>(null)
     const stati = ref<ServerStatus[]>([])
     const ws = new WebSocket(getWsEndpoint("/api/notify"))
+    ws.onerror = (_) => {
+      error.value = new Error("Error connecting to WebSocket.")
+    }
+    ws.onclose = (_) => {
+      error.value = new Error("WebSocket connection closed.")
+    }
 
     const performBillingMaintenance = async function () {
       try {

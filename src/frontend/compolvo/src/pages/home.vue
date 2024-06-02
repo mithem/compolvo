@@ -64,6 +64,12 @@ export default defineComponent({
     const error = ref<Error | null>(null);
     const wsEndpoint = getWsEndpoint("/api/notify");
     const webSocket = new WebSocket(wsEndpoint);
+    webSocket.onerror = (_) => {
+      error.value = new Error("Error connecting to WebSocket.")
+    }
+    webSocket.onclose = (_) => {
+      error.value = new Error("WebSocket connection closed.")
+    }
     const servicePlanCount = ref<number>(null);
 
 
@@ -113,12 +119,14 @@ export default defineComponent({
     }
 
     const subscribeToReloadEvents = async function (userId: string) {
-      webSocket.send(JSON.stringify({
-        intent: "subscribe",
-        subscriber_type: "user",
-        event_type: "reload",
-        id: userId
-      }))
+      webSocket.onopen = () => {
+        webSocket.send(JSON.stringify({
+          intent: "subscribe",
+          subscriber_type: "user",
+          event_type: "reload",
+          id: userId
+        }))
+      }
     }
 
     const handleWebSocketMessage = async function (ev: MessageEvent) {
