@@ -8,7 +8,7 @@ Willkommen im User Guide von Compolvo. Dieses Handbuch führt Sie durch die vers
 
 #figure(image("../images/homepage.png"), caption: "Startseite")
 
-- *Beschreibung*: Die Startseite begrüßt Benutzer der Compolvo-Seite mit einem Logo und einer Willkommensnachricht auf Deutsch: "Willkommen auf der Compolvo-Seite!".
+- *Beschreibung*: Die Startseite begrüßt Benutzer der Compolvo-Seite mit einem Logo und einer Willkommensnachricht: "Willkommen auf der Compolvo-Seite!".
   Dies ist eine statische Willkommensseite ohne interaktive Elemente. Um fortzufahren, melden Sie sich bei Ihrem Konto an. Nach dem Login verwenden Sie die Navigationsleiste, um die Website zu erkunden.
 
 ---
@@ -125,7 +125,9 @@ Die folgenden Schritte zeigen den groben Ablauf, mehr Informationen zu den einze
 
 === Benutzerkonto registrieren
 
-Gehen Sie zur [https://compolvo.mithem.uk/compolvo](Website). Sie werden von der Startseite begrüßt:
+#let compolvo_url = "https://compolvo.mithem.uk"
+
+Gehen Sie zur #link(compolvo_url)[Website]#footnote[#link(compolvo_url)]. Sie werden von der Startseite begrüßt:
 #figure(image("../images/homepage.png"), caption: "Startseite")
 
 Optional können Sie Ihr bevorzugtes Farbschema auswählen, indem Sie auf das Themenmodus-Symbol oben rechts neben der Anmeldeschaltfläche klicken.
