@@ -3,7 +3,7 @@
     <div class="page-container-cell">
       <div class="compolvo-container">
         <h1>{{ pageTitle }}</h1>
-        <p>Willkommen auf der Compolvo-Seite!</p>
+        <p>Welcome to Compolvo!</p>
       </div>
       <div class="image-container">
         <img src="@/assets/logo_compolvo.png" alt="Bildbeschreibung" class="styled-image">

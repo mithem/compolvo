@@ -133,3 +133,14 @@ export interface Token {
   id: string
   expires: Date
 }
+
+export interface WebSocketEvent {
+  event: {
+    type: string
+    message: WebSocketReloadEventMessage | object | null
+  }
+}
+
+export interface WebSocketReloadEventMessage {
+  paths: string[]
+}
