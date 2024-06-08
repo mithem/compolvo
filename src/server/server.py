@@ -417,7 +417,7 @@ async def set_up_demo_db(user: User, services: bool = False,
 @app.listener("before_server_start")
 async def test_user(app):
     options.setup_options(app)
-    await create_user("test@example.com", "Test", "user", "test", None, True)
+    await create_user("test@example.com", "Test", "user", "Test12345!", None, True)
     await create_user("admin@example.com", "Admin", "Istrator", "admin", UserRole.Role.ADMIN, True)
 
 
