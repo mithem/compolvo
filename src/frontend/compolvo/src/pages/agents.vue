@@ -1,6 +1,7 @@
 <script lang="ts">
-import {defineComponent, onMounted, ref} from "vue";
-import {Agent} from "../components/models";
+import {defineComponent, ref} from "vue";
+import {Agent, WebSocketEvent} from "../components/models";
+import {getWsEndpoint, subscribeToReloadEvents} from "../components/utils";
 
 
 export default defineComponent({
@@ -35,6 +36,29 @@ export default defineComponent({
     const newAgentID = ref<string>(null);
     const error = ref<Error | null>(null);
     const showingAgentInstallationCard = ref(false)
+    const wsEndpoint = getWsEndpoint("/api/notify");
+    const webSocket = new WebSocket(wsEndpoint);
+
+    webSocket.onmessage = async (event: MessageEvent) => {
+      try {
+        const data: WebSocketEvent | object = JSON.parse(event.data)
+        if (data.event && data.event.type === "reload" && "paths" in data.event.message && data.event.message.paths.includes("/agent/list")) {
+          await loadAgents()
+        }
+      } catch (err) {
+        error.value = new Error(`Error interpreting WebSocket message '${event.data}': ${err}`)
+      }
+    }
+
+    const listenOnWebSocket = async function () {
+      const res = await fetch("/api/user/me")
+      if (res.ok) {
+        const user = JSON.parse(await res.text())
+        subscribeToReloadEvents(webSocket, user.id)
+      } else {
+        error.value = new Error(await res.text())
+      }
+    }
 
     const loadAgents = async function () {
       loading.value = true;
@@ -53,7 +77,6 @@ export default defineComponent({
     }
 
     const filterAgents = async function () {
-      console.log(filteredAgents)
       const searchKeys = ["id", "user", "name", "connected", "connection_from_ip_address", "last_connection_start", "last_connection_end", "connection_interrupted", "initialized"]
       const query = searchQuery.value.toLowerCase()
       filteredAgents.value = searchQuery.value == "" ? agents.value : agents.value.filter((agent: Agent) => {
@@ -107,7 +130,6 @@ export default defineComponent({
       await navigator.clipboard.writeText(newAgentID.value);
     }
 
-    onMounted(loadAgents);
     return {
       agents,
       filteredAgents,
@@ -123,7 +145,8 @@ export default defineComponent({
       filterAgents,
       deleteAgents,
       createAgent,
-      copyAgentID
+      copyAgentID,
+      listenOnWebSocket
     };
   },
   watch: {
@@ -131,6 +154,10 @@ export default defineComponent({
       this.filterAgents()
     },
 
+  },
+  mounted() {
+    this.loadAgents()
+    this.listenOnWebSocket()
   }
 })
 </script>

@@ -66,6 +66,20 @@ export function formatLargeNumber(count: number): string {
   return count.toString()
 }
 
+export function subscribeToReloadEvents(ws: WebSocket, userId: string) {
+  if (ws.readyState == WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      intent: "subscribe",
+      subscriber_type: "user",
+      event_type: "reload",
+      id: userId
+    }))
+  } else {
+    ws.onopen = () => {
+      subscribeToReloadEvents(ws, userId)
+    }
+  }
+}
 export function getWsEndpoint(endpoint: string) {
   return (document.location.protocol === "https:" ? "wss" : "ws") + "://" + document.location.host + endpoint
 }

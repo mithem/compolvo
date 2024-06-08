@@ -1,6 +1,5 @@
 <template>
-  <!-- HelloWorld / -->
-  <first />
+  <IndexView/>
 </template>
 
 <script lang="ts" setup>

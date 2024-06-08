@@ -944,6 +944,9 @@ async def agent_init(request):
             agent.name = new_name
         agent.operating_system = operating_system
         await agent.save()
+        event = Event(EventType.AGENT_INIT, Recipient(SubscriberType.SERVER),
+                      {"agent_id": str(agent.id)})
+        notify.queue(event)
         return json({"name": new_name or agent.name, "operating_system": os})
     except (KeyError, AttributeError):
         raise BadRequest("Missing parameter. Expected 'id' and 'name'")
@@ -1541,18 +1544,6 @@ async def set_up_sigint_handler():
     for sig in signals:
         loop.add_signal_handler(getattr(signal, sig),
                                 lambda: asyncio.create_task(signal_handler(sig)))
-
-
-@app.post("/api/event")
-@protected({UserRole.Role.ADMIN})
-async def create_event(request, user: User):
-    user_id = request.args.get("user_id", str(user.id))
-    if user_id == "all":
-        user_id = None
-    recipient = Recipient(SubscriberType.USER, user_id)
-    event = Event(EventType.RELOAD, recipient, "/home/agent/software")
-    notify.queue(event)
-    return text("Accepted.", status=202)
 
 
 @available_version.get("/")

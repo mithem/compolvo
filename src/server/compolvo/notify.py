@@ -18,6 +18,7 @@ class EventType(enum.StrEnum):
     INSTALL_SOFTWARE = "install-software"
     UNINSTALL_SOFTWARE = "uninstall-software"
     AGENT_SOFTWARE_STATUS_UPDATE = "software-status-update"
+    AGENT_INIT = "agent-init"
     AGENT_LOGIN = "agent-login"
     WS_DISCONNECT = "ws-disconnect"
     BILLING_MAINTENANCE = "billing-maintenance"
@@ -412,7 +413,7 @@ async def run_queue_worker():
 async def get_user_reload_event(event: Event):
     agent_id: str | UUID | None = None
     match event.type:
-        case EventType.AGENT_LOGIN | EventType.WS_DISCONNECT:
+        case EventType.AGENT_INIT | EventType.AGENT_LOGIN | EventType.WS_DISCONNECT:
             agent_id = event.message["agent_id"]
         case EventType.AGENT_SOFTWARE_STATUS_UPDATE:
             software_id = event.message["software_id"]
@@ -425,7 +426,7 @@ async def get_user_reload_event(event: Event):
         return
     user_id = str((await agent.user).id)
     recipient = Recipient(SubscriberType.USER, user_id)
-    return Event(EventType.RELOAD, recipient, {"path": "/home/agent/software"})
+    return Event(EventType.RELOAD, recipient, {"paths": ["/home/agent/software", "/agent/list"]})
 
 
 async def run_event_worker():
@@ -435,6 +436,7 @@ async def run_event_worker():
             await _notify(event)
 
     logger.info("Running event worker")
+    subscribe(SubscriberType.SERVER, EventType.AGENT_INIT, handler)
     subscribe(SubscriberType.SERVER, EventType.AGENT_LOGIN, handler)
     subscribe(SubscriberType.SERVER, EventType.WS_DISCONNECT, handler)
     subscribe(SubscriberType.SERVER, EventType.AGENT_SOFTWARE_STATUS_UPDATE, handler)

@@ -49,8 +49,8 @@
 <script lang="ts">
 import {defineComponent, onMounted, ref} from 'vue';
 import AgentSoftwareCard from "../components/AgentSoftwareCard.vue";
-import {AgentSoftware, UserMeObject} from "../components/models";
-import {getWsEndpoint, isHigherVersion} from "../components/utils";
+import {AgentSoftware, UserMeObject, WebSocketEvent} from "../components/models";
+import {getWsEndpoint, isHigherVersion, subscribeToReloadEvents} from "../components/utils";
 
 
 export default defineComponent({
@@ -111,31 +111,17 @@ export default defineComponent({
         if (res.ok) {
           const user: UserMeObject = await res.json()
           firstName.value = user.first_name;
-          subscribeToReloadEvents(user.id)
+          subscribeToReloadEvents(webSocket, user.id)
         }
       } catch (err) {
         error.value = err
       }
     }
 
-    const subscribeToReloadEvents = async function (userId: string) {
-      if (webSocket.readyState == WebSocket.OPEN) {
-        webSocket.send(JSON.stringify({
-          intent: "subscribe",
-          subscriber_type: "user",
-          event_type: "reload",
-          id: userId
-        }))
-      } else {
-        webSocket.onopen = () => {
-          subscribeToReloadEvents(userId)
-        }
-      }
-    }
 
     const handleWebSocketMessage = async function (ev: MessageEvent) {
-      const data = JSON.parse(ev.data)
-      if (data.event && data.event.type === "reload" && data.event.message.path === "/home/agent/software") {
+      const data: WebSocketEvent = JSON.parse(ev.data)
+      if (data.event && data.event.type === "reload" && "paths" in data.event.message && data.event.message.paths.includes("/home/agent/software")) {
         fetchSoftware()
       } else {
         console.warn("Received invalid websocket message: ", ev.data)
