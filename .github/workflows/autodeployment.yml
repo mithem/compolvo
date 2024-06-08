@@ -24,6 +24,7 @@ env:
   DB_ROOT_PASSWORD: ${{secrets.DB_ROOT_PASSWORD}}
   COMPOLVO_SECRET_KEY: ${{secrets.COMPOLVO_SECRET_KEY}}
   HOSTNAME: ${{vars.HOSTNAME}}
+  STRIPE_API_KEY: ${{secrets.STRIPE_API_KEY}}
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
