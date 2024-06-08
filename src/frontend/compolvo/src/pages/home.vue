@@ -119,13 +119,17 @@ export default defineComponent({
     }
 
     const subscribeToReloadEvents = async function (userId: string) {
-      webSocket.onopen = () => {
+      if (webSocket.readyState == WebSocket.OPEN) {
         webSocket.send(JSON.stringify({
           intent: "subscribe",
           subscriber_type: "user",
           event_type: "reload",
           id: userId
         }))
+      } else {
+        webSocket.onopen = () => {
+          subscribeToReloadEvents(userId)
+        }
       }
     }
 
