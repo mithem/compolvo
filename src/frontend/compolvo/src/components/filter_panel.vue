@@ -133,7 +133,7 @@ export default defineComponent({
   data: () => ({
     filters: {
       tags: [],
-      priceRange: [0, 10000],
+      priceRange: [0, 200],
       license: null,
       os: null,
       period: 1
@@ -144,7 +144,7 @@ export default defineComponent({
       2: "Year",
     },
     minPrice: 0,
-    maxPrice: 1000,
+    maxPrice: 200,
   }),
   methods: {
     applyFilters(): void {
