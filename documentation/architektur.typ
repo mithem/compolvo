@@ -69,3 +69,8 @@ Der Agent ist in Python implementiert, da dies die Sprache ist, in der bereits E
 Zur Installation der Software selber wird Ansible verwendet, da dies ein breites Angebot an Diensten einbindet, über welche Software installiert werden kann.
 Dafür muss auf dem Agent ein lokaler Ansible Controller laufen, da ein Ansible Controller an einem Compolvo-Server nicht auf die Agents per SSH zugriefen könnte (damit werden die Ansible-Befehle übertragen).
 Da allerdings der Ansible Controller nur UNIX-ähnliche Betriebssysteme (MacOS und viele Linux-Distributionen) unterstützt, kann keine Software durch den Agent auf Windows-Geräten installiert werden.
+
+== Datenbankmodell
+
+Die folgende Abbildung zeigt das Datenbankschema:
+#figure(image("db-architecture-v2.png"), caption: "Datenbankmodell")
