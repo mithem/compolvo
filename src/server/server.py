@@ -810,6 +810,9 @@ async def cancel_service_plan_for_user(plan: ServicePlan):
     for software in plan.agent_softwares:
         agent: Agent = await software.agent
         await perform_software_uninstallation(agent, service, software)
+        event = Event(EventType.AGENT_SOFTWARE_STATUS_UPDATE, Recipient(SubscriberType.SERVER),
+                      {"software_id": str(software.id)})
+        notify.queue(event)
     if STRIPE_API_KEY is not None:
         app.add_task(evaluate_billing_for_user(await plan.user))
 
@@ -1511,7 +1514,7 @@ async def run_schedules():
     logger.info("Starting schedule runner...")
     scheduler = AsyncIOScheduler()
 
-    billing_maintenance_trigger = CronTrigger(minute="*/5")
+    billing_maintenance_trigger = CronTrigger(minute="*/1")
     scheduler.add_job(perform_billing_maintenance, billing_maintenance_trigger)
 
     scheduler.start()
