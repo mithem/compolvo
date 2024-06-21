@@ -1,5 +1,7 @@
 #set document(title: "Compolvo Dokumentation")
 
+#set text(lang: "de")
+
 #let current_heading = context [
   #query(selector(heading.where(level: 1)).before(here())).last().body
 ]
@@ -23,12 +25,23 @@
 #outline(
   depth: 2,
   indent: auto,
-  title: "Inhaltsverzeichnis"
 )
+
 
 #pagebreak()
 
+#include("projektdaten.typ")
 #include("marktanalyse.typ")
+#pagebreak()
 #include("anforderungen.typ")
+#pagebreak()
 #include("architektur.typ")
+#pagebreak()
 #include("user_guide.typ")
+#pagebreak()
+
+#heading("Abbildungsverzeichnis", numbering: none)
+#outline(
+  target: figure.where(kind: image),
+  title: none
+)

@@ -27,7 +27,7 @@ docker compose up -d --build mariadb frontend server reverse-proxy
 
 After the containers are running, you can access the frontend at http://localhost:8080.
 
-For detailed usage instructions, check out the [User Guide](documentation/user_guide.md).
+For detailed usage instructions and other project-related documentation, check out the [Documentation](documentation.pdf).
 
 ### User Credentials
 
@@ -36,4 +36,4 @@ By default, the following users are created for demonstration purposes:
 | E-Mail            | Password   | Role  |
 |-------------------|------------|-------|
 | test@example.com  | Test12345! | User  |
-| admin@example.com | admin      | ADMIN |
+| admin@example.com | admin      | Admin |
