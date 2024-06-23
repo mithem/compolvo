@@ -123,6 +123,7 @@ export interface UserMeObject {
   first_name: string
   last_name: string
   email: string
+  email_verified: boolean
   roles: UserRole[]
   connected_to_billing_provider: boolean
   has_payment_method: boolean

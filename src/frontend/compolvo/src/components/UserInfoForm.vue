@@ -2,6 +2,23 @@
   <v-card class="form-card account-info-card">
     <v-card-title>Account info</v-card-title>
     <ErrorPanel v-if="error != null" :error="error"/>
+    <v-alert
+      v-if="!user.email_verified"
+      type="warning"
+    >
+      <v-row align="center">
+        <v-col class="grow">
+          Email not verified. Please verify your email address.
+        </v-col>
+        <v-col class="shrink">
+          <v-btn
+            @click="verifyEmailAddress"
+            :loading="verifyingEmail"
+          >Verify
+          </v-btn>
+        </v-col>
+      </v-row>
+    </v-alert>
     <div class="payment-method-config-container">
       <div v-if="!user.has_payment_method">
         No payment method configured.
@@ -127,6 +144,7 @@ export default defineComponent({
     const error = ref<Error | null>(null);
     const deletingPaymentMethod = ref(false);
     const proxy = getCurrentInstance().proxy;
+    const verifyingEmail = ref(false);
 
     const confirmPasswordRules = [
       (value) => {
@@ -240,6 +258,24 @@ export default defineComponent({
       }
     }
 
+    const verifyEmailAddress = async function () {
+      verifyingEmail.value = true
+      try {
+        const res = await fetch("/api/user/email/verify", {
+          method: "POST"
+        })
+        if (res.ok) {
+          snackbarText.value = "Verification email sent."
+          showingSnackbar.value = true
+        } else {
+          error.value = new Error(await res.text())
+        }
+      } catch (err) {
+        error.value = err
+      }
+      verifyingEmail.value = false
+    }
+
     return {
       user,
       didChangeInfo,
@@ -252,10 +288,12 @@ export default defineComponent({
       deleting,
       deletingPaymentMethod,
       error,
+      verifyingEmail,
       saveInfo,
       validate,
       deleteAccount,
-      deletePaymentMethod
+      deletePaymentMethod,
+      verifyEmailAddress
     }
   }
 })

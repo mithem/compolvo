@@ -73,13 +73,15 @@ class User(Model, Serializable):
     first_name = TextField(null=True)
     last_name = TextField(null=True)
     email = CharField(255, unique=True)
+    email_verified = BooleanField(default=False)
+    email_verification_token = CharField(255, null=True)
     password = TextField(null=True)
     salt = TextField(null=True)
     logged_in = BooleanField(default=False)
     stripe_id = TextField(null=True)
     billing_cycle = ForeignKeyField("models.BillingCycle", "users")
 
-    fields = ["id", "first_name", "last_name", "email", "billing_cycle"]
+    fields = ["id", "first_name", "last_name", "email", "billing_cycle", "email_verified"]
 
 
 class UserRole(Model, Serializable):

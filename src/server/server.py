@@ -18,6 +18,7 @@ from tortoise.exceptions import IntegrityError
 from tortoise.expressions import F
 from tortoise.functions import Coalesce
 
+import compolvo.email
 from compolvo import cors
 from compolvo import notify
 from compolvo import options
@@ -32,6 +33,7 @@ from compolvo.notify import Event, Recipient, EventType, SubscriberType, cancel_
 from compolvo.utils import verify_password, check_token, Unauthorized, BadRequest, NotFound, \
     hash_password, generate_secret, test_email, \
     user_has_roles
+from src.server.compolvo.utils import send_user_email_verification_mail
 
 HTTP_HEADER_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
 
@@ -126,7 +128,8 @@ async def _get_svc_and_tag_from_request(request):
 
 
 async def create_user(email: str, first: str | None, last: str | None, password: str,
-                      role: UserRole.Role = None, skip: bool = False) -> User:
+                      role: UserRole.Role = None, skip: bool = False,
+                      email_verification: bool = True) -> User:
     if not test_email(email):
         raise BadRequest("Invalid email.")
     user = await User.get_or_none(email=email)
@@ -146,6 +149,12 @@ async def create_user(email: str, first: str | None, last: str | None, password:
         )
     elif not skip:
         raise IntegrityError("Email already taken.")
+    if email_verification:
+        if not user.email_verified:
+            await send_user_email_verification_mail(app, email, user)
+    else:
+        user.email_verified = True
+        await user.save()
     if role is None:
         role = UserRole.Role.USER
     existing_role = await UserRole.get_or_none(user=user, role=role)
@@ -417,8 +426,10 @@ async def set_up_demo_db(user: User, services: bool = False,
 @app.listener("before_server_start")
 async def test_user(app):
     options.setup_options(app)
-    await create_user("test@example.com", "Test", "user", "Test12345!", None, True)
-    await create_user("admin@example.com", "Admin", "Istrator", "admin", UserRole.Role.ADMIN, True)
+    compolvo.email.setup_smtp_server()
+    await create_user("test@example.com", "Test", "user", "Test12345!", None, True, False)
+    await create_user("admin@example.com", "Admin", "Istrator", "admin", UserRole.Role.ADMIN, True,
+                      False)
 
 
 @app.listener("after_server_start")
@@ -533,6 +544,36 @@ async def get_user(request, user):
         }
     )
 
+
+@user.get("/email/verify")
+async def verify_user_email(request: Request):
+    token = request.args.get("verification_token")
+    if token is None:
+        raise BadRequest("No verification token provided.")
+    try:
+        decoded = jwt.decode(token, app.config.SECRET_KEY, algorithms=["HS256"])
+    except jwt.exceptions.DecodeError:
+        raise BadRequest("Bad token provided.")
+    user = await User.get_or_none(id=decoded["id"])
+    if user is None:
+        raise NotFound("User not found.")
+    if user.email_verification_token != token:
+        raise Unauthorized("Invalid verification token.")
+    valid_until_str = decoded.get("valid_until")
+    valid_until = datetime.datetime.fromisoformat(valid_until_str)
+    if valid_until <= datetime.datetime.now(tz=datetime.timezone.utc):
+        raise Unauthorized("Verification token expired.")
+    user.email_verified = True
+    user.email_verification_token = None
+    await user.save()
+    return redirect("/home")
+
+
+@user.post("/email/verify")
+@protected()
+async def send_user_email_verification_email(request, user: User):
+    await send_user_email_verification_mail(app, user.email, user)
+    return HTTPResponse(status=204)
 
 @user.post("/")
 async def create_new_user(request):
@@ -1538,6 +1579,7 @@ async def get_server_status() -> ServerStatus | None:
 async def signal_handler(sig: str):
     logger.info(f"Received {sig}, stopping server...")
     await update_server_status(running=False)
+    compolvo.email.quit_smtp_server()
     app.stop()
 
 

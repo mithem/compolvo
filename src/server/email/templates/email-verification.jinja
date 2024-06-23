@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Email verification</title>
+    <meta charset="UTF-8">
+    <style type="text/css">
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            width: 100%;
+            padding: 20px;
+            background-color: #f4f4f4;
+            text-align: center;
+        }
+
+        .content {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            display: inline-block;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 20px 0;
+            font-size: 16px;
+            color: #ffffff;
+            background-color: #007bff;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="content">
+        <h1>Verify email</h1>
+        <p>Hello,<br/>
+            Please click the button below to verify your email address:</p>
+        <a href="{{ compolvo_url }}/api/user/email/verify?verification_token={{ token }}"
+           class="btn">Verify email</a>
+    </div>
+</div>
+</body>
+</html>
