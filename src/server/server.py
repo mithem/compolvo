@@ -33,7 +33,6 @@ from compolvo.notify import Event, Recipient, EventType, SubscriberType, cancel_
 from compolvo.utils import verify_password, check_token, Unauthorized, BadRequest, NotFound, \
     hash_password, generate_secret, test_email, \
     user_has_roles
-from src.server.compolvo.utils import send_user_email_verification_mail
 
 HTTP_HEADER_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
 
@@ -151,7 +150,7 @@ async def create_user(email: str, first: str | None, last: str | None, password:
         raise IntegrityError("Email already taken.")
     if email_verification:
         if not user.email_verified:
-            await send_user_email_verification_mail(app, email, user)
+            await compolvo.email.send_user_email_verification_mail(app, user)
     else:
         user.email_verified = True
         await user.save()
@@ -572,7 +571,44 @@ async def verify_user_email(request: Request):
 @user.post("/email/verify")
 @protected()
 async def send_user_email_verification_email(request, user: User):
-    await send_user_email_verification_mail(app, user.email, user)
+    await compolvo.email.send_user_email_verification_mail(app, user)
+    return HTTPResponse(status=204)
+
+
+@user.post("/password/reset")
+async def request_password_reset(request: Request):
+    email = request.json.get("email")
+    if email is None:
+        raise BadRequest("Missing email.")
+    await compolvo.email.send_user_password_reset_email(app, email)
+    return HTTPResponse(status=204)
+
+
+@user.patch("/password")
+async def update_user_password_after_reset(request: Request):
+    token = request.json.get("reset_token")
+    if token is None:
+        raise BadRequest("Missing reset_token.")
+    try:
+        decoded = jwt.decode(token, app.config.SECRET_KEY, algorithms=["HS256"])
+    except jwt.exceptions.DecodeError:
+        raise BadRequest("Invalid reset token.")
+    user = await User.get_or_none(email=decoded["id"])
+    if user is None:
+        raise NotFound("User not found.")
+    if user.password_reset_token != token:
+        raise Unauthorized("Invalid reset token.")
+    valid_until_str = decoded.get("valid_until")
+    valid_until = datetime.datetime.fromisoformat(valid_until_str)
+    if valid_until <= datetime.datetime.now(tz=datetime.timezone.utc):
+        return redirect("/error/reset-token-expired")
+    password = request.json.get("password")
+    if password is None:
+        raise BadRequest("Missing password.")
+    user.password = hash_password(password, user.salt)
+    user.password_reset_token = None
+    user.logged_in = False
+    await user.save()
     return HTTPResponse(status=204)
 
 
@@ -607,7 +643,7 @@ async def update_user(request, user: User):
         user.last_name = last_name
     if email is not None:
         user.email = email
-        await send_user_email_verification_mail(app, email, user)
+        await compolvo.email.send_user_email_verification_mail(app, user)
         await change_user_email_in_stripe(user)
     await user.save()
     return HTTPResponse(status=204)

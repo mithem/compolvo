@@ -76,6 +76,7 @@ class User(Model, Serializable):
     email_verified = BooleanField(default=False)
     email_verification_token = CharField(255, null=True)
     password = TextField(null=True)
+    password_reset_token = CharField(255, null=True)
     salt = TextField(null=True)
     logged_in = BooleanField(default=False)
     stripe_id = TextField(null=True)

@@ -32,7 +32,13 @@
           >Submit
           </v-btn>
           <br/>
-          <RouterLink class="link" to="/register">No account yet?</RouterLink>
+          <v-row>
+            <RouterLink class="link" to="/register">No account yet?</RouterLink>
+            <v-spacer></v-spacer>
+            <span class="link" @click="triggerPasswordReset">
+              Forgot password?
+            </span>
+          </v-row>
         </v-col>
       </v-form>
     </v-card>
@@ -61,6 +67,7 @@ export default defineComponent({
     const email = ref("")
     const password = ref("")
     const error = ref(null)
+
     const login = async function () {
       loading.value = true
       error.value = null
@@ -82,7 +89,25 @@ export default defineComponent({
       }
       loading.value = false
     }
-    return {email, password, loading, error, login}
+
+    const triggerPasswordReset = async function () {
+      loading.value = true
+      error.value = null
+      try {
+        const res = await fetch(Constants.HOST_URL + "/api/user/password/reset", {
+          method: "POST",
+          body: JSON.stringify({email: email.value})
+        })
+        if (!res.ok) {
+          error.value = new Error(await res.text())
+        }
+      } catch (err) {
+        error.value = err
+      }
+      loading.value = false
+    }
+
+    return {email, password, loading, error, login, triggerPasswordReset}
   },
 });
 </script>

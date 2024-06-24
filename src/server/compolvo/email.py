@@ -1,11 +1,19 @@
+import datetime
 import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Dict
 
+import compolvo.email
+import jwt
+import sanic
+from compolvo.models import User
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sanic.log import logger
+
+EMAIL_VERIFICATION_TOKEN_LIFETIME_HOURS = 1
+PASSWORD_RESET_TOKEN_LIFETIME_HOURS = 1
 
 SMTP: smtplib.SMTP | None = None
 SMTP_SENDER: str | None = None
@@ -68,3 +76,34 @@ def send_email(email: str, subject: str, template: str,
     logger.info("Sending email to %s", email)
     content = msg.as_string()
     SMTP.sendmail(SMTP_SENDER, email, content)
+
+
+async def send_user_email_verification_mail(app: sanic.Sanic, user: User):
+    token = get_ephemeral_email_token(app, str(user.id), EMAIL_VERIFICATION_TOKEN_LIFETIME_HOURS)
+    user.email_verified = False
+    user.email_verification_token = token
+    await user.save()
+    compolvo.email.send_email(user.email, "Verify your email", "email-verification.jinja",
+                              {"token": token})
+
+
+def get_ephemeral_email_token(app: sanic.Sanic, id: str, threshold_hours: int):
+    valid_until = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(
+        hours=threshold_hours)
+    token = jwt.encode(
+        {"id": id, "valid_until": valid_until.isoformat()},
+        app.config.SECRET_KEY,
+        algorithm="HS256")
+    return token
+
+
+async def send_user_password_reset_email(app: sanic.Sanic, email: str):
+    token = get_ephemeral_email_token(app, email, PASSWORD_RESET_TOKEN_LIFETIME_HOURS)
+    user = await User.get_or_none(email=email)
+    if user is None:
+        raise ValueError("User not found")
+    user.password_reset_token = token
+    user.logged_in = False
+    await user.save()
+    compolvo.email.send_email(user.email, "Reset your password", "password-reset.jinja",
+                              {"token": token})
