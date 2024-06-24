@@ -23,7 +23,7 @@ from compolvo import cors
 from compolvo import notify
 from compolvo import options
 from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, protected, \
-    requires_payment_details, requires_stripe_customer
+    requires_payment_details, requires_stripe_customer, requires_verified_email
 from compolvo.models import Agent, AgentSoftware, Serializable, PackageManager, \
     PackageManagerAvailableVersion, \
     BillingCycle, BillingCycleType, ServerStatus
@@ -479,11 +479,11 @@ async def login(request: Request):
 
 @app.post("/api/auth")
 async def auth(request: Request):
-    email = request.json.get("email", None)
+    id = request.json.get("id", None)
     password = request.json.get("password", None)
-    if email is None or password is None:
-        raise BadRequest("Missing email or password parameters.")
-    user = await User.get_or_none(email=email)
+    if id is None or password is None:
+        raise BadRequest("Missing id or password parameters.")
+    user = await User.get_or_none(id=id)
     if user is None:
         raise NotFound("User not found.")
     if not user.logged_in or not verify_password(password, user.password, user.salt):
@@ -562,7 +562,7 @@ async def verify_user_email(request: Request):
     valid_until_str = decoded.get("valid_until")
     valid_until = datetime.datetime.fromisoformat(valid_until_str)
     if valid_until <= datetime.datetime.now(tz=datetime.timezone.utc):
-        raise Unauthorized("Verification token expired.")
+        return redirect("/error/verification-token-expired")
     user.email_verified = True
     user.email_verification_token = None
     await user.save()
@@ -574,6 +574,7 @@ async def verify_user_email(request: Request):
 async def send_user_email_verification_email(request, user: User):
     await send_user_email_verification_mail(app, user.email, user)
     return HTTPResponse(status=204)
+
 
 @user.post("/")
 async def create_new_user(request):
@@ -606,7 +607,8 @@ async def update_user(request, user: User):
         user.last_name = last_name
     if email is not None:
         user.email = email
-        # TODO: Email verification
+        await send_user_email_verification_mail(app, email, user)
+        await change_user_email_in_stripe(user)
     await user.save()
     return HTTPResponse(status=204)
 
@@ -796,6 +798,7 @@ async def get_service_plan_count(request, user):
 
 
 @service_plan.post("/")
+@requires_verified_email()
 @requires_payment_details(stripe)
 async def create_service_plan(request, user, methods):
     try:
@@ -1549,6 +1552,13 @@ async def create_stripe_subscription_for_plan(user: User, service_plan: ServiceP
     )
     service_plan.stripe_subscription_id = subscription.id
     await service_plan.save()
+
+
+async def change_user_email_in_stripe(user: User):
+    if user.stripe_id is not None:
+        await stripe.Customer.modify_async(user.stripe_id, email=user.email)
+    else:
+        await set_up_stripe_customer(user)
 
 
 async def run_schedules():

@@ -11,11 +11,7 @@
           Email not verified. Please verify your email address.
         </v-col>
         <v-col class="shrink">
-          <v-btn
-            @click="verifyEmailAddress"
-            :loading="verifyingEmail"
-          >Verify
-          </v-btn>
+          <EmailVerificationButton text="Verify"></EmailVerificationButton>
         </v-col>
       </v-row>
     </v-alert>
@@ -112,8 +108,10 @@
 import {defineComponent, getCurrentInstance, ref} from "vue"
 import {UserMeObject} from "./models";
 import {evaluatePasswordRules} from "./utils";
+import EmailVerificationButton from "./EmailVerificationButton.vue";
 
 export default defineComponent({
+  components: {EmailVerificationButton},
   props: ["user"],
   data: () => ({
     newPasswordRules: [
@@ -144,7 +142,6 @@ export default defineComponent({
     const error = ref<Error | null>(null);
     const deletingPaymentMethod = ref(false);
     const proxy = getCurrentInstance().proxy;
-    const verifyingEmail = ref(false);
 
     const confirmPasswordRules = [
       (value) => {
@@ -160,7 +157,7 @@ export default defineComponent({
         const res = await fetch("/api/auth", {
           method: "POST",
           body: JSON.stringify({
-            email: user.value.email,
+            id: user.value.id,
             password: password
           })
         })
@@ -258,23 +255,6 @@ export default defineComponent({
       }
     }
 
-    const verifyEmailAddress = async function () {
-      verifyingEmail.value = true
-      try {
-        const res = await fetch("/api/user/email/verify", {
-          method: "POST"
-        })
-        if (res.ok) {
-          snackbarText.value = "Verification email sent."
-          showingSnackbar.value = true
-        } else {
-          error.value = new Error(await res.text())
-        }
-      } catch (err) {
-        error.value = err
-      }
-      verifyingEmail.value = false
-    }
 
     return {
       user,
@@ -288,12 +268,10 @@ export default defineComponent({
       deleting,
       deletingPaymentMethod,
       error,
-      verifyingEmail,
       saveInfo,
       validate,
       deleteAccount,
-      deletePaymentMethod,
-      verifyEmailAddress
+      deletePaymentMethod
     }
   }
 })

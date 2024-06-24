@@ -13,6 +13,8 @@ from jwt.exceptions import InvalidTokenError
 from sanic import Request
 from sanic.exceptions import SanicException
 
+EMAIL_VERIFICATION_TOKEN_LIFETIME_HOURS = 1
+
 
 async def check_token(token: str, secret_key: str) -> Optional[User]:
     try:
@@ -77,13 +79,13 @@ def test_email(email: str) -> bool:
 
 
 async def send_user_email_verification_mail(app: sanic.Sanic, email: str, user: User):
-    token_lifetime_hours = 1
     valid_until = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(
-        hours=token_lifetime_hours)
+        hours=EMAIL_VERIFICATION_TOKEN_LIFETIME_HOURS)
     token = jwt.encode(
         {"id": str(user.id), "valid_until": valid_until.isoformat()},
         app.config.SECRET_KEY,
         algorithm="HS256")
+    user.email_verified = False
     user.email_verification_token = token
     await user.save()
     compolvo.email.send_email(email, "Verify your email", "email-verification.jinja",

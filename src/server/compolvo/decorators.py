@@ -119,7 +119,9 @@ def requires_stripe_customer(stripe):
             except stripe.InvalidRequestError:
                 return customer_not_found
             return await func(request, user, customer, *args, **kwargs)
+
         return decorated_function
+
     return decorator
 
 
@@ -135,4 +137,19 @@ def requires_payment_details(stripe):
             return await func(request, user, methods, *args, **kwargs)
 
         return decorated_function
+
+    return decorator
+
+
+def requires_verified_email():
+    def decorator(func):
+        @wraps(func)
+        @protected()
+        async def decorated_function(request, user: User, *args, **kwargs):
+            if not user.email_verified:
+                return text("Requires email verification.", status=403)
+            return await func(request, *args, **kwargs)
+
+        return decorated_function
+
     return decorator
