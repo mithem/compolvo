@@ -58,6 +58,10 @@ export interface Service {
   image: string | null
 }
 
+export interface UnsavedTag {
+  label: string
+}
+
 export interface Tag {
   id: string
   props: { title: string }

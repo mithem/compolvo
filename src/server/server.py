@@ -935,6 +935,17 @@ async def delete_tag(request, tag, user):
     pass
 
 
+@tag.delete("/bulk")
+@protected({UserRole.Role.ADMIN})
+async def delete_tags_bulk(request, user):
+    try:
+        ids = request.json["ids"]
+        await Tag.filter(id__in=ids).delete()
+        return HTTPResponse(status=204)
+    except KeyError:
+        raise BadRequest("Missing parameters. Required: ids")
+
+
 @service.post("/tag")
 @protected({UserRole.Role.ADMIN})
 async def associate_tag_with_service(request, user):

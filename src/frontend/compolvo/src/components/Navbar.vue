@@ -109,7 +109,8 @@ export default {
         if (isAdmin.value) {
           items.push(
             {title: "Admin", path: "/admin", icon: "mdi-security"},
-            {title: "Services", path: "/admin/services", icon: "mdi-server"}
+            {title: "Services", path: "/admin/services", icon: "mdi-server"},
+            {title: "Tags", path: "/admin/tags", icon: "mdi-tag"}
           )
         }
         items.push(

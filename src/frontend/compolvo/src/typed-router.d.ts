@@ -17,6 +17,7 @@ declare module 'vue-router/auto-routes' {
     '/admin/service/[id]/': RouteRecordInfo<'/admin/service/[id]/', '/admin/service/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     '/admin/service/[id]/versions': RouteRecordInfo<'/admin/service/[id]/versions', '/admin/service/:id/versions', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     '/admin/services': RouteRecordInfo<'/admin/services', '/admin/services', Record<never, never>, Record<never, never>>,
+    '/admin/tags': RouteRecordInfo<'/admin/tags', '/admin/tags', Record<never, never>, Record<never, never>>,
     '/agents': RouteRecordInfo<'/agents', '/agents', Record<never, never>, Record<never, never>>,
     '/compare': RouteRecordInfo<'/compare', '/compare', Record<never, never>, Record<never, never>>,
     '/detail': RouteRecordInfo<'/detail', '/detail', Record<never, never>, Record<never, never>>,

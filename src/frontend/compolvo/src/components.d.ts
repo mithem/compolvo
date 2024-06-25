@@ -11,6 +11,7 @@ declare module 'vue' {
     AgentSoftwareCard: typeof import('./components/AgentSoftwareCard.vue')['default']
     Compact_card: typeof import('./components/compact_card.vue')['default']
     EditServiceForm: typeof import('./components/admin/EditServiceForm.vue')['default']
+    EditTagForm: typeof import('./components/admin/EditTagForm.vue')['default']
     EmailVerificationButton: typeof import('./components/EmailVerificationButton.vue')['default']
     ErrorPanel: typeof import('./components/ErrorPanel.vue')['default']
     Filter_panel: typeof import('./components/filter_panel.vue')['default']

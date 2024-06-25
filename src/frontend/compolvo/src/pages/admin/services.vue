@@ -112,7 +112,6 @@ export default defineComponent({
         {title: "Short description", key: "short_description"},
         {title: "Description", key: "description"},
         {title: "Download count", key: "download_count"},
-        {title: "Stripe product", key: "stripe_product_id"},
         {title: "Actions", key: "actions"}
       ]
     }
