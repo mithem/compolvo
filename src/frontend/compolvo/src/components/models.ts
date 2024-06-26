@@ -33,6 +33,7 @@ export interface PackageManagerAvailableVersion {
 
 export interface ServiceOffering {
   id: string
+  active: boolean
   name: string
   description: string
   price: number

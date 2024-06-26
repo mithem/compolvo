@@ -1,10 +1,19 @@
 <template>
   <v-form>
     <v-col>
-      <v-text-field
-        v-model="offering.name"
-        label="Name"
-      ></v-text-field>
+      <v-row class="horiz-input-field">
+        <v-switch
+          inline
+          v-model="offering.active"
+          class="vert-input-field"
+          label="Active"
+        ></v-switch>
+        <v-text-field
+          v-model="offering.name"
+          class="vert-input-field"
+          label="Name"
+        ></v-text-field>
+      </v-row>
       <v-text-field
         v-model="offering.description"
         label="Description"

@@ -17,6 +17,22 @@
       <template v-slot:top>
         <v-toolbar title="Offerings">
           <v-btn
+            prepend-icon="mdi-arrow-up"
+            :loading="loading"
+            @click="toggleActiveState(true)"
+            color="green"
+            :disabled="selectedOfferings.length === 0"
+          >Activate
+          </v-btn>
+          <v-btn
+            prepend-icon="mdi-arrow-down"
+            :loading="loading"
+            @click="toggleActiveState(false)"
+            color="warning"
+            :disabled="selectedOfferings.length === 0"
+          >Deactivate
+          </v-btn>
+          <v-btn
             prepend-icon="mdi-refresh"
             :loading="loading"
             @click="fetchOfferings"
@@ -91,6 +107,7 @@ export default defineComponent({
   data() {
     return {
       headers: [
+        {title: "Active", key: "active"},
         {title: "Name", key: "name"},
         {title: "Description", key: "description"},
         {title: "Price", key: "price"},
@@ -112,7 +129,7 @@ export default defineComponent({
     const fetchOfferings = async function () {
       loading.value = true
       try {
-        const res = await fetch("/api/service/offering?service=" + instance.proxy.$route.params.id)
+        const res = await fetch("/api/service/offering/admin?service=" + instance.proxy.$route.params.id)
         if (!res.ok) {
           error.value = new Error(await res.text())
         } else {
@@ -186,6 +203,20 @@ export default defineComponent({
       return success
     }
 
+    const toggleActiveState = async function (active: boolean) {
+      loading.value = true
+      const res = await fetch("/api/service/offering/bulk", {
+        method: "PATCH",
+        body: JSON.stringify({ids: selectedOfferings.value, active: active})
+      })
+      if (!res.ok) {
+        error.value = new Error(await res.text())
+      } else {
+        fetchOfferings()
+      }
+      loading.value = false
+    }
+
     return {
       loading,
       creating,
@@ -198,7 +229,8 @@ export default defineComponent({
       createOffering,
       editOffering,
       deleteOfferings,
-      fetchServiceName
+      fetchServiceName,
+      toggleActiveState
     };
   },
   mounted() {

@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import os
 import signal
-from typing import Set, Tuple, Dict, Iterable
+from typing import Set, Tuple, Dict, Iterable, Any
 
 import jwt
 import jwt.exceptions
@@ -692,7 +692,7 @@ async def get_services(request, services):
             **await svc.to_dict(),
             "tags": [await tag.to_dict() for tag in await svc.tags],
             "offerings": [await offering.to_dict() for offering in
-                          await ServiceOffering.filter(service=svc).order_by(
+                          await ServiceOffering.filter(service=svc, active=True).order_by(
                               "duration_days").all()],
             "operating_systems": oses,
         }
@@ -756,16 +756,39 @@ async def delete_services_bulk(request, service_ids, user):
     pass
 
 
+async def get_service_offerings_from_request(request: Request,
+                                             extra_filters: Dict[str, Any] = None):
+    filters = extra_filters if extra_filters is not None else {}
+    service = request.args.get("service")
+    if service is not None:
+        offerings = await ServiceOffering.filter(service__id=service, **filters).all()
+    else:
+        offerings = await ServiceOffering.filter(**filters).all()
+    return await Serializable.list_json(offerings)
+
+
 @service_offering.get("/")
 @protected()
 async def get_service_offerings(request: Request, user):
-    service = request.args.get("service")
-    if service is not None:
-        offerings = await ServiceOffering.filter(service__id=service).all()
-    else:
-        offerings = await ServiceOffering.all()
-    return await Serializable.list_json(offerings)
+    return await get_service_offerings_from_request(request, {"active": True})
 
+
+@service_offering.get("/admin")
+@protected({UserRole.Role.ADMIN})
+async def get_service_offerings_admin(request: Request, user):
+    return await get_service_offerings_from_request(request)
+
+
+@service_offering.patch("/bulk")
+@protected({UserRole.Role.ADMIN})
+async def bulk_update_service_offerings(request: Request, user):
+    ids = request.json.get("ids")
+    if ids is None:
+        raise BadRequest("Missing ids.")
+    active = request.json.get("active")
+    if active is not None:
+        await ServiceOffering.filter(id__in=ids).update(active=active)
+    return HTTPResponse(status=204)
 
 @service_offering.post("/")
 @protected({UserRole.Role.ADMIN})

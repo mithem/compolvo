@@ -94,6 +94,7 @@ export function removeKeysFromObject(obj: Object, keys: string[]) {
 
 export interface OptionalServiceOffering {
   id: string | undefined
+  active: boolean
   name: string
   description: string
   price: number

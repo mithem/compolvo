@@ -166,10 +166,11 @@ class ServiceOffering(Model, Serializable):
     description = TextField(null=True)
     price = FloatField()
     duration_days = IntField()
+    active = BooleanField(default=True)
     stripe_price_id = TextField(null=True)
 
-    fields = ["id", "name", "service", "description", "price", "duration_days"]
-    patch_fields = ["name", "description", "price", "duration_days"]
+    fields = ["id", "name", "service", "active", "description", "price", "duration_days"]
+    patch_fields = ["name", "description", "active", "price", "duration_days"]
 
 
 class ServicePlan(Model, Serializable):
