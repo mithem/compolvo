@@ -110,7 +110,8 @@ export default {
           items.push(
             {title: "Admin", path: "/admin", icon: "mdi-security"},
             {title: "Services", path: "/admin/services", icon: "mdi-server"},
-            {title: "Tags", path: "/admin/tags", icon: "mdi-tag"}
+            {title: "Tags", path: "/admin/tags", icon: "mdi-tag"},
+            {title: "Licenses", path: "/admin/licenses", icon: "mdi-license"}
           )
         }
         items.push(

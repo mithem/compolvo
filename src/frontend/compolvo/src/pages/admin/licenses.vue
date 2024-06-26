@@ -1,19 +1,21 @@
 <template>
   <v-col>
-    <ErrorPanel :error="error"></ErrorPanel>
+    <div v-if="error !== null">
+      <ErrorPanel :error="error"></ErrorPanel>
+    </div>
     <v-data-table
-      v-model="selectedTags"
+      v-model="selectedLicenses"
       :headers="headers"
-      :items="tags"
+      :items="licenses"
       item-key="id"
       show-select
       class="elevation-1"
       :loading="loading"
     >
       <template v-slot:top>
-        <v-toolbar title="Tags">
-          <v-btn prepend-icon="mdi-refresh" @click="fetchTags">Refresh</v-btn>
-          <v-btn prepend-icon="mdi-delete" color="red" @click="deleteTags">Delete</v-btn>
+        <v-toolbar title="Licenses">
+          <v-btn prepend-icon="mdi-refresh" @click="fetchLicenses">Refresh</v-btn>
+          <v-btn prepend-icon="mdi-delete" color="red" @click="deleteLicenses">Delete</v-btn>
           <v-dialog>
             <template v-slot:activator="{ props: activatorProps }">
               <v-btn v-bind="activatorProps" color="blue">
@@ -23,15 +25,11 @@
             </template>
             <template v-slot:default="{isActive}">
               <v-card class="pa-5">
-                <v-col>
-                  <h1>Create Tag</h1>
-                  <ErrorPanel :error="error"></ErrorPanel>
-                  <v-progress-linear v-if="creating" indeterminate :height="5"></v-progress-linear>
-                  <EditTagForm
-                    :tag="null"
-                    @tag-save="createTag($event).then(success => {if (success) isActive.value = false})"
-                  ></EditTagForm>
-                </v-col>
+                <v-card-title>Create license</v-card-title>
+                <EditLicenseForm
+                  :license="null"
+                  @license-save="createLicense($event).then(success => {if (success) isActive.value = false})"
+                ></EditLicenseForm>
               </v-card>
             </template>
           </v-dialog>
@@ -43,21 +41,17 @@
 
 <script lang="ts">
 import {defineComponent, ref} from "vue"
-import {Tag, UnsavedTag} from "../../components/models";
-import EditTagForm from "../../components/admin/EditTagForm.vue";
+import {License, UnsavedLicense} from "../../components/models";
+import EditLicenseForm from "../../components/admin/EditLicenseForm.vue";
 
 export default defineComponent({
-  components: {EditTagForm},
+  components: {EditLicenseForm},
   data() {
     return {
       singleSelect: false,
       headers: [
-        {
-          title: "ID",
-          align: "start",
-          key: "id"
-        },
-        {title: "Label", key: "label"},
+        {title: "ID", key: "id"},
+        {title: "Name", key: "name"},
       ]
     }
   },
@@ -66,17 +60,17 @@ export default defineComponent({
     const creating = ref(false)
     const deleting = ref(false)
     const error = ref<Error | null>(null)
-    const tags = ref<Tag[]>([])
-    const selectedTags = ref<string[]>([])
+    const licenses = ref<License[]>([])
+    const selectedLicenses = ref<string[]>([])
 
-    const fetchTags = async () => {
+    const fetchLicenses = async () => {
       loading.value = true
       try {
-        const res = await fetch("/api/tag")
+        const res = await fetch("/api/license")
         if (!res.ok) {
           error.value = new Error(await res.text())
         } else {
-          tags.value = await res.json()
+          licenses.value = await res.json()
         }
       } catch (err) {
         error.value = err
@@ -84,18 +78,18 @@ export default defineComponent({
       loading.value = false
     }
 
-    const deleteTags = async () => {
+    const deleteLicenses = async () => {
       deleting.value = true
       try {
-        const res = await fetch("/api/tag/bulk", {
+        const res = await fetch("/api/license/bulk", {
           method: "DELETE",
-          body: JSON.stringify({ids: selectedTags.value})
+          body: JSON.stringify({ids: selectedLicenses.value})
         })
         if (!res.ok) {
           error.value = new Error(await res.text())
         } else {
-          selectedTags.value = []
-          fetchTags()
+          selectedLicenses.value = []
+          fetchLicenses()
         }
       } catch (err) {
         error.value = err
@@ -103,17 +97,17 @@ export default defineComponent({
       deleting.value = false
     }
 
-    const createTag = async (tag: UnsavedTag) => {
+    const createLicense = async (license: UnsavedLicense) => {
       creating.value = true
-      const res = await fetch("/api/tag", {
+      const res = await fetch("/api/license", {
         method: "POST",
-        body: JSON.stringify(tag)
+        body: JSON.stringify(license)
       })
       const success = res.ok;
       if (!success) {
         error.value = new Error(await res.text())
       } else {
-        fetchTags()
+        fetchLicenses()
       }
       creating.value = false
       return success
@@ -122,16 +116,16 @@ export default defineComponent({
     return {
       loading,
       creating,
-      tags,
-      selectedTags,
+      licenses,
+      selectedLicenses,
       error,
-      fetchTags,
-      createTag,
-      deleteTags
+      fetchLicenses,
+      createLicense,
+      deleteLicenses
     }
   },
   mounted() {
-    this.fetchTags()
+    this.fetchLicenses()
   }
 })
 </script>

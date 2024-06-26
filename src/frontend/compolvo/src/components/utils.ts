@@ -83,3 +83,20 @@ export function subscribeToReloadEvents(ws: WebSocket, userId: string) {
 export function getWsEndpoint(endpoint: string) {
   return (document.location.protocol === "https:" ? "wss" : "ws") + "://" + document.location.host + endpoint
 }
+
+export function removeKeysFromObject(obj: Object, keys: string[]) {
+  for (const key of keys) {
+    if (obj[key] !== undefined) {
+      delete obj[key]
+    }
+  }
+}
+
+export interface OptionalServiceOffering {
+  id: string | undefined
+  name: string
+  description: string
+  price: number
+  duration_days: number
+  service: string
+}

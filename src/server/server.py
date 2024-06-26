@@ -17,13 +17,15 @@ from tortoise.contrib.sanic import register_tortoise
 from tortoise.exceptions import IntegrityError
 from tortoise.expressions import F
 from tortoise.functions import Coalesce
+from tortoise.transactions import in_transaction
 
 import compolvo.email
 from compolvo import cors
 from compolvo import notify
 from compolvo import options
 from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, protected, \
-    requires_payment_details, requires_stripe_customer, requires_verified_email
+    requires_payment_details, requires_stripe_customer, requires_verified_email, \
+    bulk_delete_endpoint
 from compolvo.models import Agent, AgentSoftware, Serializable, PackageManager, \
     PackageManagerAvailableVersion, \
     BillingCycle, BillingCycleType, ServerStatus
@@ -433,7 +435,7 @@ async def test_user(app):
 
 @app.listener("after_server_start")
 async def after_server_start(app):
-    await update_server_status(running=True)
+    await update_server_status(running=True, billing_maintenance=False)
 
 
 async def get_latest_version(service: Service, os: OperatingSystem) -> str | None:
@@ -726,9 +728,19 @@ async def create_service(request, user):
 
 @service.patch("/")
 @protected({UserRole.Role.ADMIN})
-@patch_endpoint(Service)
-async def update_service(request, svc, user):
-    pass
+@patch_endpoint(Service, True)
+async def update_service(request: Request, svc: Service, user):
+    # Don't shield against request.json being None as that's already handled by @patch_endpoint
+    license = request.json.get("license")
+    if license is not None:
+        svc.license = await License.get_or_none(id=license)
+        await svc.save()
+    tags = request.json.get("tags")
+    if tags is not None:
+        async with in_transaction():
+            await svc.tags.clear()
+            new_tags = await Tag.filter(id__in=tags).all()
+            await svc.tags.add(*new_tags)
 
 
 @service.delete("/")
@@ -739,20 +751,20 @@ async def delete_service(request, svc, user):
 
 
 @service.delete("/bulk")
-@protected({UserRole.Role.ADMIN})
-async def delete_services_bulk(request, user):
-    if request.json is None:
-        raise BadRequest("No services provided.")
-    ids = request.json.get("services", [])
-    await Service.filter(id__in=ids).delete()
-    return json({"deleted": ids})
+@bulk_delete_endpoint(Service, {UserRole.Role.ADMIN})
+async def delete_services_bulk(request, service_ids, user):
+    pass
 
 
 @service_offering.get("/")
 @protected()
-@get_endpoint(ServiceOffering)
-async def get_service_offerings(request, offerings, user):
-    pass
+async def get_service_offerings(request: Request, user):
+    service = request.args.get("service")
+    if service is not None:
+        offerings = await ServiceOffering.filter(service__id=service).all()
+    else:
+        offerings = await ServiceOffering.all()
+    return await Serializable.list_json(offerings)
 
 
 @service_offering.post("/")
@@ -777,9 +789,12 @@ async def create_service_offering(request, user):
 
 @service_offering.patch("/")
 @protected({UserRole.Role.ADMIN})
-@patch_endpoint(ServiceOffering)
-async def update_service_offering(request, offering, user):
-    pass
+@patch_endpoint(ServiceOffering, True)
+async def update_service_offering(request: Request, offering: ServiceOffering, user):
+    service = request.json.get("service")
+    if service is not None:
+        offering.service = await Service.get_or_none(id=service)
+        await offering.save()
 
 
 @service_offering.delete("/")
@@ -788,6 +803,11 @@ async def update_service_offering(request, offering, user):
 async def delete_service_offering(request, offering, user):
     pass
 
+
+@service_offering.delete("/bulk")
+@bulk_delete_endpoint(ServiceOffering, {UserRole.Role.ADMIN})
+async def bulk_delete_service_offerings(request, offering_ids, user):
+    pass
 
 @service_plan.get("/all")
 @protected()
@@ -936,30 +956,9 @@ async def delete_tag(request, tag, user):
 
 
 @tag.delete("/bulk")
-@protected({UserRole.Role.ADMIN})
-async def delete_tags_bulk(request, user):
-    try:
-        ids = request.json["ids"]
-        await Tag.filter(id__in=ids).delete()
-        return HTTPResponse(status=204)
-    except KeyError:
-        raise BadRequest("Missing parameters. Required: ids")
-
-
-@service.post("/tag")
-@protected({UserRole.Role.ADMIN})
-async def associate_tag_with_service(request, user):
-    svc, tag = await _get_svc_and_tag_from_request(request)
-    await svc.tags.add(tag)
-    return HTTPResponse(status=204)
-
-
-@service.delete("/tag")
-@protected({UserRole.Role.ADMIN})
-async def deassociate_tag_with_service(request, user):
-    svc, tag = await _get_svc_and_tag_from_request(request)
-    await svc.tags.remove(tag)
-    return HTTPResponse(status=204)
+@bulk_delete_endpoint(Tag, {UserRole.Role.ADMIN})
+async def delete_tags_bulk(request, tag_ids, user):
+    pass
 
 
 async def get_os_compatible_agents(agents: Iterable[Agent], oses: Iterable[str]) -> Set[
@@ -1276,9 +1275,8 @@ async def send_agent_software_notification(command: EventType, agent: Agent,
 
 
 @license.get("/")
-@protected()
 @get_endpoint(License)
-async def get_licenses(request, licenses, user):
+async def get_licenses(request, licenses):
     pass
 
 
@@ -1304,6 +1302,12 @@ async def update_license(request, license, user):
 @protected({UserRole.Role.ADMIN})
 @delete_endpoint(License)
 async def delete_license(request, license, user):
+    pass
+
+
+@license.delete("/bulk")
+@bulk_delete_endpoint(License, {UserRole.Role.ADMIN})
+async def delete_licenses_bulk(request, license_ids, user):
     pass
 
 
@@ -1667,14 +1671,9 @@ async def get_available_versions(request: Request, user):
 
 
 @available_version.delete("/bulk")
-@protected({UserRole.Role.ADMIN})
-async def delete_available_versions_bulk(request: Request, user):
-    try:
-        ids = request.json.get("ids", [])
-    except (NameError, AttributeError):
-        raise BadRequest("Missing ids parameter.")
-    await PackageManagerAvailableVersion.filter(id__in=ids).delete()
-    return HTTPResponse(status=204)
+@bulk_delete_endpoint(PackageManagerAvailableVersion, {UserRole.Role.ADMIN})
+async def delete_available_versions_bulk(request: Request, version_ids, user):
+    pass
 
 
 @app.get("/api/server-status")

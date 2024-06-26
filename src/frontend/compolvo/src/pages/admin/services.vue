@@ -52,8 +52,9 @@
                   <v-progress-linear v-if="creating" indeterminate :height="5"></v-progress-linear>
                   <EditServiceForm
                     :service="null"
-                    @service-save="createService($event).then(success => {if (success) isActive.value = false})"
+                    @service-save="createService($event).then(success => isActive.value = !success)"
                     :licenses="licenses"
+                    :tags="tags"
                   ></EditServiceForm>
                 </v-col>
               </v-card>
@@ -72,12 +73,15 @@
             <v-card class="pa-5">
               <v-col>
                 <h1>Edit Service</h1>
-                <ErrorPanel :error="error"></ErrorPanel>
+                <div v-if="error !== null">
+                  <ErrorPanel :error="error"></ErrorPanel>
+                </div>
                 <v-progress-linear v-if="creating" indeterminate :height="5"></v-progress-linear>
                 <EditServiceForm
                   :service="item"
-                  @service-save="editService(item.id, $event).then(success => {if (success) isActive.value = false})"
+                  @service-save="editService(item.id, $event).then(success => isActive.value = !success)"
                   :licenses="licenses"
+                  :tags="tags"
                 ></EditServiceForm>
               </v-col>
             </v-card>
@@ -87,6 +91,10 @@
                @click="$router.push({path: `/admin/service/${item.id}/versions`})">
           <v-icon>mdi-cog</v-icon>
         </v-btn>
+        <v-btn icon variant="text"
+               @click="$router.push({path: `/admin/service/${item.id}/offerings`})">
+          <v-icon>mdi-cash-multiple</v-icon>
+        </v-btn>
       </template>
     </v-data-table>
   </v-col>
@@ -94,19 +102,16 @@
 
 <script lang="ts">
 import {defineComponent, ref} from "vue"
-import {License, Service} from "../../components/models";
+import {License, Service, Tag} from "../../components/models";
 import {OptionalService} from "../../components/admin/EditServiceForm.vue";
+import {removeKeysFromObject} from "../../components/utils"
 
 export default defineComponent({
   data() {
     return {
       singleSelect: false,
       headers: [
-        {
-          title: "ID",
-          align: "start",
-          key: "id"
-        },
+        {title: "ID", key: "id"},
         {title: "System name", key: "system_name"},
         {title: "Name", key: "name"},
         {title: "Short description", key: "short_description"},
@@ -118,12 +123,13 @@ export default defineComponent({
   },
   setup() {
     const services = ref<Service[]>([])
-    const selectedServices = ref<Service[]>([])
+    const selectedServices = ref<string[]>([])
     const error = ref<Error | null>(null)
     const loading = ref(false)
+    const creating = ref(false)
     const deleting = ref(false)
     const licenses = ref<License[]>([])
-    const creating = ref(false)
+    const tags = ref<Tag[]>([])
 
     const fetchServices = async function () {
       loading.value = true
@@ -156,7 +162,7 @@ export default defineComponent({
       deleting.value = true
       const res = await fetch("/api/service/bulk", {
         method: "DELETE",
-        body: JSON.stringify({services: selectedServices.value})
+        body: JSON.stringify({ids: selectedServices.value})
       })
       if (!res.ok) {
         error.value = new Error(await res.text())
@@ -171,23 +177,17 @@ export default defineComponent({
       if (!res.ok) {
         error.value = new Error(await res.text())
       } else {
-        licenses.value = (await res.json()).map(license => {
-          return {id: license.id, props: {title: license.name, subtitle: license.id}}
-        })
+        licenses.value = await res.json()
       }
     }
 
     const editService = async function (id: string, svc: OptionalService) {
       loading.value = true
-      const keysToRemove = ["id", "tags", "operating_systems", "offerings"]
-      for (const key of keysToRemove) {
-        if (svc[key] !== undefined) {
-          delete svc[key]
-        }
-      }
+      removeKeysFromObject(svc, ["id", "operating_systems", "offerings"]);
+      const data = {...svc, tags: svc.tags.map(t => t.id)}
       const res = await fetch("/api/service?id=" + id, {
         method: "PATCH",
-        body: JSON.stringify(svc)
+        body: JSON.stringify(data)
       })
       const success = res.ok;
       if (!success) {
@@ -199,6 +199,15 @@ export default defineComponent({
       return success
     }
 
+    const fetchTags = async function () {
+      const res = await fetch("/api/tag")
+      if (!res.ok) {
+        error.value = new Error(await res.text())
+      } else {
+        tags.value = await res.json()
+      }
+    }
+
     return {
       services,
       selectedServices,
@@ -207,16 +216,19 @@ export default defineComponent({
       loading,
       creating,
       deleting,
+      tags,
       fetchServices,
       createService,
       editService,
       deleteServices,
-      fetchLicenses
+      fetchLicenses,
+      fetchTags
     }
   },
   mounted() {
     this.fetchServices()
     this.fetchLicenses()
+    this.fetchTags()
   }
 })
 </script>

@@ -23,17 +23,27 @@
         v-model="service.description"
         label="Description"
       ></v-textarea>
-      <v-text-field
-        v-model="service.download_count"
-        label="Download count"
-      ></v-text-field>
+      <v-row class="vert-input-field">
+        <v-text-field
+          v-model="service.download_count"
+          class="horiz-input-field"
+          label="Download count"
+        ></v-text-field>
+        <v-select
+          v-model="selectedLicense"
+          :items="mappedLicenses"
+          class="horiz-input-field"
+          label="License"
+          mandatory
+        >
+        </v-select>
+      </v-row>
       <v-select
-        v-model="service.license"
-        :items="licenses"
-        label="License"
-        mandatory
-      >
-      </v-select>
+        v-model="selectedTags"
+        :items="mappedTags"
+        label="Tags"
+        multiple
+      ></v-select>
       <v-row>
         <v-spacer></v-spacer>
         <v-btn
@@ -47,8 +57,8 @@
 </template>
 
 <script lang="ts">
-import {defineComponent, getCurrentInstance, Ref, ref} from 'vue';
-import {License} from "../models";
+import {defineComponent, getCurrentInstance, ref} from 'vue';
+import {License, SelectableListEntry, Tag} from "../models";
 
 export interface OptionalService {
   name: string,
@@ -56,19 +66,30 @@ export interface OptionalService {
   short_description: string | null,
   description: string | null,
   download_count: number,
-  license: string | null
+  license: string | null,
+  tags: Tag[]
 }
 
 export default defineComponent({
   name: 'EditServiceForm',
-  props: ["licenses", "service"],
+  props: ["licenses", "service", "tags"],
   setup(props: {
-    licenses: Ref<License[]>,
-    service: OptionalService | null
+    licenses: License[],
+    service: OptionalService | null,
+    tags: Tag[]
   }) {
     const error = ref<Error | null>(null)
-    const selectedLicense = ref<License | null>(null)
+    const selectedLicense = ref<SelectableListEntry | null>(null)
     const licenses = props.licenses
+    const mappedLicenses = licenses.map(l => {
+      return {id: l.id, props: {title: l.name, subtitle: l.id}}
+    })
+    const mappedTags = props.tags.map(t => {
+      return {id: t.id, props: {title: t.label, subtitle: t.id}}
+    })
+    const serviceTags = props.service === null ? [] : props.service.tags.map(t => t.id)
+    const startTagSelection = mappedTags.filter(tag => serviceTags.includes(tag.id))
+    const selectedTags = ref<SelectableListEntry[]>(startTagSelection)
     const instance = getCurrentInstance()
     const service = ref<OptionalService>({
       name: "",
@@ -76,21 +97,29 @@ export default defineComponent({
       short_description: "",
       description: "",
       download_count: 0,
-      license: null
+      license: null,
+      tags: []
     })
     if (props.service !== null) {
       service.value = props.service
+      selectedLicense.value = mappedLicenses.filter(l => l.id === service.value.license)[0]
     }
 
     const save = async function () {
-      service.value.license = service.value.license.id
+      service.value.license = selectedLicense.value.id
+      service.value.tags = selectedTags.value.map(t => {
+        return {id: t.id, label: t.props.title}
+      })
       instance.proxy.$emit("service-save", service.value)
     }
 
     return {
       error,
       licenses,
+      mappedLicenses,
       selectedLicense,
+      mappedTags,
+      selectedTags,
       service,
       save
     }

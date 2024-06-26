@@ -1,7 +1,10 @@
 <template>
   <v-col>
-    <h1>Service versions</h1>
-    <ErrorPanel :error="error"></ErrorPanel>
+    <h2>Service versions</h2>
+    <h3 style="color: rgb(var(--v-theme-text-secondary))">{{ serviceName }}</h3>
+    <div v-if="error !== null">
+      <ErrorPanel :error="error"></ErrorPanel>
+    </div>
     <v-data-table
       v-model="selectedVersions"
       :headers="headers"
@@ -54,7 +57,9 @@ export default defineComponent({
     const error = ref<Error | null>(null)
     const versions = ref<PackageManagerAvailableVersion[]>([])
     const selectedVersions = ref<PackageManagerAvailableVersion[]>([])
+    const serviceName = ref("")
     const instance = getCurrentInstance()
+
     const fetchPackageManagerAvailableVersions = async function () {
       loading.value = true
       try {
@@ -74,6 +79,15 @@ export default defineComponent({
         error.value = err
       }
       loading.value = false
+    }
+
+    const fetchServiceName = async function () {
+      const res = await fetch("/api/service?id=" + instance.proxy.$route.params.id)
+      if (res.ok) {
+        serviceName.value = (await res.json()).name
+      } else {
+        serviceName.value = ""
+      }
     }
 
     const deleteVersions = async function () {
@@ -100,12 +114,15 @@ export default defineComponent({
       error,
       versions,
       selectedVersions,
+      serviceName,
       fetchPackageManagerAvailableVersions,
-      deleteVersions
+      deleteVersions,
+      fetchServiceName
     };
   },
   mounted() {
     this.fetchPackageManagerAvailableVersions()
+    this.fetchServiceName()
   }
 })
 </script>

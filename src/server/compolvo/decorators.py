@@ -9,7 +9,7 @@ from sanic import HTTPResponse, text
 from sanic.exceptions import BadRequest, NotFound
 
 
-def patch_endpoint(cls: Type[Serializable]):
+def patch_endpoint(cls: Type[Serializable], ignore_unsupported_fields: bool = False):
     def decorator(func):
         @wraps(func)
         async def wrapper(request, *args, **kwargs):
@@ -23,9 +23,10 @@ def patch_endpoint(cls: Type[Serializable]):
                 raise NotFound(f"Specified {cls.__name__} '{id}' not found.")
             for key, value in request.json.items():
                 fields = set(getattr(cls, "patch_fields", cls.fields)) - {"id"}
-                if key not in fields:
+                if key in fields:
+                    setattr(instance, key, value)
+                elif not ignore_unsupported_fields:
                     raise BadRequest(f"Key '{key}' does not exist on {cls.__name__}.")
-                setattr(instance, key, value)
             await instance.save()
             return_value = await func(request, instance, *args, **kwargs)
             return return_value if return_value is not None else await instance.json()
@@ -48,6 +49,25 @@ def delete_endpoint(cls: Type[Serializable]):
 
         return wrapper
 
+    return decorator
+
+
+def bulk_delete_endpoint(cls: Type[Serializable], requires_roles: Set[UserRole.Role]):
+    def decorator(func):
+        @wraps(func)
+        @protected(requires_roles)
+        async def wrapper(request, *args, **kwargs):
+            bad_request = BadRequest("Expected JSON body with 'ids' key.")
+            if not request.json:
+                raise bad_request
+            try:
+                ids = request.json["ids"]
+                await cls.filter(id__in=ids).delete()
+                return_value = await func(request, ids, *args, **kwargs)
+                return return_value if return_value is not None else HTTPResponse(status=204)
+            except KeyError:
+                raise bad_request
+        return wrapper
     return decorator
 
 

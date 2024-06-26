@@ -115,6 +115,8 @@ class Service(Model, Serializable):
 
     fields = ["id", "system_name", "name", "short_description", "description", "license",
               "download_count"]
+    patch_fields = ["system_name", "name", "short_description", "description",
+                    "download_count"]
 
 
 class OperatingSystem(Model, Serializable):
@@ -167,6 +169,7 @@ class ServiceOffering(Model, Serializable):
     stripe_price_id = TextField(null=True)
 
     fields = ["id", "name", "service", "description", "price", "duration_days"]
+    patch_fields = ["name", "description", "price", "duration_days"]
 
 
 class ServicePlan(Model, Serializable):

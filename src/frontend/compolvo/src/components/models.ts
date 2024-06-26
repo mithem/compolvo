@@ -64,12 +64,16 @@ export interface UnsavedTag {
 
 export interface Tag {
   id: string
-  props: { title: string }
+  label: string
+}
+
+export interface UnsavedLicense {
+  name: string
 }
 
 export interface License {
   id: string
-  props: { title: string, subtitle: string | undefined }
+  name: string
 }
 
 export interface OperatingSystem {
@@ -148,4 +152,12 @@ export interface WebSocketEvent {
 
 export interface WebSocketReloadEventMessage {
   paths: string[]
+}
+
+export interface SelectableListEntry {
+  id: string
+  props: {
+    title: string
+    subtitle: string | undefined
+  }
 }
