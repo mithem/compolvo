@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@v3
       # Runs a single command using the runners shell
       - name: Pull latest version
-        run: cd $GITHUB_WORKSPACE/infrastructure && git switch origin/main && git pull
+        run: cd $GITHUB_WORKSPACE/infrastructure && git switch main && git pull
       - name: Compose down
         run: cd $GITHUB_WORKSPACE/infrastructure && docker compose down
       - name: Compose up
