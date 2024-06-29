@@ -1,0 +1,8 @@
+- name: docker-license-setup
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: debian
+      when: ansible_distribution == "Debian" or ansible_distribution == "MacOSX" or ansible_distribution == "Archlinux"
+      ansible.builtin.command:
+        cmd: # TODO

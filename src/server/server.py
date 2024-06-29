@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import os
 import signal
-from typing import Set, Tuple, Dict, Iterable, Any
+from typing import Set, Tuple, Dict, Iterable, Any, List
 
 import jwt
 import jwt.exceptions
@@ -28,9 +28,10 @@ from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, p
     bulk_delete_endpoint
 from compolvo.models import Agent, AgentSoftware, Serializable, PackageManager, \
     PackageManagerAvailableVersion, \
-    BillingCycle, BillingCycleType, ServerStatus
+    BillingCycle, BillingCycleType, ServerStatus, ServiceUserLicenseType, \
+    ServiceUserLicenseTypeAttribute, ServiceUserLicenseTypeAttributeType
 from compolvo.models import Service, OperatingSystem, Tag, UserRole, User, License, \
-    ServiceOffering, ServicePlan
+    ServiceOffering, ServicePlan, ServiceUserLicenseTypeLevel
 from compolvo.notify import Event, Recipient, EventType, SubscriberType, cancel_event
 from compolvo.utils import verify_password, check_token, Unauthorized, BadRequest, NotFound, \
     hash_password, generate_secret, test_email, \
@@ -231,6 +232,22 @@ async def set_up_demo_db(user: User, services: bool = False,
         pm_pacman = await PackageManager.create(
             name="pacman"
         )
+        svc_jq = await Service.create(
+            system_name="jq",
+            name="jq",
+            license=lic_mit,
+            latest_version="1.7.1",
+            hidden=True
+        )
+        vs_jq = []
+        for os, pm in [(os_man, pm_apt), (os_deb, pm_apt), (os_mac, pm_brew), (os_win, pm_choco)]:
+            vs_jq.append(await PackageManagerAvailableVersion.create(
+                service=svc_jq,
+                version="1.7.1",
+                latest=True,
+                operating_system=os,
+                package_manager=pm
+            ))
         svc_docker = await Service.create(
             system_name="docker-desktop",
             name="Docker Desktop",
@@ -245,6 +262,36 @@ async def set_up_demo_db(user: User, services: bool = False,
             tag_developer,
             tag_enthusiast
         )
+        l_docker_personal = await ServiceUserLicenseType.create(service=svc_docker, name="Personal",
+                                                                level=ServiceUserLicenseTypeLevel.SUBSCRIPTION)
+        l_docker_pro = await ServiceUserLicenseType.create(service=svc_docker, name="Pro",
+                                                           level=ServiceUserLicenseTypeLevel.SUBSCRIPTION)
+        l_docker_team = await ServiceUserLicenseType.create(service=svc_docker, name="Team",
+                                                            level=ServiceUserLicenseTypeLevel.PER_USER)
+        l_docker_business = await ServiceUserLicenseType.create(service=svc_docker, name="Business",
+                                                                level=ServiceUserLicenseTypeLevel.PER_USER)
+        l_docker_personal_map = {"commercial_use": False, "image_pulls": "200/6h",
+                                 "docker_debug": False, "rbac": False, "sso": False}
+        l_docker_pro_map = {"commercial_use": True, "image_pulls": "5000/d", "docker_debug": True,
+                            "rbac": False, "sso": False}
+        l_docker_team_map = {"commercial_use": True, "image_pulls": "5000/d", "docker_debug": True,
+                             "rbac": True, "sso": False}
+        l_docker_business_map = {"commercial_use": True, "image_pulls": "5000/d",
+                                 "docker_debug": True, "rbac": True, "sso": True}
+        for license_type, map in [(l_docker_personal, l_docker_personal_map),
+                                  (l_docker_pro, l_docker_pro_map),
+                                  (l_docker_team, l_docker_team_map),
+                                  (l_docker_business, l_docker_business_map)]:
+            for key, value in map.items():
+                attr_type = ServiceUserLicenseTypeAttributeType.STRING
+                if type(value) == bool:
+                    attr_type = ServiceUserLicenseTypeAttributeType.BOOLEAN
+                await ServiceUserLicenseTypeAttribute.create(
+                    license_type=license_type,
+                    attribute_type=attr_type,
+                    key=key,
+                    value=value,
+                )
         v_docker_1 = await PackageManagerAvailableVersion.create(
             service=svc_docker,
             operating_system=os_win,
@@ -266,6 +313,9 @@ async def set_up_demo_db(user: User, services: bool = False,
             version="1.2.5",
             latest=True
         )
+        await v_docker_1.dependencies.add(vs_jq[3])
+        await v_docker_2.dependencies.add(vs_jq[1])
+        await v_docker_3.dependencies.add(vs_jq[2])
         svc_nginx = await Service.create(
             system_name="nginx",
             name="Nginx",
@@ -301,6 +351,9 @@ async def set_up_demo_db(user: User, services: bool = False,
             version="1.25.5",
             latest=True
         )
+        await v_nginx_1.dependencies.add(vs_jq[1])  # Add pj as dependency just for demo purposes
+        await v_nginx_2.dependencies.add(vs_jq[2])
+        await v_nginx_3.dependencies.add(vs_jq[0])
         svc_git = await Service.create(
             system_name="git",
             name="Git",
@@ -438,23 +491,13 @@ async def after_server_start(app):
     await update_server_status(running=True, billing_maintenance=False)
 
 
-async def get_latest_version(service: Service, os: OperatingSystem) -> str | None:
-    query = (
-        Service
-        .filter(
-            id=service.id,
-            available_versions__latest=True,
-            available_versions__operating_system=os
-        )
-        .annotate(
-            version=Coalesce("available_versions__version")
-        )
-        .values("version")
-    )
-    results = await query
-    if results:
-        return results[0]["version"]
-    return None
+async def get_latest_version(service: Service,
+                             os: OperatingSystem) -> PackageManagerAvailableVersion | None:
+    return await PackageManagerAvailableVersion.filter(
+        service=service,
+        latest=True,
+        operating_system=os
+    ).first()
 
 
 @app.get("/api/login")
@@ -673,7 +716,11 @@ async def delete_own_user(request, user: User):
 @openapi.description(
     "By default, returns a JSON list of all services including tags. If a `id` is specified in the query args, only that specific service will be returned (provided it is found).")
 # @openapi.response(200, {"application/json": Union[List[Service], Service]})
-async def get_services(request, services):
+async def get_services(request, services: List[Service] | Service):
+    return await fetch_service_data_from_db(services)
+
+
+async def fetch_service_data_from_db(services: List[Service] | Service, filter_hidden=True):
     async def expand(svc: Service) -> dict:
         query = (
             Service
@@ -701,8 +748,15 @@ async def get_services(request, services):
         return json(
             [await expand(svc) for
              svc in
-             services])
+             services if not filter_hidden or not svc.hidden])
     return json(await expand(services))
+
+
+@service.get("/admin")
+@protected({UserRole.Role.ADMIN})
+@get_endpoint(Service)
+async def get_services_admin(request, services: List[Service] | Service, user):
+    return await fetch_service_data_from_db(services, False)
 
 
 @service.post("/")
@@ -741,6 +795,18 @@ async def update_service(request: Request, svc: Service, user):
             await svc.tags.clear()
             new_tags = await Tag.filter(id__in=tags).all()
             await svc.tags.add(*new_tags)
+
+
+@service.patch("/bulk")
+@protected({UserRole.Role.ADMIN})
+async def bulk_update_services(request: Request, user):
+    ids = request.json.get("ids")
+    if ids is None:
+        raise BadRequest("Missing ids.")
+    hidden = request.json.get("hidden")
+    if hidden is not None:
+        await Service.filter(id__in=ids).update(hidden=hidden)
+    return HTTPResponse(status=204)
 
 
 @service.delete("/")
@@ -790,6 +856,7 @@ async def bulk_update_service_offerings(request: Request, user):
         await ServiceOffering.filter(id__in=ids).update(active=active)
     return HTTPResponse(status=204)
 
+
 @service_offering.post("/")
 @protected({UserRole.Role.ADMIN})
 async def create_service_offering(request, user):
@@ -831,6 +898,7 @@ async def delete_service_offering(request, offering, user):
 @bulk_delete_endpoint(ServiceOffering, {UserRole.Role.ADMIN})
 async def bulk_delete_service_offerings(request, offering_ids, user):
     pass
+
 
 @service_plan.get("/all")
 @protected()
@@ -1139,10 +1207,11 @@ async def get_own_agent_software(request, user):
         offering = await (await software.service_plan).service_offering
         service = await offering.service
         agent = await software.agent
+        latest_version = await get_latest_version(service, await agent.operating_system)
         data.append(
             {
                 **await software.to_dict(),
-                "latest_version": await get_latest_version(service, await agent.operating_system),
+                "latest_version": latest_version.version if latest_version is not None else None,
                 "offering": await offering.to_dict(),
                 "service": await service.to_dict(),
                 "agent": await agent.to_dict()
@@ -1150,73 +1219,69 @@ async def get_own_agent_software(request, user):
     return json(data)
 
 
-@agent_software.post("/")
-@protected({UserRole.Role.ADMIN})
-async def create_agent_software(request, user):
-    try:
-        agent = await Agent.get_or_none(id=request.json["agent"])
-        if agent is None:
-            raise NotFound("Agent not found.")
-        service_plan = await ServicePlan.get_or_none(id=request.json["service_plan"])
-        if service_plan is None:
-            raise NotFound("Service plan not found.")
-        # TODO: Test whether software can be installed on agent
-        software = await AgentSoftware.create(
-            agent=agent,
-            service_plan=service_plan,
-        )
-        return await software.json()
-    except KeyError:
-        raise BadRequest("Missing parameters. Required: agent, service_plan")
-
-
 @agent_software.post("/bulk")
 @protected()
-async def bulk_create_agent_software(request, user):
+async def bulk_create_agent_software(request, user: User):
     missing_params = BadRequest("Missing parameters. Required: agents, service_plan.")
-    agents = []
     if request.json is None:
         raise missing_params
     try:
         plan = await ServicePlan.get_or_none(id=request.json["service_plan"])
-        if plan is None:
-            raise NotFound("Service plan not found.")
-        offering: ServiceOffering = await plan.service_offering
-        service: Service = await offering.service
-        offerings = await ServiceOffering.filter(service=service).all()
-        offering_ids = list(map(lambda offering: offering.id, offerings))
-        existing_plans = list(map(lambda plan: plan.id, await ServicePlan.filter(user=user,
-                                                                                 service_offering_id__in=offering_ids).all()))
-        existing_softwares = await AgentSoftware.filter(
-            service_plan_id__in=existing_plans).all().prefetch_related("agent")
-        if (await plan.user).id != user.id:
-            raise BadRequest(
-                "You can't bulk-create agent software for another user's service plan.")
-        agent_ids = request.json.get("agents", [])
-        for id in agent_ids:
-            agent = await Agent.get_or_none(id=id)
-            if agent is None:
-                raise NotFound(f"Agent {id} not found.")
-            if (await agent.user).id != user.id:
-                raise BadRequest("You can't bulk-create agent software for other user's agents.")
-            for software in existing_softwares:
-                potentially_already_installed_agent = await software.agent
-                if str(potentially_already_installed_agent.id) == id:
-                    raise BadRequest(
-                        f"The software you want to install via the service plan is already installed on agent {id} (possibly by another service plan).")
-            agents.append(agent)
-        softwares = [AgentSoftware(agent=agent, service_plan=plan, installing=True) for agent in
-                     agents]
-        await AgentSoftware.bulk_create(softwares)
-        for (software, agent) in zip(softwares, agents):
-            await send_agent_software_notification(EventType.INSTALL_SOFTWARE, agent,
-                                                   service, software)
-        await _increase_download_count_for_service(str(service.id), len(agent_ids))
-        return HTTPResponse(status=201)
+        await create_agent_softwares_after_safety_checks(request.json["agents"], plan, user)
     except KeyError:
         raise missing_params
     except IntegrityError:
         raise BadRequest("Service plan is already installed on at least one agent.")
+    return HTTPResponse(status=201)
+
+
+async def create_agent_softwares_after_safety_checks(agent_ids: List[int],
+                                                     service_plan: ServicePlan, user: User):
+    agents = []
+    if service_plan is None:
+        raise NotFound("Service plan not found.")
+    offering: ServiceOffering = await service_plan.service_offering
+    service: Service = await offering.service
+    offerings = await ServiceOffering.filter(service=service).all()
+    offering_ids = list(map(lambda offering: offering.id, offerings))
+    existing_plans = list(map(lambda plan: plan.id, await ServicePlan.filter(user=user,
+                                                                             service_offering_id__in=offering_ids).all()))
+    existing_softwares = await AgentSoftware.filter(
+        service_plan_id__in=existing_plans).all().prefetch_related("agent")
+    if (await service_plan.user).id != user.id:
+        raise BadRequest(
+            "You can't bulk-create agent software for another user's service plan.")
+    for id in agent_ids:
+        agent = await Agent.get_or_none(id=id)
+        if agent is None:
+            raise NotFound(f"Agent {id} not found.")
+        if (await agent.user).id != user.id:
+            raise BadRequest("You can't bulk-create agent software for other user's agents.")
+        for software in existing_softwares:
+            potentially_already_installed_agent = await software.agent
+            if str(potentially_already_installed_agent.id) == id:
+                raise BadRequest(
+                    f"The software you want to install via the service plan is already installed on agent {id} (possibly by another service plan).")
+        agents.append(agent)
+    softwares = [AgentSoftware(agent=agent, service_plan=service_plan, installing=True) for agent in
+                 agents]
+    async with in_transaction():
+        await AgentSoftware.bulk_create(softwares)
+        for (software, agent) in zip(softwares, agents):
+            version = await get_latest_version(service, await agent.operating_system)
+            if version is None:
+                raise BadRequest("No compatible version found for agent.")
+            dependencies = []
+            new_deps: List[PackageManagerAvailableVersion] = await version.dependencies.all()
+            while len(new_deps) > 0:
+                dependencies.extend(new_deps)
+                new_deps = [dep for v in new_deps for dep in await v.dependencies.all()]
+            for dep in dependencies:
+                await send_agent_software_notification(EventType.INSTALL_DEPENDENCY, agent, dep,
+                                                       None)
+            await send_agent_software_notification(EventType.INSTALL_SOFTWARE, agent,
+                                                   version, software)
+        await _increase_download_count_for_service(str(service.id), len(agent_ids))
 
 
 @agent_software.patch("/")
@@ -1274,24 +1339,29 @@ async def uninstall_agent_software(request, user):
 
 
 async def perform_software_uninstallation(agent: Agent, service: Service, software: AgentSoftware):
-    await send_agent_software_notification(EventType.UNINSTALL_SOFTWARE, agent, service,
+    version = await get_latest_version(service, await agent.operating_system)
+    await send_agent_software_notification(EventType.UNINSTALL_SOFTWARE, agent, version,
                                            software)
     software.uninstalling = True
     await software.save()
 
 
 async def send_agent_software_notification(command: EventType, agent: Agent,
-                                           service: Service,
-                                           software: AgentSoftware):
-    assert command in [EventType.INSTALL_SOFTWARE, EventType.UNINSTALL_SOFTWARE]
-    software.last_updated = datetime.datetime.now(tz=datetime.timezone.utc)
-    # await software.save()
+                                           version: PackageManagerAvailableVersion,
+                                           software: AgentSoftware | None):
+    assert command in [EventType.INSTALL_SOFTWARE, EventType.UNINSTALL_SOFTWARE,
+                       EventType.INSTALL_DEPENDENCY]
+    if software is not None:
+        software.last_updated = datetime.datetime.now(tz=datetime.timezone.utc)
+    service_name = (await version.service).system_name
     msg = {
-        "service": service.system_name,
-        "software": str(software.id)
+        "service": service_name
     }
-    if command == EventType.INSTALL_SOFTWARE:
-        msg["version"] = await get_latest_version(service, await agent.operating_system)
+    if command in [EventType.INSTALL_SOFTWARE, EventType.UNINSTALL_SOFTWARE]:
+        assert software is not None
+        msg["software"] = str(software.id)
+    if command in [EventType.INSTALL_SOFTWARE, EventType.INSTALL_DEPENDENCY]:
+        msg["version"] = version.version
     recipient = Recipient(SubscriberType.AGENT, str(agent.id))
     event = Event(command, recipient, msg, False)
     notify.queue(event)

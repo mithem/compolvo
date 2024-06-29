@@ -13,6 +13,22 @@
       <template v-slot:top>
         <v-toolbar title="Services">
           <v-btn
+            prepend-icon="mdi-arrow-up"
+            :loading="loading"
+            @click="toggleHiddenState(false)"
+            color="green"
+            :disabled="selectedServices.length === 0"
+          >Show
+          </v-btn>
+          <v-btn
+            prepend-icon="mdi-arrow-down"
+            :loading="loading"
+            @click="toggleHiddenState(true)"
+            color="warning"
+            :disabled="selectedServices.length === 0"
+          >Hide
+          </v-btn>
+          <v-btn
             @click="fetchServices"
             :loading="loading"
           >
@@ -112,6 +128,7 @@ export default defineComponent({
       singleSelect: false,
       headers: [
         {title: "ID", key: "id"},
+        {title: "Hidden", key: "hidden"},
         {title: "System name", key: "system_name"},
         {title: "Name", key: "name"},
         {title: "Short description", key: "short_description"},
@@ -133,7 +150,7 @@ export default defineComponent({
 
     const fetchServices = async function () {
       loading.value = true
-      const res = await fetch("/api/service")
+      const res = await fetch("/api/service/admin")
       if (!res.ok) {
         error.value = new Error(await res.text())
       } else {
@@ -208,6 +225,24 @@ export default defineComponent({
       }
     }
 
+    const toggleHiddenState = async function (hidden: boolean) {
+      loading.value = true
+      try {
+        const res = await fetch("/api/service/bulk", {
+          method: "PATCH",
+          body: JSON.stringify({ids: selectedServices.value, hidden: hidden})
+        })
+        if (!res.ok) {
+          error.value = new Error(await res.text())
+        } else {
+          await fetchServices()
+        }
+      } catch (err) {
+        error.value = err
+      }
+      loading.value = false
+    }
+
     return {
       services,
       selectedServices,
@@ -222,7 +257,8 @@ export default defineComponent({
       editService,
       deleteServices,
       fetchLicenses,
-      fetchTags
+      fetchTags,
+      toggleHiddenState
     }
   },
   mounted() {

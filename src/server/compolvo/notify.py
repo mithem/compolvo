@@ -17,6 +17,7 @@ class EventType(enum.StrEnum):
     RELOAD = "reload"
     INSTALL_SOFTWARE = "install-software"
     UNINSTALL_SOFTWARE = "uninstall-software"
+    INSTALL_DEPENDENCY = "install-dependency"
     AGENT_SOFTWARE_STATUS_UPDATE = "software-status-update"
     AGENT_INIT = "agent-init"
     AGENT_LOGIN = "agent-login"

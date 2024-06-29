@@ -1,13 +1,13 @@
 import datetime
 import enum
 from enum import IntEnum
-from typing import List, Type, Iterable
+from typing import List, Type, Iterable, Dict
 from uuid import UUID
 
 import tortoise.queryset
 from sanic import json
 from tortoise.fields import UUIDField, TextField, CharField, IntEnumField, FloatField, IntField, \
-    DatetimeField, BooleanField, ForeignKeyField, ManyToManyField
+    DatetimeField, BooleanField, ForeignKeyField, ManyToManyField, CharEnumField
 from tortoise.fields.relational import _NoneAwaitable
 from tortoise.models import Model
 
@@ -112,11 +112,12 @@ class Service(Model, Serializable):
     download_count = IntField(null=True)
     tags = ManyToManyField("models.Tag", related_name="services")
     stripe_product_id = TextField(null=True)
+    hidden = BooleanField(default=False)
 
     fields = ["id", "system_name", "name", "short_description", "description", "license",
-              "download_count"]
+              "download_count", "hidden"]
     patch_fields = ["system_name", "name", "short_description", "description",
-                    "download_count"]
+                    "download_count", "hidden"]
 
 
 class OperatingSystem(Model, Serializable):
@@ -141,6 +142,8 @@ class PackageManagerAvailableVersion(Model, Serializable):
     package_manager = ForeignKeyField("models.PackageManager", "available_versions")
     version = TextField()
     latest = BooleanField(default=False)
+    dependencies = ManyToManyField("models.PackageManagerAvailableVersion",
+                                   through="avail_version_dependencies")
 
     fields = ["id", "service", "operating_system", "package_manager", "version", "latest"]
 
@@ -228,3 +231,57 @@ class ServerStatus(Model, Serializable):
     performing_billing_maintenance = BooleanField(default=False)
 
     fields = ["id", "server_id", "server_running", "performing_billing_maintenance"]
+
+
+class ServiceUserLicenseTypeAttributeType(enum.IntEnum):
+    STRING = 0
+    INTEGER = 1
+    FLOAT = 2
+    BOOLEAN = 3
+
+
+class ServiceUserLicenseTypeLevel(enum.StrEnum):
+    # One (compolvo) subscription for infinitely many agent software installations
+    SUBSCRIPTION = "subscription"
+    # One (compolvo) subscription for one end user (not compolvo user), which might include multiple agent software installations
+    PER_USER = "per-user"
+    # One (compolvo) subscription for one agent software installation
+    PER_AGENT = "per-agent"
+
+
+ServiceUserLicenseTypeAttributeTypePythonTypes = str | int | float | bool
+
+
+class ServiceUserLicenseType(Model, Serializable):
+    id = UUIDField(pk=True)
+    service = ForeignKeyField("models.Service", "service_user_license_types")
+    name = TextField()
+    level = CharEnumField(ServiceUserLicenseTypeLevel)
+
+    fields = ["id", "service", "name", "level"]
+
+    async def get_attributes(self) -> Dict[str, ServiceUserLicenseTypeAttributeTypePythonTypes]:
+        await self.fetch_related("attributes")
+        return {attribute.key: attribute.get_value() for attribute in self.attributes}
+
+
+class ServiceUserLicenseTypeAttribute(Model, Serializable):
+    id = UUIDField(pk=True)
+    key = TextField()
+    attribute_type = IntEnumField(ServiceUserLicenseTypeAttributeType,
+                                  default=ServiceUserLicenseTypeAttributeType.STRING)
+    value = TextField()
+    license_type = ForeignKeyField("models.ServiceUserLicenseType", "attributes")
+
+    fields = ["id", "key", "attribute_type", "value", "license_type"]
+
+    def get_value(self) -> ServiceUserLicenseTypeAttributeTypePythonTypes:
+        match self.attribute_type:
+            case ServiceUserLicenseTypeAttributeType.STRING:
+                return self.value
+            case ServiceUserLicenseTypeAttributeType.INTEGER:
+                return int(self.value)
+            case ServiceUserLicenseTypeAttributeType.FLOAT:
+                return float(self.value)
+            case ServiceUserLicenseTypeAttributeType.BOOLEAN:
+                return bool(self.value)

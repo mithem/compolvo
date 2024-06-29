@@ -52,6 +52,7 @@ export interface DetailedServiceOffering {
 
 export interface Service {
   id: string
+  hidden: boolean
   name: string
   description: string | null
   license: string | null

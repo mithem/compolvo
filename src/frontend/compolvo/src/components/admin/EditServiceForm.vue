@@ -2,6 +2,12 @@
   <v-form>
     <v-col>
       <v-row class="vert-input-field">
+        <v-switch
+          inline
+          class="horiz-input-field"
+          v-model="service.hidden"
+          label="Hidden"
+        ></v-switch>
         <v-text-field
           class="horiz-input-field"
           v-model="service.system_name"
@@ -61,6 +67,7 @@ import {defineComponent, getCurrentInstance, ref} from 'vue';
 import {License, SelectableListEntry, Tag} from "../models";
 
 export interface OptionalService {
+  hidden: boolean
   name: string,
   system_name: string,
   short_description: string | null,
@@ -92,6 +99,7 @@ export default defineComponent({
     const selectedTags = ref<SelectableListEntry[]>(startTagSelection)
     const instance = getCurrentInstance()
     const service = ref<OptionalService>({
+      hidden: false,
       name: "",
       system_name: "",
       short_description: "",

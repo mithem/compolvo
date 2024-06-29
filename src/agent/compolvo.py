@@ -80,13 +80,14 @@ def save_config(config: Config, config_file: str):
 
 def install_software(event: Dict) -> str | None:
     system_name, software_id, version = extract_command_data_from_event(event)
+    assert version is not None, "Server instructed to install software without version."
     return run_playbook(system_name, software_id, version)
 
 
 def extract_command_data_from_event(event: Dict):
     msg = event["message"]
     system_name = msg["service"]
-    software_id = msg["software"]
+    software_id = msg.get("software")
     version = msg.get("version")
     return system_name, software_id, version
 
@@ -116,6 +117,8 @@ def handle_websocket_command(command: str) -> str | None:
     msg: str | None = None
     match type:
         case "install-software":
+            msg = install_software(event)
+        case "install-dependency":
             msg = install_software(event)
         case "uninstall-software":
             msg = uninstall_software(event)
@@ -149,7 +152,7 @@ def generate_software_status(software_id: str, installed_version: str | None, co
     })
 
 
-def run_playbook(system_name: str, software_id: str, playbook_name: str):
+def run_playbook(system_name: str, software_id: str | None, playbook_name: str):
     playbook_url = f"http{'s' if config.compolvo.secure else ''}://{config.compolvo.host}/ansible/playbooks/{system_name}/{playbook_name}.yml"
     response = requests.get(playbook_url)
     if not response.ok:
@@ -161,6 +164,8 @@ def run_playbook(system_name: str, software_id: str, playbook_name: str):
     return_code = os.system(f"ansible-playbook '{path}'")
     os.remove(path)
     installed_version = playbook_name if playbook_name != 'uninstall' else None
+    if software_id is None:
+        return None
     if return_code == 0:
         return generate_software_status(software_id, installed_version, False, False, False)
     return generate_software_status(software_id, installed_version, True, False, False)
@@ -208,6 +213,7 @@ async def run_websocket(retries: Optional[int] = 5):
                 _ = await ws.recv()
                 await subscribe(ws, "install-software")
                 await subscribe(ws, "uninstall-software")
+                await subscribe(ws, "install-dependency")
                 logger.info("Subscribed to relevant notification topics.")
                 try:
                     while True:
