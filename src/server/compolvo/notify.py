@@ -23,6 +23,7 @@ class EventType(enum.StrEnum):
     AGENT_LOGIN = "agent-login"
     WS_DISCONNECT = "ws-disconnect"
     BILLING_MAINTENANCE = "billing-maintenance"
+    SET_UP_LICENSE = "set-up-license"
 
 
 class SubscriberType(enum.StrEnum):

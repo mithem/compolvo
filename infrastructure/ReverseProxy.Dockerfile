@@ -18,6 +18,14 @@ COPY ansible/templates ansible/templates
 COPY generate_playbooks.py .
 RUN . venv/bin/activate && python3 generate_playbooks.py generate
 
+RUN mkdir -p /tmp/ansible/scripts
+COPY ansible/scripts /tmp/ansible/scripts
+RUN cd /tmp/ansible/scripts
+COPY reverse-proxy-compress-scripts.sh /tmp/ansible/scripts/compress-scripts.sh
+RUN chmod +x /tmp/ansible/scripts/compress-scripts.sh
+RUN ./compress-scripts.sh
+
+
 RUN mkdir -p /var/www/html/compolvo/ansible
 RUN cp -r ansible/playbooks /var/www/html/compolvo/ansible/playbooks
 COPY static /var/www/html/compolvo/static

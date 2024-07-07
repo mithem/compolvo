@@ -14,6 +14,7 @@ services:
   - system_name: docker-desktop
     template: apt_homebrew_choco_pacman.yml.jinja
     brew_module: homebrew/cask/docker
+    license_setup_template: docker-license-setup.yml.jinja
     versions:
       - 4.30.0,149282
   - system_name: jq

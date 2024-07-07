@@ -40,6 +40,10 @@ def generate_playbooks(config: str, verbose: bool):
             write_to_template(template, name, version, version=version, state="present", **data)
             version_counter += 1
         write_to_template(template, name, "uninstall", version=None, state="absent", **data)
+        license_setup_template = service.get("license_setup_template")
+        if license_setup_template is not None:
+            templ = env.get_template(license_setup_template)
+            write_to_template(templ, name, "license_setup", **data)
     logging.info("Generated playbooks for %s service(s) across %s versions (%s files total)",
                  len(services), version_counter, version_counter + len(services))
 

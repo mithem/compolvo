@@ -285,3 +285,14 @@ class ServiceUserLicenseTypeAttribute(Model, Serializable):
                 return float(self.value)
             case ServiceUserLicenseTypeAttributeType.BOOLEAN:
                 return bool(self.value)
+
+
+class UserLicense(Model, Serializable):
+    id = UUIDField(pk=True)
+    license_type = ForeignKeyField("models.ServiceUserLicenseType")
+    user = ForeignKeyField("models.User")
+    start_date = DatetimeField()
+    end_date = DatetimeField(null=True)
+    license_key = CharField(2048)
+
+    fields = ["id", "license_type", "user", "start_date", "end_date"]

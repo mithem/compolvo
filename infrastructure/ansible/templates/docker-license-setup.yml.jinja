@@ -4,5 +4,5 @@
   tasks:
     - name: debian
       when: ansible_distribution == "Debian" or ansible_distribution == "MacOSX" or ansible_distribution == "Archlinux"
-      ansible.builtin.command:
-        cmd: # TODO
+      ansible.builtin.script:
+        cmd: license-setup/docker-license-setup.sh

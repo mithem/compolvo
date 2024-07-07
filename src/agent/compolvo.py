@@ -5,7 +5,9 @@ import logging
 import os
 import platform
 import queue
+import shutil
 import sys
+import tarfile
 from logging import Logger
 from threading import Thread
 from typing import Dict, Any, Optional
@@ -97,6 +99,29 @@ def uninstall_software(event: Dict) -> str | None:
     return run_playbook(system_name, software_id, "uninstall")
 
 
+def set_up_license(event: Dict) -> str | None:
+    msg = event["message"]
+    license_key = msg["license"]["license_key"]
+    system_name = msg["service"]["system_name"]
+    filename = None
+    logging.info("Setting up license for '%s' with key '%s'", system_name, license_key)
+    os.environ["COMPOLVO_LICENSE_KEY"] = license_key
+
+    url = f"{_get_http_scheme()}://{config.compolvo.host}/ansible/scripts/{system_name}.tar.gz"
+    res = requests.get(url)
+    if res.ok:
+        filename = f"{system_name}.tar.gz"
+        with open(filename, "wb") as file:
+            file.write(res.content)
+        shutil.unpack_archive(filename, "license-setup")
+
+    response = run_playbook(system_name, None, "license_setup")
+    del os.environ["COMPOLVO_LICENSE_KEY"]
+    if filename is not None:
+        os.remove(filename)
+    return response
+
+
 def handle_websocket_command(command: str) -> str | None:
     data = json.loads(command)
     event = data.get("event")
@@ -122,6 +147,8 @@ def handle_websocket_command(command: str) -> str | None:
             msg = install_software(event)
         case "uninstall-software":
             msg = uninstall_software(event)
+        case "set-up-license":
+            msg = set_up_license(event)
         case other:
             logger.error("Received unsupported event of type '%s': %s", other, event)
     if msg is not None:
@@ -151,9 +178,11 @@ def generate_software_status(software_id: str, installed_version: str | None, co
         }
     })
 
+def _get_http_scheme() -> str:
+    return f"http{'s' if config.compolvo.secure else ''}"
 
 def run_playbook(system_name: str, software_id: str | None, playbook_name: str):
-    playbook_url = f"http{'s' if config.compolvo.secure else ''}://{config.compolvo.host}/ansible/playbooks/{system_name}/{playbook_name}.yml"
+    playbook_url = f"{_get_http_scheme()}://{config.compolvo.host}/ansible/playbooks/{system_name}/{playbook_name}.yml"
     response = requests.get(playbook_url)
     if not response.ok:
         logger.error("Error fetching playbook from %s: %s", playbook_url, response.text)
@@ -214,6 +243,7 @@ async def run_websocket(retries: Optional[int] = 5):
                 await subscribe(ws, "install-software")
                 await subscribe(ws, "uninstall-software")
                 await subscribe(ws, "install-dependency")
+                await subscribe(ws, "set-up-license")
                 logger.info("Subscribed to relevant notification topics.")
                 try:
                     while True:
@@ -252,6 +282,7 @@ def handle_error_for_user(err: Exception):
     logger.error("Error occured: %s: %s", err.__class__.__name__, err)
     if logger.level == logging.DEBUG:
         logger.exception(err)
+
 
 class OperatingSystem(enum.StrEnum):
     debian = "debian"

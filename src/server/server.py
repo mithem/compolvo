@@ -29,7 +29,7 @@ from compolvo.decorators import patch_endpoint, delete_endpoint, get_endpoint, p
 from compolvo.models import Agent, AgentSoftware, Serializable, PackageManager, \
     PackageManagerAvailableVersion, \
     BillingCycle, BillingCycleType, ServerStatus, ServiceUserLicenseType, \
-    ServiceUserLicenseTypeAttribute, ServiceUserLicenseTypeAttributeType
+    ServiceUserLicenseTypeAttribute, ServiceUserLicenseTypeAttributeType, UserLicense
 from compolvo.models import Service, OperatingSystem, Tag, UserRole, User, License, \
     ServiceOffering, ServicePlan, ServiceUserLicenseTypeLevel
 from compolvo.notify import Event, Recipient, EventType, SubscriberType, cancel_event
@@ -115,6 +115,19 @@ async def db_setup(request, user: User):
         return text("Created.", status=201)
     return HTTPResponse(status=204)
 
+
+@app.post("/api/license/setup")
+@protected({UserRole.Role.ADMIN})
+async def setup_license(request, user: User):
+    licenses = await UserLicense.filter(user=user).all()
+    agents = await Agent.filter(user=user).all()
+    if await UserLicense.filter().count() == 0:
+        license_type = await ServiceUserLicenseType.filter(name="Pro").first()
+        await UserLicense.create(start_date=datetime.datetime.now(tz=datetime.timezone.utc), license_key="Hello, world!", license_type=license_type, user=user)
+    for license in licenses:
+        for agent in agents:
+            await send_agent_set_up_license_notification(agent, license)
+    return HTTPResponse(status=202)
 
 async def _get_svc_and_tag_from_request(request):
     try:
@@ -263,13 +276,13 @@ async def set_up_demo_db(user: User, services: bool = False,
             tag_enthusiast
         )
         l_docker_personal = await ServiceUserLicenseType.create(service=svc_docker, name="Personal",
-                                                                level=ServiceUserLicenseTypeLevel.SUBSCRIPTION)
+                                                                level=ServiceUserLicenseTypeLevel.SUBSCRIPTION, setup_script_name="docker-license-setup.sh")
         l_docker_pro = await ServiceUserLicenseType.create(service=svc_docker, name="Pro",
-                                                           level=ServiceUserLicenseTypeLevel.SUBSCRIPTION)
+                                                           level=ServiceUserLicenseTypeLevel.SUBSCRIPTION, setup_script_name="docker-license-setup.sh")
         l_docker_team = await ServiceUserLicenseType.create(service=svc_docker, name="Team",
-                                                            level=ServiceUserLicenseTypeLevel.PER_USER)
+                                                            level=ServiceUserLicenseTypeLevel.PER_USER, setup_script_name="docker-license-setup.sh")
         l_docker_business = await ServiceUserLicenseType.create(service=svc_docker, name="Business",
-                                                                level=ServiceUserLicenseTypeLevel.PER_USER)
+                                                                level=ServiceUserLicenseTypeLevel.PER_USER, setup_script_name="docker-license-setup.sh")
         l_docker_personal_map = {"commercial_use": False, "image_pulls": "200/6h",
                                  "docker_debug": False, "rbac": False, "sso": False}
         l_docker_pro_map = {"commercial_use": True, "image_pulls": "5000/d", "docker_debug": True,
@@ -1366,6 +1379,16 @@ async def send_agent_software_notification(command: EventType, agent: Agent,
     event = Event(command, recipient, msg, False)
     notify.queue(event)
 
+async def send_agent_set_up_license_notification(agent: Agent, license: UserLicense):
+    recipient = Recipient(SubscriberType.AGENT, str(agent.id))
+    license_type: ServiceUserLicenseType = await license.license_type
+    service: Service = await license_type.service
+    msg = {
+        "license": {**await license.to_dict(), "license_key": license.license_key},
+        "service": await service.to_dict()
+    }
+    event = Event(EventType.SET_UP_LICENSE, recipient, msg, False)
+    notify.queue(event)
 
 @license.get("/")
 @get_endpoint(License)
