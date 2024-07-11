@@ -32,7 +32,7 @@
 
       <div class="download-container">
         <span class="data-label">Downloads:</span>
-        <span class="data-value">{{ service.download_count }}</span>
+        <span class="data-value">{{ service.download_count || "N/A" }}</span>
       </div>
     </div>
 
@@ -51,25 +51,27 @@
     </div>
     <!-- Description -->
     <div class="desc" v-html=compileMarkdownDescription()></div>
-    <hr/>
-    <div class="slide-group-container">
-      <v-icon
-        class="slide-group-hint"
-        @click="scrollOfferings(false)"
-      >mdi-chevron-left
-      </v-icon>
-      <div class="offering-slide-group" id="service-offering-slide-group">
-        <div
-          v-for="offering in service.offerings"
-        >
-          <ServiceOfferingCard :offering=offering></ServiceOfferingCard>
+    <div v-if="service.offerings.length > 0">
+      <hr/>
+      <div class="slide-group-container">
+        <v-icon
+          class="slide-group-hint"
+          @click="scrollOfferings(false)"
+        >mdi-chevron-left
+        </v-icon>
+        <div class="offering-slide-group" id="service-offering-slide-group">
+          <div
+            v-for="offering in service.offerings"
+          >
+            <ServiceOfferingCard :offering=offering></ServiceOfferingCard>
+          </div>
         </div>
+        <v-icon
+          class="slide-group-hint"
+          @click="scrollOfferings(true)"
+        >mdi-chevron-right
+        </v-icon>
       </div>
-      <v-icon
-        class="slide-group-hint"
-        @click="scrollOfferings(true)"
-      >mdi-chevron-right
-      </v-icon>
     </div>
   </v-card>
   <v-progress-linear v-else indeterminate>
@@ -113,7 +115,7 @@ export default defineComponent({
     };
 
     const compileMarkdownDescription = () => {
-      return marked(service.value.description)
+      return service.value.description !== null ? marked(service.value.description) : "No description."
     }
 
 

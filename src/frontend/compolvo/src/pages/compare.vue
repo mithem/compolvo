@@ -47,7 +47,6 @@ export default defineComponent({
         const response = await fetch(`${apiHost}service`);
         if (response.ok) {
           services.value = await response.json()
-          console.log("Services Maped", services.value);  // Debugging line to see what's fetched
           await filterServices(null)
         } else {
           error.value = new Error(await response.text());
@@ -64,7 +63,6 @@ export default defineComponent({
           oses.value = (await response.json()).map((os) => {
             return {props: {title: os.name}, id: os.id}
           });
-          console.log("oses", oses.value);  // Debugging line to see what's fetched
         } else {
           error.value = new Error(await response.text());
         }
@@ -79,7 +77,6 @@ export default defineComponent({
           licenses.value = (await response.json()).map((license) => {
             return {props: {title: license.name}, id: license.id}
           });
-          console.log("licenses", licenses.value);  // Debugging line to see what's fetched
         } else {
           error.value = new Error(await response.text());
         }
@@ -110,11 +107,10 @@ export default defineComponent({
       }
       filteredServices.value = services.value.map((service: DetailedService) => {
         const priceForService = getPriceForService(service.offerings);
-        console.log("priceForService", priceForService)
         return {
           service: service,
-          calculatedPrice: priceForService[0] as number,
-          selectedOffering: priceForService[1] as ServiceOffering,
+          calculatedPrice: priceForService ? priceForService[0] as number : null,
+          selectedOffering: priceForService ? priceForService[1] as ServiceOffering : null,
         }
       })
       let result = filteredServices.value;
@@ -143,10 +139,6 @@ export default defineComponent({
 
     const getPriceForService = (offerings: ServiceOffering[]) => {
       const filtered = offerings.filter((offering: ServiceOffering) => {
-        console.log(offering.service)
-        console.log("offering.duration_days", offering.duration_days)
-        console.log("targetDurationDays.value", targetDurationDays.value)
-        console.log("---------------------------------------------------")
         return offering.duration_days === targetDurationDays.value
       }).sort((a, b) => {
         if (a.price < b.price) {
@@ -157,7 +149,6 @@ export default defineComponent({
         }
         return 0;
       })
-      console.log("filtered", filtered)
       if (filtered.length > 0) {
         return [filtered[0].price, filtered[0]]
       }
@@ -170,6 +161,9 @@ export default defineComponent({
         }
         return 0;
       })[0]
+      if (offering === undefined) {
+        return null
+      }
       return [targetDurationDays.value / offering.duration_days * offering.price, offering]
     }
 

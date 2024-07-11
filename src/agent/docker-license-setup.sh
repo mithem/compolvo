@@ -1,7 +1,6 @@
 #!/bin/bash
 # Define the Docker config file path
 CONFIG_FILE="$HOME/.docker/config.json"
-cp $CONFIG_FILE $CONFIG_FILE.bak
 
 # Check if the config file exists
 if [ -f "$CONFIG_FILE" ]; then
@@ -12,7 +11,6 @@ else
     CONFIG="{}"
 fi
 
-# TODO: Handle jq not being installed without overwriting the config file
 # Use jq to add or update the license key in the config
 UPDATED_CONFIG=$(echo "$CONFIG" | jq --arg license "$COMPOLVO_LICENSE_KEY" '.proLicense = $license')
 

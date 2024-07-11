@@ -5,4 +5,4 @@
     - name: debian
       when: ansible_distribution == "Debian" or ansible_distribution == "MacOSX" or ansible_distribution == "Archlinux"
       ansible.builtin.script:
-        cmd: license-setup/docker-license-setup.sh
+        cmd: license-setup/docker-desktop/docker-license-setup.sh

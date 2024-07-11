@@ -123,7 +123,7 @@ async def setup_license(request, user: User):
     agents = await Agent.filter(user=user).all()
     if await UserLicense.filter().count() == 0:
         license_type = await ServiceUserLicenseType.filter(name="Pro").first()
-        await UserLicense.create(start_date=datetime.datetime.now(tz=datetime.timezone.utc), license_key="Hello, world!", license_type=license_type, user=user)
+        licenses = [await UserLicense.create(start_date=datetime.datetime.now(tz=datetime.timezone.utc), license_key="Hello, world!", license_type=license_type, user=user)]
     for license in licenses:
         for agent in agents:
             await send_agent_set_up_license_notification(agent, license)

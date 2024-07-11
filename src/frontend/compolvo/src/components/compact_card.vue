@@ -33,7 +33,7 @@ compact_card.vue
 
     <!-- Download Count and Price -->
     <v-card-actions class="bottom-right">
-      <div>Downloads: {{ formatLargeNumber(filteredService.service.download_count) }}</div>
+      <div>Downloads: {{ filteredService.service.download_count !== null ? formatLargeNumber(filteredService.service.download_count) : "N/A"}}</div>
       <div>Price: {{formatPriceMean(filteredService.calculatedPrice,filteredService.selectedOffering)}}</div>
     </v-card-actions>
   </v-card>
@@ -74,6 +74,9 @@ export default defineComponent({
 
 
     const formatPriceMean = (calcPrice,offering) => {
+      if (offering === null) {
+        return "N/A"
+      }
       let periodName = "";
       switch (targetDurationDays.value) {
         case 1: periodName = "day"; break

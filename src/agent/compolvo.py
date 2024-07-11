@@ -100,6 +100,7 @@ def uninstall_software(event: Dict) -> str | None:
 
 
 def set_up_license(event: Dict) -> str | None:
+    EXTRACT_DIR_NAME = "license-setup"
     msg = event["message"]
     license_key = msg["license"]["license_key"]
     system_name = msg["service"]["system_name"]
@@ -107,18 +108,22 @@ def set_up_license(event: Dict) -> str | None:
     logging.info("Setting up license for '%s' with key '%s'", system_name, license_key)
     os.environ["COMPOLVO_LICENSE_KEY"] = license_key
 
+    if os.path.exists(EXTRACT_DIR_NAME):
+        raise Exception(f"Directory '{EXTRACT_DIR_NAME}' (temporary script storage) already exists. Please remove it before continuing.")
+
     url = f"{_get_http_scheme()}://{config.compolvo.host}/ansible/scripts/{system_name}.tar.gz"
     res = requests.get(url)
     if res.ok:
         filename = f"{system_name}.tar.gz"
         with open(filename, "wb") as file:
             file.write(res.content)
-        shutil.unpack_archive(filename, "license-setup")
+        shutil.unpack_archive(filename, EXTRACT_DIR_NAME)
 
     response = run_playbook(system_name, None, "license_setup")
     del os.environ["COMPOLVO_LICENSE_KEY"]
     if filename is not None:
-        os.remove(filename)
+        shutil.rmtree(EXTRACT_DIR_NAME) # script directory
+        os.remove(filename) # tarball
     return response
 
 
